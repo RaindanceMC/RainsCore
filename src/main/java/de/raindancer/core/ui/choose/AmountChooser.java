@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 
 /**
  * Picking a number without typing it.
@@ -44,7 +45,14 @@ public final class AmountChooser extends Menu {
     private final int min;
     private final int max;
     private final IntConsumer onAccept;
+    private final int start;
     private int value;
+    private int[] steps = STEPS;
+    private boolean wraps;
+    private IntFunction<String> shown = String::valueOf;
+    private IntConsumer preview;
+    private IntFunction<String> stepNames = step -> (step > 0 ? "+" : "") + step;
+    private boolean accepted;
 
     /**
      * @param label what is being set, shown under the number — "Entry fee", "XP levels"
@@ -58,7 +66,81 @@ public final class AmountChooser extends Menu {
         this.min = Math.min(min, max);
         this.max = Math.max(min, max);
         this.value = stepped(start, 0, min, max);
+        this.start = this.value;
         this.onAccept = onAccept;
+    }
+
+    /**
+     * Its own step sizes instead of 1, 10 and 100 — each becomes a minus and a plus button, at most four a side
+     * (the finest kept). A time of day wants an hour, ten minutes, a minute and a single tick.
+     */
+    public AmountChooser stepsOf(int... sizes) {
+        this.steps = stepsFor(sizes).stream().mapToInt(Integer::intValue).toArray();
+        return this;
+    }
+
+    /** What each step button says: "+1 hour" rather than +1000. Handed the signed step. */
+    public AmountChooser namingSteps(IntFunction<String> naming) {
+        if (naming != null) {
+            this.stepNames = naming;
+        }
+        return this;
+    }
+
+    /** Round the ends instead of stopping at them — for something without an end, like a time of day. */
+    public AmountChooser wrapping() {
+        this.wraps = true;
+        return this;
+    }
+
+    /** How the value is written: "14:30" rather than 8500. */
+    public AmountChooser showing(IntFunction<String> format) {
+        this.shown = format == null ? String::valueOf : format;
+        return this;
+    }
+
+    /**
+     * Shown live while choosing: handed every value as it changes, and the value it opened on again if they
+     * leave without Accept — so the preview never outlives the dialog.
+     */
+    public AmountChooser previewing(IntConsumer show) {
+        this.preview = show;
+        return this;
+    }
+
+    /** The minus and plus buttons for these sizes, largest minus first: sign, zero and duplicates tidied. */
+    public static List<Integer> stepsFor(int[] sizes) {
+        java.util.TreeSet<Integer> spans = new java.util.TreeSet<>();
+        if (sizes != null) {
+            for (int size : sizes) {
+                if (size != 0 && size != Integer.MIN_VALUE) {
+                    spans.add(Math.abs(size));
+                }
+            }
+        }
+        List<Integer> kept = spans.stream().limit(4).toList();
+        List<Integer> all = new ArrayList<>(kept.size() * 2);
+        for (int index = kept.size() - 1; index >= 0; index--) {
+            all.add(-kept.get(index));
+        }
+        all.addAll(kept);
+        return List.copyOf(all);
+    }
+
+    /** The value a step lands on: round the range when it wraps, else clamped to it. */
+    public static int stepped(int from, int step, int min, int max, boolean wraps) {
+        int low = Math.min(min, max);
+        int high = Math.max(min, max);
+        if (!wraps) {
+            return stepped(from, step, low, high);
+        }
+        long span = (long) high - low + 1;
+        return (int) (low + Math.floorMod((long) from + step - low, span));
+    }
+
+    /** Whether a step would move the value, round the range when it wraps. */
+    public static boolean reachable(int from, int step, int min, int max, boolean wraps) {
+        return stepped(from, step, min, max, wraps) != stepped(from, 0, min, max, wraps);
     }
 
     /** The value a step lands on: clamped to the range, never wrapped. */
@@ -91,31 +173,30 @@ public final class AmountChooser extends Menu {
     @Override
     protected void render() {
         // The number itself, stacked so the count is legible on the icon as well as in its name.
-        set(MenuLayout.HEADER_SUBJECT, Icons.of(Material.PAPER, "<white><bold>" + value,
+        set(MenuLayout.HEADER_SUBJECT, Icons.of(Material.PAPER, "<white><bold>" + shown.apply(value),
                 "<gray>" + label,
-                "<dark_gray>anything from " + min + " to " + max));
+                "<dark_gray>anything from " + shown.apply(min) + " to " + shown.apply(max)));
 
-        for (int index = 0; index < STEPS.length; index++) {
-            int step = STEPS[index];
-            boolean reachable = reachable(value, step, min, max);
-            set(STEP_SLOTS[index], Icons.of(
-                            step < 0 ? Material.RED_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE,
-                            (step < 0 ? "<red>" : "<green>") + (step > 0 ? "+" : "") + step,
+        int side = steps.length / 2;
+        for (int index = 0; index < steps.length; index++) {
+            int step = steps[index];
+            boolean reachable = reachable(value, step, min, max, wraps);
+            // The default three a side keep their old places; a caller's own sizes sit right beside the value.
+            int slot = steps == STEPS ? STEP_SLOTS[index]
+                    : index < side ? MenuLayout.HEADER_SUBJECT - side + index : MenuLayout.HEADER_SUBJECT + 1 + index - side;
+            set(slot,
+                    Icons.of(step < 0 ? Material.RED_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE,
+                            (step < 0 ? "<red>" : "<green>") + stepNames.apply(step),
                             reachable ? "<gray>Click to apply" : "<dark_gray>out of range"),
-                    click -> {
-                        value = stepped(value, step, min, max);
-                        refresh();
-                    });
+                    click -> change(stepped(value, step, min, max, wraps)));
         }
 
-        set(11, Icons.of(Material.HOPPER, "<yellow>Least <gray>(" + min + ")"),
-                click -> {
-                    value = min;
-                    refresh();
-                });
+        set(11, Icons.of(Material.HOPPER, "<yellow>Least <gray>(" + shown.apply(min) + ")"),
+                click -> change(min));
 
-        set(13, Icons.of(Material.LIME_CONCRETE, "<green><bold>Accept", "<gray>Use " + value),
+        set(13, Icons.of(Material.LIME_CONCRETE, "<green><bold>Accept", "<gray>Use " + shown.apply(value)),
                 click -> {
+                    accepted = true;
                     if (onAccept != null) {
                         onAccept.accept(value);
                     }
@@ -124,10 +205,29 @@ public final class AmountChooser extends Menu {
                     backToWhoeverOpenedThis();
                 });
 
-        set(15, Icons.of(Material.BEACON, "<yellow>Most <gray>(" + max + ")"),
-                click -> {
-                    value = max;
-                    refresh();
-                });
+        set(15, Icons.of(Material.BEACON, "<yellow>Most <gray>(" + shown.apply(max) + ")"),
+                click -> change(max));
+    }
+
+    private void change(int to) {
+        value = to;
+        if (preview != null) {
+            preview.accept(value);
+        }
+        refresh();
+    }
+
+    @Override
+    public void handleClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        // Left without Accept — Back, Escape, another window — and a preview is showing: put it back.
+        if (!accepted && preview != null && value != start) {
+            value = start;
+            preview.accept(start);
+            // Back has already drawn the page behind this one, with the preview still in it.
+            if (parent() != null) {
+                parent().refresh();
+            }
+        }
+        super.handleClose(event);
     }
 }

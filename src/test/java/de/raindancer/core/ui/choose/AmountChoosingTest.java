@@ -90,4 +90,29 @@ class AmountChoosingTest {
         assertThat(AmountChooser.steps())
                 .containsExactly(-100, -10, -1, 1, 10, 100);
     }
+
+    @Test
+    @DisplayName("a cyclic range — a time of day, an angle — wraps round instead of stopping, either way")
+    void cyclicRangesWrap() {
+        // Opt-in only: wrapping is right for something that has no end, and wrong for everything else.
+        assertThat(AmountChooser.stepped(23900, 1000, 0, 23999, true)).isEqualTo(900);
+        assertThat(AmountChooser.stepped(100, -1000, 0, 23999, true)).isEqualTo(23100);
+        assertThat(AmountChooser.stepped(23999, 1, 0, 23999, true)).isZero();
+        assertThat(AmountChooser.stepped(0, -1, 0, 23999, true)).isEqualTo(23999);
+        assertThat(AmountChooser.stepped(5, 3, 5, 9, true)).isEqualTo(8);
+        assertThat(AmountChooser.stepped(95, 100, 0, 100, false)).as("unchanged without it").isEqualTo(100);
+        assertThat(AmountChooser.reachable(23999, 1, 0, 23999, true)).isTrue();
+        assertThat(AmountChooser.reachable(5, 1, 5, 5, true)).as("one value has nowhere to go").isFalse();
+    }
+
+    @Test
+    @DisplayName("a caller's own step sizes become a minus and a plus button each, smallest nearest the value")
+    void ownSteps() {
+        assertThat(AmountChooser.stepsFor(new int[]{1, 17, 167, 1000}))
+                .containsExactly(-1000, -167, -17, -1, 1, 17, 167, 1000);
+        assertThat(AmountChooser.stepsFor(new int[]{-10, 1, 1, 0}))
+                .as("signs, duplicates and zero tidied away").containsExactly(-10, -1, 1, 10);
+        assertThat(AmountChooser.stepsFor(new int[]{1, 2, 3, 4, 5}))
+                .as("at most four a side fit the row; the finest are kept").containsExactly(-4, -3, -2, -1, 1, 2, 3, 4);
+    }
 }
