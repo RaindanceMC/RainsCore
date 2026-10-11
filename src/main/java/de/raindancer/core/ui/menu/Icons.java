@@ -39,13 +39,34 @@ public final class Icons {
     private Icons() {
     }
 
+    /**
+     * What a button is drawn as: the material itself, or for a block nobody can hold (a portal, water, fire)
+     * the nearest thing that is an item. An ItemStack of a non-item throws, which took a whole settings page down.
+     */
+    public static Material shown(Material material) {
+        if (material == null) {
+            return Material.STONE;
+        }
+        if (material.isItem() && !material.isAir()) {
+            return material;
+        }
+        return switch (material) {
+            case NETHER_PORTAL -> Material.OBSIDIAN;
+            case END_PORTAL, END_GATEWAY -> Material.END_PORTAL_FRAME;
+            case WATER, BUBBLE_COLUMN -> Material.WATER_BUCKET;
+            case LAVA -> Material.LAVA_BUCKET;
+            case FIRE, SOUL_FIRE -> Material.FLINT_AND_STEEL;
+            default -> Material.STONE;
+        };
+    }
+
     /** A button: an icon, a name, and however many lines of explanation. All MiniMessage. */
     public static ItemStack of(Material material, String name, String... lore) {
         return of(material, name, List.of(lore));
     }
 
     public static ItemStack of(Material material, String name, List<String> lore) {
-        ItemStack item = new ItemStack(material == null ? Material.STONE : material);
+        ItemStack item = new ItemStack(shown(material));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(text(name == null ? "" : name, Style.itemName()));
