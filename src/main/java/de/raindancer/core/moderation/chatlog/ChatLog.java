@@ -249,6 +249,27 @@ public final class ChatLog {
         }).orElse(Set.of());
     }
 
+    /** Every name somebody chatted under, the one used most recently first. Off the server's threads. */
+    public List<String> namesOf(UUID player) {
+        if (player == null) {
+            return List.of();
+        }
+        flush();
+        return database.read(connection -> {
+            List<String> found = new ArrayList<>();
+            try (PreparedStatement select = connection.prepareStatement(
+                    "SELECT name FROM chat_line WHERE player = ? GROUP BY name ORDER BY MAX(id) DESC")) {
+                select.setString(1, player.toString());
+                try (ResultSet rows = select.executeQuery()) {
+                    while (rows.next()) {
+                        found.add(rows.getString(1));
+                    }
+                }
+            }
+            return found;
+        }).orElse(List.of());
+    }
+
     private record Where(String sql, List<Object> values) {
         int bind(PreparedStatement statement) throws java.sql.SQLException {
             int at = 1;

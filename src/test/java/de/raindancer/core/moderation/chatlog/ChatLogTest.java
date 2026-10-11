@@ -197,4 +197,19 @@ class ChatLogTest {
         log.record(bo, "Bo", ChatLog.PUBLIC, "just now");
         assertThat(log.count(ChatLog.Search.everything().containing("just"))).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("every name somebody chatted under, the most recent first, each once")
+    void namesOf() {
+        log.record(bo, "OldBo", ChatLog.PUBLIC, "one");
+        clock.addAndGet(1000);
+        log.record(bo, "MiddleBo", ChatLog.PUBLIC, "two");
+        clock.addAndGet(1000);
+        log.record(bo, "Bo", ChatLog.PUBLIC, "three");
+        clock.addAndGet(1000);
+        log.record(bo, "OldBo", ChatLog.PUBLIC, "back to the old one");
+        log.record(cy, "Cy", ChatLog.PUBLIC, "hi");
+        assertThat(log.namesOf(bo)).containsExactly("OldBo", "Bo", "MiddleBo");
+        assertThat(log.namesOf(UUID.randomUUID())).isEmpty();
+    }
 }
