@@ -60,17 +60,14 @@ public final class Attendants {
     }
 
     /**
-     * An attendant where the player stands, facing them. On the player's own region thread.
+     * An attendant where the player stands, looking the way they look. On the player's own region thread.
      *
      * @param tag marks it as whatever it is (a PDC entry), before it is added to the world
      */
     public static Mannequin place(Player player, Component name, Component description, ResolvableProfile look,
                                   Consumer<Mannequin> tag) {
         Location at = player.getLocation();
-        Location facing = at.clone();
-        facing.setYaw(at.getYaw() + 180);
-        facing.setPitch(0);
-        return at.getWorld().spawn(facing, Mannequin.class, attendant -> {
+        return at.getWorld().spawn(standing(at), Mannequin.class, attendant -> {
             attendant.setImmovable(true);
             attendant.setInvulnerable(true);
             attendant.setSilent(true);
@@ -82,6 +79,16 @@ public final class Attendants {
             attendant.setProfile(look);
             tag.accept(attendant);
         });
+    }
+
+    /**
+     * Where an attendant placed from {@code placer} stands: the same spot and the same direction, level. Staff
+     * line up a counter by looking along it, so a dealer facing back at them would face the wrong way.
+     */
+    static Location standing(Location placer) {
+        Location standing = placer.clone();
+        standing.setPitch(0);
+        return standing;
     }
 
     /** The nearest attendant within {@code radius} blocks that {@code which} accepts. */
