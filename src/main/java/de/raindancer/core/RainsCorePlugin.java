@@ -553,6 +553,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // unowned section wears whatever plugin called prefixFrom last — which is how every warp and
         // home line on the test server announced itself as "Moderation".
         int signed = messages.claimSections(chat.brand()::chatPrefix);
+        de.raindancer.core.social.desk.ServiceDesks.install(messages, chat.brand());
+        getServer().getPluginManager().registerEvents(new de.raindancer.core.social.desk.DeskListener(), this);
         if (signed > 0) {
             log.debug("{} message section(s) signed as Core's own.", signed);
         }
@@ -880,6 +882,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      * about.
      */
     private void applyNewSettings(CoreConfig config) {
+        de.raindancer.core.social.desk.ServiceDesks.inPersonOnly(
+                de.raindancer.core.social.desk.ServiceDesk.INSURANCE, config.insuranceInPersonOnly());
         if (chatLog != null) {
             chatLog.enabled(config.chatLogEnabled());
         }
@@ -1000,6 +1004,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.economy.ItemValues.clear();
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
+        de.raindancer.core.social.desk.ServiceDesks.clear();
         de.raindancer.core.social.roles.PlayerRoles.clear();
         de.raindancer.core.data.loadout.SideData.clear();
         de.raindancer.core.world.blocks.PlacedBlocks.clear();
@@ -1815,6 +1820,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.economy.PriceIndex.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Debts.forgetFrom(loader)
                 + de.raindancer.core.content.items.InsuredItems.forgetFrom(loader)
+                + de.raindancer.core.social.desk.ServiceDesks.forgetFrom(loader)
                 + de.raindancer.core.social.presence.Away.forgetFrom(loader)
                 + de.raindancer.core.social.presence.PresenceLines.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.ServerRules.forgetFrom(loader)

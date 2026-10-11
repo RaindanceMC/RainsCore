@@ -156,6 +156,11 @@ invsee:
     lore: "What <who> is carrying"
     hint: "Click to go back"
 
+# ──────────────────────────────────────────── attendants standing in the world
+desk:
+  # <desk>: what the attendant is called, e.g. Insurance agent.
+  in-person-only: "<red>That is done in person here. <gray>Go and see an <white><desk></white> — they do not take calls."
+
 # ──────────────────────────────────────────────────────── menus, everywhere
 menu:
   back: "<gray>Back"

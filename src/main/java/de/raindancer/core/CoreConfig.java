@@ -45,6 +45,8 @@ import org.bukkit.Material;
                 description = "The one pack every plugin's assets go into, and how it is served."),
         @Topic(path = "moderation/chatlog", title = "Chat log", icon = Material.BOOK,
                 description = "What everybody said in chat, kept for staff for a while."),
+        @Topic(path = "world/desks", title = "Attendants", icon = Material.ARMOR_STAND,
+                description = "People standing in the world who serve players: insurance agents."),
         @Topic(path = "moderation", title = "Moderation", icon = Material.IRON_AXE,
                 description = "Whether punishments are acted on, and what a punished player is "
                         + "told. The record is kept either way."),
@@ -354,7 +356,13 @@ public record CoreConfig(
         @Describe("Older lines are deleted. What people said, beside their names, is personal data: under the "
                 + "GDPR it may be kept while there is a reason — moderating — and no longer, so there is no "
                 + "'for ever'. Say how long in your privacy notice.")
-        int chatLogRetentionDays
+        int chatLogRetentionDays,
+
+        @In("world/desks") @Title("Insurance only at an insurance agent")
+        @Describe("Players take out and change every insurance — bets, death, items — by talking to an "
+                + "insurance agent standing in the world, not by command. Staff place agents with "
+                + "/eco agent place or /insurance agent place.")
+        boolean insuranceInPersonOnly
 
 ) {
 
@@ -397,5 +405,6 @@ public record CoreConfig(
             de.raindancer.core.world.teleport.TravelShow.DEFAULT_ARRIVAL_DENSITY,
             true, 1, 8,
             // A year: long enough to look into something reported months late, and a limit — never for ever.
-            true, 365);
+            true, 365,
+            false);
 }

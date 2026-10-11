@@ -22,6 +22,9 @@ settings:
 invsee:
   yourself: "<gray>Your own inventory is a key rather than a menu."
 
+desk:
+  in-person-only: "<red>This is only arranged in person. <gray>Please see an <white><desk></white>."
+
 menu:
   close-lore: "<gray>Shut this menu"
 
