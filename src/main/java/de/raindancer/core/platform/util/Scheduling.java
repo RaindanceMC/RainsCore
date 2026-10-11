@@ -83,6 +83,24 @@ public final class Scheduling {
     }
 
     /**
+     * Runs on the thread owning {@code entity}, and runs {@code retired} instead when the entity is gone before
+     * that could happen — a player who disconnected in between.
+     *
+     * <p>For work that must end one way or the other, like handing somebody items that were taken from
+     * somewhere else a moment ago: {@link #entity(Plugin, Entity, Runnable)} drops the task in that case, and
+     * with it whatever the task was going to do. {@code retired} runs on whichever thread notices, so it must not
+     * touch the world.
+     */
+    public static void entity(Plugin plugin, Entity entity, Runnable task, Runnable retired) {
+        if (ranInPlace(plugin, task)) {
+            return;
+        }
+        if (entity.getScheduler().run(plugin, ignored -> task.run(), retired) == null) {
+            retired.run();
+        }
+    }
+
+    /**
      * Runs on the thread owning {@code entity}: right here when that is this thread — always, on
      * Paper's main thread — and through the entity's scheduler otherwise. For an action that should
      * take effect at once where it can, and must not touch somebody another Folia region is ticking.

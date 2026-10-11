@@ -510,6 +510,18 @@ public abstract class Menu implements InventoryHolder {
     }
 
     /**
+     * Whether a player may put an item into this slot of the window — by dragging, or by a click that
+     * {@link #handleClick} leaves to the game.
+     *
+     * <p>False everywhere by default. {@link MenuListener} asks it for every slot of a drag, so a screen that
+     * has opted into {@link #allowBottomInventoryInteraction} for the sake of reading items still cannot have
+     * one dragged onto a button.
+     */
+    public boolean acceptsItemsIn(int rawSlot) {
+        return false;
+    }
+
+    /**
      * A click in the player's own inventory, for a screen that said yes to {@link
      * #allowBottomInventoryInteraction}. Never called otherwise.
      *

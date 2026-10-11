@@ -55,11 +55,9 @@ public final class MenuListener implements Listener {
         if (menu == null) {
             return;
         }
-        if (menu.allowBottomInventoryInteraction()) {
-            return;
-        }
+        boolean reading = menu.allowBottomInventoryInteraction();
         for (int slot : event.getRawSlots()) {
-            if (slot < event.getInventory().getSize()) {
+            if (slot < event.getInventory().getSize() && !(reading && menu.acceptsItemsIn(slot))) {
                 event.setCancelled(true);
                 return;
             }
