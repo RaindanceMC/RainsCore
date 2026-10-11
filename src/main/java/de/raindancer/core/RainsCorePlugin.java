@@ -248,6 +248,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private GrantListener grantListener;
     private Punishments punishments;
     private PunishmentGuard punishmentGuard;
+    private de.raindancer.core.moderation.punishment.BlockedAttempts blockedAttempts;
     private VanillaBanBridge banBridge;
     private CustomItems items;
     private ItemFactory itemFactory;
@@ -469,8 +470,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         banBridge = new VanillaBanBridge(punishments);
         applyModerationSettings();
         settings.onChange(config -> applyModerationSettings());
+        blockedAttempts = new de.raindancer.core.moderation.punishment.BlockedAttempts(audit, System::currentTimeMillis);
         getServer().getPluginManager().registerEvents(
-                new PunishmentListener(punishmentGuard), this);
+                new PunishmentListener(punishmentGuard, blockedAttempts, addressKey(), getServer()), this);
 
         items = new CustomItems(getDataFolder().toPath().resolve("items.yml"));
         items.load();
@@ -1010,6 +1012,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.moderation.rules.ServerRules.clear();
         de.raindancer.core.moderation.rules.RuleBreaches.clear();
         de.raindancer.core.moderation.chatlog.ChatLog.clearWatchers();
+        de.raindancer.core.moderation.punishment.BlockedAttempts.clearWatchers();
         // The mirror of the startup exemption in onEnable. On the way out the scheduler is already
         // shutting down, so the final flushes below have to run on this thread, and there is nobody
         // left on the server for them to stall — reporting them as a mistake put an ERROR line in every
@@ -1560,6 +1563,36 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public de.raindancer.core.moderation.punishment.BlockedAttempts blockedAttempts() {
+        return blockedAttempts;
+    }
+
+    /**
+     * The key blocked joins' addresses are hashed with, made once and kept in the data folder. Lost, old hashes
+     * simply stop matching new ones; nothing else depends on it.
+     */
+    private byte[] addressKey() {
+        java.nio.file.Path file = getDataFolder().toPath().resolve("address-hash.key");
+        try {
+            if (java.nio.file.Files.isRegularFile(file)) {
+                byte[] kept = java.nio.file.Files.readAllBytes(file);
+                if (kept.length >= 16) {
+                    return kept;
+                }
+            }
+            byte[] fresh = new byte[32];
+            new java.security.SecureRandom().nextBytes(fresh);
+            java.nio.file.Files.createDirectories(file.getParent());
+            java.nio.file.Files.write(file, fresh);
+            return fresh;
+        } catch (java.io.IOException unwritable) {
+            getLogger().warning("Could not keep address-hash.key (" + unwritable.getMessage()
+                    + "); blocked joins are recorded without an address.");
+            return new byte[0];
+        }
+    }
+
+    @Override
     public de.raindancer.core.social.presence.Playtime playtime() {
         return playtime;
     }
@@ -1786,7 +1819,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.presence.PresenceLines.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.ServerRules.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.RuleBreaches.forgetFrom(loader)
-                + de.raindancer.core.moderation.chatlog.ChatLog.forgetFrom(loader);
+                + de.raindancer.core.moderation.chatlog.ChatLog.forgetFrom(loader)
+                + de.raindancer.core.moderation.punishment.BlockedAttempts.forgetFrom(loader);
         if (combat != null) {
             dropped += combat.forgetFrom(loader);
         }

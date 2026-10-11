@@ -435,6 +435,9 @@ public interface RainsCore {
     /** Everything said in public and channel chat, per player, for staff — kept for the configured days only. */
     de.raindancer.core.moderation.chatlog.ChatLog chatLog();
 
+    /** What punished players tried and were stopped from — joins, chat, building — kept in the audit journal. */
+    de.raindancer.core.moderation.punishment.BlockedAttempts blockedAttempts();
+
     /** How long everybody has played here, and how much of it actively — counted by Core, a minute at a time. */
     de.raindancer.core.social.presence.Playtime playtime();
 
