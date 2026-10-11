@@ -9,6 +9,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -38,10 +41,51 @@ public final class ChatLog {
             "CREATE TABLE chat_line (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, player TEXT NOT NULL, "
                     + "name TEXT NOT NULL, channel TEXT NOT NULL, text TEXT NOT NULL)",
             "CREATE INDEX chat_line_player ON chat_line (player, id)",
-            "CREATE INDEX chat_line_at ON chat_line (at)");
+            "CREATE INDEX chat_line_at ON chat_line (at)",
+            // Who used a name, for finding somebody by a name they have since changed.
+            "CREATE INDEX chat_line_name ON chat_line (name COLLATE NOCASE)");
 
     /** One line, as it was said. */
     public record Line(long at, UUID player, String name, String channel, String text) {
+    }
+
+    /**
+     * What staff look for: every part optional, all of them narrowing together.
+     *
+     * <p>Kept as a plain {@code LIKE} over the time and player indexes rather than a full-text index: a busy
+     * year is well under a million short lines, which SQLite scans in a fraction of a second off the server's
+     * threads, while FTS would double the file and could not find part of a word shorter than three letters.
+     *
+     * @param players whose lines; empty for everybody
+     * @param from    from this moment on, inclusive (epoch millis)
+     * @param to      before this moment, exclusive (epoch millis)
+     * @param terms   each must appear in the line, in any case — a term with spaces is a phrase, as it stands
+     */
+    public record Search(Set<UUID> players, long from, long to, List<String> terms) {
+
+        public Search {
+            players = players == null ? Set.of() : Set.copyOf(players);
+            terms = terms == null ? List.of() : terms.stream().filter(term -> term != null && !term.isBlank())
+                    .map(String::strip).toList();
+        }
+
+        public static Search everything() {
+            return new Search(Set.of(), Long.MIN_VALUE, Long.MAX_VALUE, List.of());
+        }
+
+        public Search by(Collection<UUID> who) {
+            return new Search(who == null ? Set.of() : Set.copyOf(who), from, to, terms);
+        }
+
+        public Search between(long fromInclusive, long toExclusive) {
+            return new Search(players, fromInclusive, toExclusive, terms);
+        }
+
+        public Search containing(String... wanted) {
+            List<String> all = new ArrayList<>(terms);
+            all.addAll(List.of(wanted));
+            return new Search(players, from, to, all);
+        }
     }
 
     private static final List<Consumer<Line>> watchers = new CopyOnWriteArrayList<>();
@@ -143,21 +187,20 @@ public final class ChatLog {
      * @param search words that must all appear, in any case; blank for everything
      */
     public List<Line> of(UUID player, String search, int limit, int offset) {
+        return search(Search.everything().by(Set.of(player)).containing(words(search).toArray(String[]::new)),
+                limit, offset);
+    }
+
+    /** What matches, newest first. Off the server's threads. */
+    public List<Line> search(Search what, int limit, int offset) {
         flush();
-        List<String> words = words(search);
-        StringBuilder sql = new StringBuilder("SELECT at, player, name, channel, text FROM chat_line WHERE player = ?");
-        for (int i = 0; i < words.size(); i++) {
-            sql.append(" AND lower(text) LIKE ? ESCAPE '\\'");
-        }
-        sql.append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        Where where = where(what);
+        String sql = "SELECT at, player, name, channel, text FROM chat_line" + where.sql
+                + " ORDER BY id DESC LIMIT ? OFFSET ?";
         return database.read(connection -> {
             List<Line> found = new ArrayList<>();
-            try (PreparedStatement select = connection.prepareStatement(sql.toString())) {
-                int at = 1;
-                select.setString(at++, player.toString());
-                for (String word : words) {
-                    select.setString(at++, "%" + escaped(word) + "%");
-                }
+            try (PreparedStatement select = connection.prepareStatement(sql)) {
+                int at = where.bind(select);
                 select.setInt(at++, Math.max(1, limit));
                 select.setInt(at, Math.max(0, offset));
                 try (ResultSet rows = select.executeQuery()) {
@@ -169,6 +212,82 @@ public final class ChatLog {
             }
             return found;
         }).orElse(List.of());
+    }
+
+    /** How many lines match. Off the server's threads. */
+    public long count(Search what) {
+        flush();
+        Where where = where(what);
+        return database.read(connection -> {
+            try (PreparedStatement select = connection.prepareStatement("SELECT COUNT(*) FROM chat_line" + where.sql)) {
+                where.bind(select);
+                try (ResultSet rows = select.executeQuery()) {
+                    return rows.next() ? rows.getLong(1) : 0L;
+                }
+            }
+        }).orElse(0L);
+    }
+
+    /** Everybody who has said something under this name, in any case — old names included. Off the server's threads. */
+    public Set<UUID> playersNamed(String name) {
+        if (name == null || name.isBlank()) {
+            return Set.of();
+        }
+        flush();
+        return database.read(connection -> {
+            Set<UUID> found = new LinkedHashSet<>();
+            try (PreparedStatement select = connection.prepareStatement(
+                    "SELECT DISTINCT player FROM chat_line WHERE name = ? COLLATE NOCASE")) {
+                select.setString(1, name.strip());
+                try (ResultSet rows = select.executeQuery()) {
+                    while (rows.next()) {
+                        found.add(UUID.fromString(rows.getString(1)));
+                    }
+                }
+            }
+            return (Set<UUID>) found;
+        }).orElse(Set.of());
+    }
+
+    private record Where(String sql, List<Object> values) {
+        int bind(PreparedStatement statement) throws java.sql.SQLException {
+            int at = 1;
+            for (Object value : values) {
+                statement.setObject(at++, value);
+            }
+            return at;
+        }
+    }
+
+    private static Where where(Search what) {
+        Search search = what == null ? Search.everything() : what;
+        List<String> parts = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+        if (!search.players().isEmpty()) {
+            parts.add("player IN (" + String.join(", ", java.util.Collections.nCopies(search.players().size(), "?")) + ")");
+            search.players().forEach(player -> values.add(player.toString()));
+        }
+        if (search.from() != Long.MIN_VALUE) {
+            parts.add("at >= ?");
+            values.add(search.from());
+        }
+        if (search.to() != Long.MAX_VALUE) {
+            parts.add("at < ?");
+            values.add(search.to());
+        }
+        for (String term : search.terms()) {
+            // LIKE folds ASCII case only; a term with other letters is also tried in the cases people write it.
+            Set<String> spellings = new LinkedHashSet<>();
+            spellings.add(term.toLowerCase(Locale.ROOT));
+            if (!term.chars().allMatch(c -> c < 128)) {
+                String lower = term.toLowerCase(Locale.ROOT);
+                spellings.add(lower.toUpperCase(Locale.ROOT));
+                spellings.add(lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1));
+            }
+            parts.add("(" + String.join(" OR ", java.util.Collections.nCopies(spellings.size(), "text LIKE ? ESCAPE '\\'")) + ")");
+            spellings.forEach(spelling -> values.add("%" + escaped(spelling) + "%"));
+        }
+        return new Where(parts.isEmpty() ? "" : " WHERE " + String.join(" AND ", parts), values);
     }
 
     /** How many lines of theirs are kept. Off the server's threads. */
