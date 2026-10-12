@@ -69,4 +69,25 @@ class LinkRosterTest {
         assertThat(survival.serverName()).isEqualTo("Arena");
         assertThat(arena.serverName()).isEqualTo("SMP");
     }
+
+    @Test
+    @DisplayName("a name given as a supplier is read at every exchange, so renaming the server needs no restart")
+    void renamed() throws Exception {
+        LinkHost host = LinkHost.listen("127.0.0.1", 0, SECRET, Duration.ofSeconds(2));
+        open.add(host);
+        LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + host.port()), SECRET,
+                Duration.ofSeconds(2), Duration.ofMillis(50));
+        open.add(guest);
+        AtomicLong clock = new AtomicLong(1_000);
+        java.util.concurrent.atomic.AtomicReference<String> name = new java.util.concurrent.atomic.AtomicReference<>("SMP");
+        LinkRoster arena = new LinkRoster(host, "Arena", () -> List.of(), clock::get);
+        LinkRoster survival = new LinkRoster(guest, name::get, () -> List.of("Ada"), clock::get);
+
+        survival.exchange().get();
+        assertThat(arena.serverName()).isEqualTo("SMP");
+
+        name.set("Lilly's SMP");
+        survival.exchange().get();
+        assertThat(arena.serverName()).isEqualTo("Lilly's SMP");
+    }
 }

@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -20,14 +21,23 @@ import java.util.function.Function;
  * writing it would overwrite the rank. A badge is <em>asked for</em> each time a name is drawn, so it is
  * never stale and never stored, and any number of plugins can each have one.
  *
- * <p>A badge function is called on the chat thread and the tablist refresh, so it must be cheap and safe
- * from any thread. One that throws is skipped (and logged once), never taking the chat line with it.
+ * <p>A badge function is called on the chat thread, the tablist refresh and the nametag pass, so it must be
+ * cheap and safe from any thread. One that throws is skipped (and logged once), never taking the chat line
+ * with it.
+ *
+ * <p>{@link #register} badges show in chat and the tablist only — what they always did. A badge that should
+ * also float above the head, or be left out of one place, is {@link #registerPlaced} and asked per
+ * {@link Place}.
  */
 public final class NameBadges {
 
     private static final LogChannel log = Log.of("identity");
 
-    private record Entry(String owner, Function<UUID, Optional<Component>> badge) {
+    /** Where a name is being drawn. */
+    public enum Place { CHAT, TABLIST, NAMETAG }
+
+    /** {@code source} is the caller's own function — what {@link #forgetFrom} judges the plugin by. */
+    private record Entry(String owner, BiFunction<UUID, Place, Optional<Component>> badge, Object source) {
     }
 
     private static final List<Entry> entries = new CopyOnWriteArrayList<>();
@@ -37,11 +47,30 @@ public final class NameBadges {
     }
 
     /** Adds a badge under {@code owner}; registering again under the same owner replaces it in place. */
-    public static synchronized void register(String owner, Function<UUID, Optional<Component>> badge) {
-        if (owner == null || badge == null) {
+    public static void register(String owner, Function<UUID, Optional<Component>> badge) {
+        if (badge == null) {
             return;
         }
-        Entry entry = new Entry(owner, badge);
+        put(new Entry(owner, (player, place) -> place == Place.NAMETAG ? Optional.empty() : badge.apply(player),
+                badge));
+    }
+
+    /**
+     * Adds a badge asked for each {@link Place} separately — empty where it should not show. Same owner
+     * namespace as {@link #register}: either replaces the other.
+     */
+    public static void registerPlaced(String owner, BiFunction<UUID, Place, Optional<Component>> badge) {
+        if (badge == null) {
+            return;
+        }
+        put(new Entry(owner, badge, badge));
+    }
+
+    private static synchronized void put(Entry entry) {
+        String owner = entry.owner();
+        if (owner == null) {
+            return;
+        }
         for (int index = 0; index < entries.size(); index++) {
             if (entries.get(index).owner().equals(owner)) {
                 entries.set(index, entry);
@@ -61,15 +90,20 @@ public final class NameBadges {
         return entries.stream().map(Entry::owner).toList();
     }
 
-    /** Every badge this player has, each followed by a space; empty when there are none. */
+    /** Every badge this player has in chat, each followed by a space; empty when there are none. */
     public static Component before(UUID player) {
-        if (player == null || entries.isEmpty()) {
+        return before(player, Place.CHAT);
+    }
+
+    /** Every badge this player has where they are being drawn, each followed by a space. */
+    public static Component before(UUID player, Place place) {
+        if (player == null || place == null || entries.isEmpty()) {
             return Component.empty();
         }
         List<Component> found = new ArrayList<>(2);
         for (Entry entry : entries) {
             try {
-                Optional<Component> badge = entry.badge().apply(player);
+                Optional<Component> badge = entry.badge().apply(player, place);
                 if (badge != null && badge.isPresent()) {
                     found.add(badge.get());
                 }
@@ -93,7 +127,7 @@ public final class NameBadges {
             return 0;
         }
         List<Entry> gone = entries.stream()
-                .filter(entry -> entry.badge().getClass().getClassLoader() == loader)
+                .filter(entry -> entry.source().getClass().getClassLoader() == loader)
                 .toList();
         entries.removeAll(gone);
         gone.forEach(entry -> complainedAbout.remove(entry.owner()));

@@ -598,6 +598,14 @@ public interface RainsCore {
         return java.util.Set.of();
     }
 
+    /**
+     * What this server is called, for anything that names it to a player — the owner's setting, else
+     * link.yml's server-name, else the MOTD's first line. Plain text, never empty.
+     */
+    default String serverName() {
+        return de.raindancer.core.ui.text.ServerName.resolve("", "", org.bukkit.Bukkit.motd());
+    }
+
     /** {@link #playersElsewhere} by the server they are on, under the name it gives itself (server-name in link.yml). */
     default java.util.Map<String, java.util.Set<String>> playersByServer() {
         return java.util.Map.of();

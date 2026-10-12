@@ -79,8 +79,8 @@ public final class HubMenu extends HubPage {
     }
 
     static String serverName() {
-        String motd = Text.plain(Bukkit.motd()).lines().findFirst().orElse("").strip();
-        return motd.isBlank() ? "This server" : motd;
+        return RainsCore.isAvailable() ? RainsCore.get().serverName()
+                : de.raindancer.core.ui.text.ServerName.resolve("", "", Bukkit.motd());
     }
 
     @Override

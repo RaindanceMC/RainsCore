@@ -118,7 +118,7 @@ public final class Identities {
      */
     public Component chatName(UUID player, String name) {
         Identity identity = identityOf(player);
-        Component built = NameBadges.before(player);
+        Component built = NameBadges.before(player, NameBadges.Place.CHAT);
         if (!identity.prefix().isEmpty()) {
             built = built.append(parse(identity.prefix()));
         }
@@ -138,7 +138,10 @@ public final class Identities {
         String prefix = identity.nametagPrefix().isEmpty()
                 ? identity.prefix()
                 : identity.nametagPrefix();
-        Component built = prefix.isEmpty() ? Component.empty() : parse(prefix);
+        Component built = NameBadges.before(player, NameBadges.Place.NAMETAG);
+        if (!prefix.isEmpty()) {
+            built = built.append(parse(prefix));
+        }
         built = built.append(colouredName(shownName(player, name), identity.colour()));
         return clip(built);
     }
@@ -160,7 +163,7 @@ public final class Identities {
      */
     public Component tablistName(UUID player, String name) {
         Identity identity = identityOf(player);
-        Component built = NameBadges.before(player);
+        Component built = NameBadges.before(player, NameBadges.Place.TABLIST);
         if (!identity.nametagPrefix().isEmpty()) {
             built = built.append(parse(identity.nametagPrefix()));
         }

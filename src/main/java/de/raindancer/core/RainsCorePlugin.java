@@ -783,7 +783,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 de.raindancer.core.platform.log.Log.of("link")).orElse(null);
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         peerLinks = de.raindancer.core.platform.link.NetworkLink.peers(linkFile, de.raindancer.core.platform.log.Log.of("link"));
-        String ownName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
+        linkServerName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
+        if (tablists != null) {
+            tablists.serverName(serverName());
+        }
         java.util.Map<String, de.raindancer.core.platform.link.ServerLink> allLinks = new java.util.LinkedHashMap<>();
         if (link != null) {
             allLinks.put("", link);
@@ -796,7 +799,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 .map(org.bukkit.entity.Player::getName).toList();
         allLinks.forEach((peerName, end) -> {
             de.raindancer.core.platform.link.LinkRoster each =
-                    new de.raindancer.core.platform.link.LinkRoster(end, ownName, seen, System::currentTimeMillis);
+                    new de.raindancer.core.platform.link.LinkRoster(end, this::serverName, seen, System::currentTimeMillis);
             rosters.put(peerName, each);
             de.raindancer.core.platform.link.LinkProfiles parts = new de.raindancer.core.platform.link.LinkProfiles(end);
             parts.provide("identity", identities::export);
@@ -1382,6 +1385,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         tablists.showWorldOnEachLine(config.tablistWorldOnEachLine());
         tablists.header(config.tablistHeader());
         tablists.footer(config.tablistFooter());
+        tablists.serverName(serverName());
     }
 
     /**
@@ -2129,9 +2133,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
 
-    /** The MOTD as plain text — what the tablist logo is drawn from. */
-    private String serverName() {
-        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                .serialize(getServer().motd());
+    /** server-name in link.yml, read once at start; empty without one. */
+    private volatile String linkServerName = "";
+
+    @Override
+    public String serverName() {
+        CoreConfig config = settings == null ? null : settings.current();
+        return de.raindancer.core.ui.text.ServerName.resolve(config == null ? "" : config.serverName(),
+                linkServerName, getServer().motd());
     }
 }

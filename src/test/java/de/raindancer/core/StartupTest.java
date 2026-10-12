@@ -97,6 +97,14 @@ class StartupTest {
     }
 
     @Test
+    @DisplayName("the server's name is a setting, empty by default so the MOTD keeps naming an untouched server")
+    void serverNameIsASetting() {
+        SettingsSchema<CoreConfig> schema = SettingsSchema.of(CoreConfig.class, CoreConfig.DEFAULTS);
+        assertThat(schema.keys()).anyMatch(key -> key.endsWith("server-name"));
+        assertThat(CoreConfig.DEFAULTS.serverName()).isEmpty();
+    }
+
+    @Test
     @DisplayName("every setting is reachable from a topic, so none of them is invisible in the menu")
     void everySettingIsReachable() {
         SettingsSchema<CoreConfig> schema = SettingsSchema.of(CoreConfig.class, CoreConfig.DEFAULTS);

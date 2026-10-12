@@ -362,7 +362,13 @@ public record CoreConfig(
         @Describe("Players take out and change every insurance — bets, death, items — by talking to an "
                 + "insurance agent standing in the world, not by command. Staff place agents with "
                 + "/eco agent place or /insurance agent place.")
-        boolean insuranceInPersonOnly
+        boolean insuranceInPersonOnly,
+
+        @In("appearance") @Title("Server name")
+        @Describe("What this server is called wherever a plugin names it: the tablist header and logo, "
+                + "the hub, and the other servers of a network. Plain text. Empty uses server-name in "
+                + "link.yml, then the MOTD's first line.")
+        String serverName
 
 ) {
 
@@ -406,5 +412,6 @@ public record CoreConfig(
             true, 1, 8,
             // A year: long enough to look into something reported months late, and a limit — never for ever.
             true, 365,
-            false);
+            false,
+            "");
 }

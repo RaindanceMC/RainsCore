@@ -21,7 +21,7 @@ public final class LinkRoster {
     public static final Duration FORGOTTEN_AFTER = Duration.ofSeconds(20);
 
     private final ServerLink link;
-    private final String name;
+    private final Supplier<String> name;
     private final Supplier<? extends Collection<String>> here;
     private final LongSupplier clock;
     private volatile Set<String> there = Set.of();
@@ -34,13 +34,22 @@ public final class LinkRoster {
 
     /** @param name what this server is called (server-name in link.yml), for the other side to say where people are */
     public LinkRoster(ServerLink link, String name, Supplier<? extends Collection<String>> here, LongSupplier clock) {
+        this(link, () -> name, here, clock);
+    }
+
+    /** @param name read at every exchange, so a renamed server is called its new name without a restart */
+    public LinkRoster(ServerLink link, Supplier<String> name, Supplier<? extends Collection<String>> here,
+                      LongSupplier clock) {
         this.link = link;
-        this.name = name == null ? "" : name;
+        this.name = () -> {
+            String now = name == null ? null : name.get();
+            return now == null ? "" : now;
+        };
         this.here = here;
         this.clock = clock;
         link.on(TOPIC, data -> {
             heardFrom(data);
-            return Map.of("names", join(here.get()), "server", this.name);
+            return Map.of("names", join(here.get()), "server", this.name.get());
         });
     }
 
@@ -51,7 +60,7 @@ public final class LinkRoster {
 
     /** Sends this side's names and takes the other's from the answer. */
     public CompletableFuture<Void> exchange() {
-        return link.request(TOPIC, Map.of("names", join(here.get()), "server", name), Duration.ofSeconds(3))
+        return link.request(TOPIC, Map.of("names", join(here.get()), "server", name.get()), Duration.ofSeconds(3))
                 .thenAccept(this::heardFrom);
     }
 

@@ -114,4 +114,59 @@ class NameBadgesTest {
         assertThat(NameBadges.owners()).isEmpty();
         assertThat(NameBadges.forgetFrom(null)).isZero();
     }
+
+    @Test
+    @DisplayName("a badge registered without places stays out of the nametag, as it always did")
+    void unplacedStaysOffTheNametag() {
+        NameBadges.register("guilds", player -> Optional.of(Component.text("[ELF]")));
+        assertThat(plain(identities.nametag(ALICE, "Alice"))).isEqualTo("Alice");
+        assertThat(plain(NameBadges.before(ALICE, NameBadges.Place.TABLIST))).isEqualTo("[ELF] ");
+        assertThat(plain(NameBadges.before(ALICE, NameBadges.Place.NAMETAG))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a placed badge is asked per place: chat, tablist and nametag each get only what it answers there")
+    void placed() {
+        identities.setPrefix(ALICE, "<gold>[Admin] ");
+        NameBadges.registerPlaced("ranks", (player, place) -> place == NameBadges.Place.TABLIST
+                ? Optional.empty() : Optional.of(Component.text("[OWNER]")));
+
+        assertThat(plain(identities.chatName(ALICE, "Alice"))).isEqualTo("[OWNER] [Admin] Alice");
+        assertThat(plain(identities.tablistName(ALICE, "Alice"))).isEqualTo("[Admin] Alice");
+        assertThat(plain(identities.nametag(ALICE, "Alice"))).isEqualTo("[OWNER] [Admin] Alice");
+    }
+
+    @Test
+    @DisplayName("before(player) without a place is the chat's answer, so older callers draw what they did")
+    void beforeWithoutPlaceIsChat() {
+        NameBadges.registerPlaced("ranks", (player, place) -> Optional.of(Component.text("[" + place + "]")));
+        assertThat(plain(NameBadges.before(ALICE))).isEqualTo("[CHAT] ");
+    }
+
+    @Test
+    @DisplayName("placed and unplaced badges share one order, and one owner name replaces across both kinds")
+    void placedAndUnplacedShareOwners() {
+        NameBadges.register("a", player -> Optional.of(Component.text("[A]")));
+        NameBadges.registerPlaced("b", (player, place) -> Optional.of(Component.text("[B]")));
+        assertThat(plain(NameBadges.before(ALICE, NameBadges.Place.CHAT))).isEqualTo("[A] [B] ");
+
+        NameBadges.registerPlaced("a", (player, place) -> Optional.of(Component.text("[A2]")));
+        assertThat(plain(NameBadges.before(ALICE, NameBadges.Place.NAMETAG))).isEqualTo("[A2] [B] ");
+        assertThat(NameBadges.owners()).containsExactly("a", "b");
+    }
+
+    @Test
+    @DisplayName("a placed badge is forgotten with the plugin whose code it is, not with Core's wrapper")
+    void forgetPlaced() {
+        NameBadges.registerPlaced("ranks", (player, place) -> Optional.of(Component.text("[OWNER]")));
+        assertThat(NameBadges.forgetFrom(NameBadgesTest.class.getClassLoader())).isEqualTo(1);
+        assertThat(NameBadges.owners()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a long badge in a nametag is clipped with the rest, never past the nametag's limit")
+    void nametagStillClipped() {
+        NameBadges.registerPlaced("ranks", (player, place) -> Optional.of(Component.text("[" + "X".repeat(40) + "]")));
+        assertThat(plain(identities.nametag(ALICE, "Alice")).length()).isEqualTo(Identities.MAX_NAMETAG_CHARS);
+    }
 }
