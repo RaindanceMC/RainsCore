@@ -175,11 +175,14 @@ public final class LinkHost extends AbstractLink {
     private void hold(HttpExchange exchange) throws IOException {
         Map<String, String> query = query(exchange.getRequestURI());
         lastPoll = System.currentTimeMillis();
-        if (instance.equals(query.get("instance"))) {
+        boolean known = instance.equals(query.get("instance"));
+        if (known) {
             long seen = parse(query.get("after"));
             outbox.removeIf(message -> message.id() <= seen);
         }
-        long until = System.currentTimeMillis() + pollWait.toMillis();
+        // A guest that does not know this start yet is answered at once: it learns the instance, and counts itself
+        // connected now rather than when a held poll runs out.
+        long until = System.currentTimeMillis() + (known ? pollWait.toMillis() : 0);
         synchronized (arrived) {
             while (outbox.isEmpty() && !closed) {
                 long left = until - System.currentTimeMillis();

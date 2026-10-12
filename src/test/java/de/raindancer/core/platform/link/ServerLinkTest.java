@@ -414,4 +414,19 @@ class ServerLinkTest {
             fake.stop(0);
         }
     }
+
+    @Test
+    @DisplayName("a guest counts as connected as soon as it has reached the host, not only after a held poll ends")
+    void connectedAtOnce() throws Exception {
+        LinkHost host = LinkHost.listen("127.0.0.1", 0, SECRET, Duration.ofSeconds(20));
+        open.add(host);
+        LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + host.port()), SECRET,
+                Duration.ofSeconds(20), Duration.ofMillis(50));
+        open.add(guest);
+
+        Thread.sleep(1500);
+
+        assertThat(guest.isConnected()).isTrue();
+        assertThat(host.isConnected()).isTrue();
+    }
 }
