@@ -1018,6 +1018,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.moderation.rules.RuleBreaches.clear();
         de.raindancer.core.moderation.reports.AutoReports.clear();
         de.raindancer.core.moderation.players.AdminModes.clear();
+        de.raindancer.core.moderation.players.CheatRecords.clear();
         de.raindancer.core.moderation.chatlog.ChatLog.clearWatchers();
         de.raindancer.core.moderation.punishment.BlockedAttempts.clearWatchers();
         // The mirror of the startup exemption in onEnable. On the way out the scheduler is already
@@ -1836,6 +1837,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.moderation.rules.RuleBreaches.forgetFrom(loader)
                 + de.raindancer.core.moderation.reports.AutoReports.forgetFrom(loader)
                 + de.raindancer.core.moderation.players.AdminModes.forgetFrom(loader)
+                + de.raindancer.core.moderation.players.CheatRecords.forgetFrom(loader)
                 + de.raindancer.core.moderation.chatlog.ChatLog.forgetFrom(loader)
                 + de.raindancer.core.moderation.punishment.BlockedAttempts.forgetFrom(loader);
         if (combat != null) {
