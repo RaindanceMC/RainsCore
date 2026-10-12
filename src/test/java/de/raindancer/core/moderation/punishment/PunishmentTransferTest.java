@@ -33,7 +33,7 @@ class PunishmentTransferTest {
         arena.adopt(ada, survival.export(ada));
         assertThat(arena.isActive(ada, PunishmentKind.MUTE)).isTrue();
         assertThat(arena.remaining(ada, PunishmentKind.MUTE).orElseThrow()).isBetween(Duration.ofMinutes(5), Duration.ofMinutes(6));
-        assertThat(arena.active(ada, PunishmentKind.MUTE).orElseThrow().reason()).isEqualTo("spam");
+        assertThat(arena.active(ada, PunishmentKind.MUTE).orElseThrow().reason()).startsWith("spam");
 
         survival.lift(ada, PunishmentKind.MUTE, mod, "sorry");
         arena.adopt(ada, survival.export(ada));
@@ -42,5 +42,30 @@ class PunishmentTransferTest {
         survival.punish(ada, PunishmentKind.BAN, mod, "griefing", null);
         assertThat(Punishments.banned(survival.export(ada))).isTrue();
         assertThat(Punishments.banned(arena.export(ada))).isFalse();
+    }
+
+    @Test
+    @DisplayName("a mute given in the arena itself is never lifted or shortened by survival's state")
+    void ownMutesStay() {
+        AtomicLong clock = new AtomicLong(1_000_000);
+        UUID ada = UUID.randomUUID();
+        UUID mod = UUID.randomUUID();
+        Punishments survival = new Punishments(Database.open(directory.resolve("c.db"), CoreSchema.CORE, () -> false), clock::get);
+        Punishments arena = new Punishments(Database.open(directory.resolve("d.db"), CoreSchema.CORE, () -> false), clock::get);
+        arena.punish(ada, PunishmentKind.MUTE, mod, "arena spam", Duration.ofHours(2));
+
+        arena.adopt(ada, survival.export(ada));
+        assertThat(arena.isActive(ada, PunishmentKind.MUTE)).as("survival has none, the arena's own stays").isTrue();
+
+        survival.punish(ada, PunishmentKind.MUTE, mod, "short", Duration.ofMinutes(5));
+        arena.adopt(ada, survival.export(ada));
+        assertThat(arena.remaining(ada, PunishmentKind.MUTE).orElseThrow()).as("not shortened")
+                .isGreaterThan(Duration.ofHours(1));
+        assertThat(arena.active(ada, PunishmentKind.MUTE).orElseThrow().reason()).isEqualTo("arena spam");
+
+        survival.punish(ada, PunishmentKind.MUTE, mod, "long", Duration.ofDays(1));
+        arena.adopt(ada, survival.export(ada));
+        assertThat(arena.remaining(ada, PunishmentKind.MUTE).orElseThrow()).as("a longer one from survival holds")
+                .isGreaterThan(Duration.ofHours(20));
     }
 }

@@ -128,29 +128,42 @@ public final class Punishments {
         return out;
     }
 
+    /** Marks a mute that came from the linked server, so only those are ever lifted or changed by it. */
+    static final String LINKED = " (linked server)";
+
     /**
-     * Makes this server's mute match what another server {@link #export exported}: given here for the time it has
-     * left there, lifted here when it is gone there. A ban is not copied — see {@link #banned}; the server that keeps
-     * the bans keeps people out.
+     * Brings over a mute another server {@link #export exported}, for the time it has left there, and lifts one
+     * that came from there once it is gone there. A mute given on this server is never lifted or shortened by the
+     * other's state — only a longer one from there replaces it. A ban is not copied — see {@link #banned}.
      */
     public void adopt(UUID player, java.util.Map<String, String> exported) {
         if (player == null || exported == null) {
             return;
         }
         Optional<Punishment> here = active(player, PunishmentKind.MUTE);
+        boolean mirrored = here.isPresent() && here.get().reason().endsWith(LINKED);
         if (!"true".equals(exported.get("mute"))) {
-            here.ifPresent(mute -> lift(player, PunishmentKind.MUTE, null, "lifted on the linked server"));
+            if (mirrored) {
+                lift(player, PunishmentKind.MUTE, null, "lifted on the linked server");
+            }
             return;
         }
         String ends = exported.getOrDefault("mute.ends", "");
         Instant endsAt = ends.isBlank() ? null : Instant.ofEpochMilli(Long.parseLong(ends));
-        String reason = exported.getOrDefault("mute.reason", "");
-        if (here.isPresent() && java.util.Objects.equals(here.get().endsAt(), endsAt)
-                && here.get().reason().equals(reason.isBlank() ? "no reason given" : reason.trim())) {
-            return;
-        }
         if (endsAt != null && !endsAt.isAfter(now())) {
             return;
+        }
+        String given = exported.getOrDefault("mute.reason", "");
+        String reason = (given.isBlank() ? "no reason given" : given.trim()) + LINKED;
+        if (here.isPresent()) {
+            Punishment current = here.get();
+            if (mirrored && java.util.Objects.equals(current.endsAt(), endsAt) && current.reason().equals(reason)) {
+                return;
+            }
+            boolean longer = current.endsAt() != null && (endsAt == null || endsAt.isAfter(current.endsAt()));
+            if (!mirrored && !longer) {
+                return;
+            }
         }
         String moderator = exported.getOrDefault("mute.moderator", "");
         punish(player, PunishmentKind.MUTE, moderator.isBlank() ? null : UUID.fromString(moderator), reason,
