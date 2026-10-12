@@ -118,7 +118,7 @@ public final class Identities {
      */
     public Component chatName(UUID player, String name) {
         Identity identity = identityOf(player);
-        Component built = Component.empty();
+        Component built = NameBadges.before(player);
         if (!identity.prefix().isEmpty()) {
             built = built.append(parse(identity.prefix()));
         }
@@ -160,7 +160,7 @@ public final class Identities {
      */
     public Component tablistName(UUID player, String name) {
         Identity identity = identityOf(player);
-        Component built = Component.empty();
+        Component built = NameBadges.before(player);
         if (!identity.nametagPrefix().isEmpty()) {
             built = built.append(parse(identity.nametagPrefix()));
         }
