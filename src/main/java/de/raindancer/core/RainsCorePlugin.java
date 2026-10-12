@@ -1526,6 +1526,42 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public void sharePlayerData(String namespace) {
+        de.raindancer.core.platform.link.LinkProfiles current = profiles;
+        if (current == null || namespace == null || namespace.isBlank()) {
+            return;
+        }
+        String part = "data:" + namespace;
+        current.provide(part, player -> {
+            // The saved data of somebody not here is read on the server's thread, as Bukkit expects.
+            java.util.concurrent.CompletableFuture<java.util.Map<String, String>> read = new java.util.concurrent.CompletableFuture<>();
+            de.raindancer.core.platform.util.Scheduling.global(this, () -> {
+                try {
+                    read.complete(de.raindancer.core.platform.link.PlayerDataPart.export(
+                            getServer().getOfflinePlayer(player).getPersistentDataContainer(), namespace));
+                } catch (RuntimeException | java.io.IOException failed) {
+                    read.complete(java.util.Map.of());
+                }
+            });
+            try {
+                return read.get(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception slow) {
+                return java.util.Map.of();
+            }
+        });
+        if (linkFollows) {
+            current.follow(part, (player, exported) -> {
+                org.bukkit.entity.Player online = getServer().getPlayer(player);
+                if (online != null && exported.containsKey("bytes")) {
+                    de.raindancer.core.platform.util.Scheduling.entity(this, online, () ->
+                            de.raindancer.core.platform.link.PlayerDataPart.adopt(online.getPersistentDataContainer(),
+                                    namespace, exported));
+                }
+            });
+        }
+    }
+
+    @Override
     public boolean linkFollows() {
         return profiles != null && linkFollows;
     }

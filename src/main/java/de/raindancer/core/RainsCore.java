@@ -599,6 +599,15 @@ public interface RainsCore {
         return java.util.Optional.empty();
     }
 
+    /**
+     * Shares what a plugin keeps on its players under one namespace of their persistent data — cosmetics chosen on
+     * survival worn in the arena. The server that keeps it answers from the player's saved data; a following server
+     * replaces that namespace on a player with it when they arrive (and every half minute while they stay).
+     * Nothing without a link.
+     */
+    default void sharePlayerData(String namespace) {
+    }
+
     /** Whether this server shows the other one's player data ({@code follows: true} in link.yml) rather than its own. */
     default boolean linkFollows() {
         return false;
