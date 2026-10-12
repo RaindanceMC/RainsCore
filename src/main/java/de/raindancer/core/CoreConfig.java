@@ -368,7 +368,12 @@ public record CoreConfig(
         @Describe("What this server is called wherever a plugin names it: the tablist header and logo, "
                 + "the hub, and the other servers of a network. Plain text. Empty: the MOTD's first line, "
                 + "and server-name in link.yml towards the network.")
-        String serverName
+        String serverName,
+
+        @In("appearance/tablist") @Title("Server performance")
+        @Describe("A line under the list with the ticks per second, how long a tick takes and the memory in "
+                + "use — green while all is well, yellow when it strains, red when it lags.")
+        boolean tablistShowPerformance
 
 ) {
 
@@ -413,5 +418,6 @@ public record CoreConfig(
             // A year: long enough to look into something reported months late, and a limit — never for ever.
             true, 365,
             false,
-            "");
+            "",
+            true);
 }

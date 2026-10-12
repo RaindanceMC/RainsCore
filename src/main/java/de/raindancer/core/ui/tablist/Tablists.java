@@ -85,6 +85,19 @@ public final class Tablists {
     }
 
     /** Where to ask who is on the other servers of the network; their names are listed under the footer. */
+    private volatile Supplier<java.util.Optional<ServerLoad>> load = java.util.Optional::empty;
+    private volatile boolean showPerformance;
+
+    /** Where the server's load comes from; empty where the platform cannot say (Folia has no global TPS). */
+    public void load(Supplier<java.util.Optional<ServerLoad>> source) {
+        this.load = source == null ? java.util.Optional::empty : source;
+    }
+
+    /** Whether the TPS, tick time and memory line goes under the list. */
+    public void showPerformance(boolean show) {
+        this.showPerformance = show;
+    }
+
     public void elsewhere(java.util.function.Supplier<java.util.Map<String, java.util.Set<String>>> source) {
         this.elsewhere = source == null ? java.util.Map::of : source;
     }
@@ -211,12 +224,16 @@ public final class Tablists {
         String resolvedCustomHeader = headerNow;
         String resolvedCustomFooter = footerNow;
 
+        ServerLoad loadNow = currentLoad();
         Component header = resolvedCustomHeader.isBlank()
                 ? model.header(visibleEntries, serverName)
-                : model.custom(resolvedCustomHeader, visibleEntries, serverName);
+                : model.custom(resolvedCustomHeader, visibleEntries, serverName, loadNow);
         Component footer = resolvedCustomFooter.isBlank()
                 ? model.footer(visibleEntries)
-                : model.custom(resolvedCustomFooter, visibleEntries, serverName);
+                : model.custom(resolvedCustomFooter, visibleEntries, serverName, loadNow);
+        if (showPerformance && loadNow != null) {
+            footer = footer.append(Component.newline()).append(model.performance(loadNow)).append(Component.newline());
+        }
         Component away = model.elsewhere(elsewhere.get());
         if (!away.equals(Component.empty())) {
             footer = footer.append(Component.newline()).append(away).append(Component.newline());
@@ -320,6 +337,14 @@ public final class Tablists {
     }
 
     /** Removes the teams this class made. Called from {@code onDisable}. */
+    private ServerLoad currentLoad() {
+        try {
+            return load.get().orElse(null);
+        } catch (RuntimeException unavailable) {
+            return null;
+        }
+    }
+
     public void shutdown() {
         try {
             Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();

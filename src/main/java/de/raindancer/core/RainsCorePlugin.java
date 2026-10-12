@@ -510,6 +510,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         achievements.load();
 
         tablists = new Tablists(new TablistModel(identities), serverName());
+        tablists.load(this::serverLoad);
         applyTablistSettings();
         // Applied again whenever they change, so switching the custom list off in a menu puts
         // every name back rather than freezing whatever was last drawn.
@@ -1383,6 +1384,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         tablists.header(config.tablistHeader());
         tablists.footer(config.tablistFooter());
         tablists.serverName(serverName());
+        tablists.showPerformance(config.tablistShowPerformance());
     }
 
     /**
@@ -2129,6 +2131,18 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
     }
 
+
+    /** TPS over the last minute, the average tick, the heap. Empty on Folia, which has no global tick. */
+    private java.util.Optional<de.raindancer.core.ui.tablist.ServerLoad> serverLoad() {
+        try {
+            Runtime runtime = Runtime.getRuntime();
+            long used = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
+            return java.util.Optional.of(new de.raindancer.core.ui.tablist.ServerLoad(getServer().getTPS()[0],
+                    getServer().getAverageTickTime(), used, runtime.maxMemory() / (1024 * 1024)));
+        } catch (UnsupportedOperationException folia) {
+            return java.util.Optional.empty();
+        }
+    }
 
     /** server-name in link.yml, read once at start; empty without one. */
     private volatile String linkServerName = "";

@@ -7,6 +7,7 @@ import de.raindancer.core.ui.identity.Identities;
 import de.raindancer.core.ui.identity.Symbols;
 import de.raindancer.core.ui.messages.Messages;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import java.util.ArrayList;
@@ -376,6 +377,31 @@ public final class TablistModel {
      * on, what the server is called, and how many are in each world. A full expression language
      * here would be a second settings system nobody asked for.
      */
+    /** The server's health on one line: TPS, the tick in ms, memory — each in a colour saying how it is going. */
+    public Component performance(ServerLoad load) {
+        if (load == null) {
+            return Component.empty();
+        }
+        double usedShare = load.maxMb() <= 0 ? 0 : (double) load.usedMb() / load.maxMb();
+        return Component.text("TPS ", NamedTextColor.GRAY)
+                .append(Component.text(load.tpsText(), ServerLoad.tpsColour(load.tps())))
+                .append(Component.text(" · ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(load.msptText(), ServerLoad.msptColour(load.mspt())))
+                .append(Component.text(" · ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("RAM ", NamedTextColor.GRAY))
+                .append(Component.text(load.ramText(), usedShare < 0.8 ? NamedTextColor.GREEN
+                        : usedShare < 0.92 ? NamedTextColor.YELLOW : NamedTextColor.RED));
+    }
+
+    /** {@link #custom(String, List, String)} with the server's load for {@code <tps>}, {@code <mspt>}, {@code <ram>}. */
+    public Component custom(String miniMessage, List<TablistEntry> online, String serverName, ServerLoad load) {
+        String filled = miniMessage
+                .replace("<tps>", load == null ? "?" : load.tpsText())
+                .replace("<mspt>", load == null ? "?" : load.msptText())
+                .replace("<ram>", load == null ? "?" : load.ramText());
+        return custom(filled, online, serverName);
+    }
+
     public Component custom(String miniMessage, List<TablistEntry> online, String serverName) {
         int count = online == null ? 0 : online.size();
         String name = serverName == null || serverName.isBlank() ? "This server" : serverName.trim();
