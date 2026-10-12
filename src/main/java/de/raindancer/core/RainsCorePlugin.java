@@ -2,6 +2,8 @@ package de.raindancer.core;
 
 import de.raindancer.core.ui.actionbar.ActionBars;
 import de.raindancer.core.content.achievement.Achievements;
+import de.raindancer.core.content.advancement.BukkitAdvancementSink;
+import de.raindancer.core.content.advancement.CustomAdvancements;
 import de.raindancer.core.ui.banner.Banner;
 import de.raindancer.core.ui.bossbar.BossBars;
 import de.raindancer.core.ui.chat.Brand;
@@ -254,6 +256,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private ItemFactory itemFactory;
     private ItemAbilities itemAbilities;
     private Achievements achievements;
+    private final CustomAdvancements advancements = new CustomAdvancements(new BukkitAdvancementSink());
     private LootTables lootTables;
     private LootFiller lootFiller;
 
@@ -1468,6 +1471,17 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public Achievements achievements() {
         return achievements;
+    }
+
+    @Override
+    public CustomAdvancements advancements() {
+        return advancements;
+    }
+
+    /** A data reload throws away every advancement loaded at runtime. */
+    @EventHandler
+    public void onDataReload(io.papermc.paper.event.server.ServerResourcesReloadedEvent event) {
+        advancements.republish();
     }
 
     @Override

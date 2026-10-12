@@ -9,6 +9,7 @@ import de.raindancer.core.ui.bossbar.BossBars;
 import de.raindancer.core.platform.permission.Grants;
 import de.raindancer.core.ui.identity.Identities;
 import de.raindancer.core.content.achievement.Achievements;
+import de.raindancer.core.content.advancement.CustomAdvancements;
 import de.raindancer.core.content.items.CustomItems;
 import de.raindancer.core.content.items.ItemAbilities;
 import de.raindancer.core.content.items.ItemFactory;
@@ -270,6 +271,13 @@ public interface RainsCore {
      * advancements, which cannot express "claim your first plot" at all.
      */
     Achievements achievements();
+
+    /**
+     * Real vanilla advancements a plugin defines and grants — toast, chat line, a page in the
+     * advancements screen. {@link #achievements()} is the plugin's own points-and-progress; these are
+     * the game's.
+     */
+    CustomAdvancements advancements();
 
     /**
      * Every plugin's settings as one tree, with the rules about what a screen shows and what a
