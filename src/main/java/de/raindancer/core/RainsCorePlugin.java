@@ -317,6 +317,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.link.ServerLink link;
     private volatile de.raindancer.core.platform.link.LinkRoster roster;
     private volatile de.raindancer.core.platform.link.LinkProfiles profiles;
+    private java.util.Map<String, de.raindancer.core.platform.link.ServerLink> peerLinks = java.util.Map.of();
+    private final java.util.Map<String, de.raindancer.core.platform.link.LinkRoster> rosters =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.List<de.raindancer.core.platform.link.LinkProfiles> allProfiles =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
     private boolean linkFollows;
     private volatile de.raindancer.core.social.economy.LinkedEconomy linkedEconomy;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask profileTimer;
@@ -773,50 +778,70 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         startResourcePacks(settings.current());
         link = de.raindancer.core.platform.link.NetworkLink.start(getDataFolder().toPath().resolve("link.yml"),
                 de.raindancer.core.platform.log.Log.of("link")).orElse(null);
+        java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
+        peerLinks = de.raindancer.core.platform.link.NetworkLink.peers(linkFile, de.raindancer.core.platform.log.Log.of("link"));
+        String ownName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
+        java.util.Map<String, de.raindancer.core.platform.link.ServerLink> allLinks = new java.util.LinkedHashMap<>();
         if (link != null) {
-            // Vanished staff are not on the list: a name that completes over there is somebody seen here.
-            roster = new de.raindancer.core.platform.link.LinkRoster(link, () -> getServer().getOnlinePlayers().stream()
-                    .filter(online -> !vanish.isVanished(online.getUniqueId()))
-                    .map(org.bukkit.entity.Player::getName).toList(), System::currentTimeMillis);
-            // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
-            rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
-                    task -> roster.exchange().exceptionally(unreachable -> null));
-            profiles = new de.raindancer.core.platform.link.LinkProfiles(link);
-            linkFollows = de.raindancer.core.platform.link.NetworkLink.follows(getDataFolder().toPath().resolve("link.yml"));
-            profiles.provide("identity", identities::export);
-            profiles.provide("punishments", punishments::export);
-            if (linkFollows) {
-                profiles.follow("identity", identities::adopt);
-                profiles.follow("punishments", (player, exported) -> {
-                    punishments.adopt(player, exported);
-                    org.bukkit.entity.Player online = getServer().getPlayer(player);
-                    if (online != null && de.raindancer.core.moderation.punishment.Punishments.banned(exported)) {
-                        de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> online.kick(
-                                net.kyori.adventure.text.Component.text("You are banned: "
-                                        + exported.getOrDefault("ban.reason", "no reason given"))));
-                    }
-                });
-                log.info("Server link: player names and styles are taken from the other server.");
-                // A mute given over there while somebody is here holds here within half a minute, not at their next visit.
-                profileTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 30, 30, task -> {
-                    de.raindancer.core.platform.link.LinkProfiles current = profiles;
-                    if (current != null) {
-                        getServer().getOnlinePlayers().forEach(online -> current.fetch(online.getUniqueId()));
-                    }
-                });
-                // After every plugin is enabled: only a server with no economy of its own uses the other's.
-                de.raindancer.core.platform.util.Scheduling.globalLater(this, 1L, () -> {
-                    if (link != null && de.raindancer.core.social.economy.Economies.current().isEmpty()) {
-                        linkedEconomy = new de.raindancer.core.social.economy.LinkedEconomy(link);
-                        de.raindancer.core.social.economy.Economies.provide(this, linkedEconomy);
-                        linkedEconomy.refreshCurrency().exceptionally(unreachable -> null);
-                        log.info("Server link: money is the other server's — one balance on both.");
-                    }
-                });
-            } else {
-                de.raindancer.core.social.economy.LinkedEconomy.serve(link,
+            allLinks.put("", link);
+        }
+        allLinks.putAll(peerLinks);
+        linkFollows = link != null && de.raindancer.core.platform.link.NetworkLink.follows(linkFile);
+        // Vanished staff are not on the list: a name that completes over there is somebody seen here.
+        java.util.function.Supplier<java.util.List<String>> seen = () -> getServer().getOnlinePlayers().stream()
+                .filter(online -> !vanish.isVanished(online.getUniqueId()))
+                .map(org.bukkit.entity.Player::getName).toList();
+        allLinks.forEach((peerName, end) -> {
+            de.raindancer.core.platform.link.LinkRoster each =
+                    new de.raindancer.core.platform.link.LinkRoster(end, ownName, seen, System::currentTimeMillis);
+            rosters.put(peerName, each);
+            de.raindancer.core.platform.link.LinkProfiles parts = new de.raindancer.core.platform.link.LinkProfiles(end);
+            parts.provide("identity", identities::export);
+            parts.provide("punishments", punishments::export);
+            allProfiles.add(parts);
+            if (end == link) {
+                roster = each;
+                profiles = parts;
+            }
+            if (!(end == link && linkFollows)) {
+                de.raindancer.core.social.economy.LinkedEconomy.serve(end,
                         de.raindancer.core.social.economy.Economies::current);
             }
+        });
+        if (!allLinks.isEmpty()) {
+            // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
+            rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
+                    task -> rosters.values().forEach(each -> each.exchange().exceptionally(unreachable -> null)));
+            tablists.elsewhere(this::playersByServer);
+        }
+        if (linkFollows) {
+            profiles.follow("identity", identities::adopt);
+            profiles.follow("punishments", (player, exported) -> {
+                punishments.adopt(player, exported);
+                org.bukkit.entity.Player online = getServer().getPlayer(player);
+                if (online != null && de.raindancer.core.moderation.punishment.Punishments.banned(exported)) {
+                    de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> online.kick(
+                            net.kyori.adventure.text.Component.text("You are banned: "
+                                    + exported.getOrDefault("ban.reason", "no reason given"))));
+                }
+            });
+            log.info("Server link: player names and styles are taken from the other server.");
+            // A mute given over there while somebody is here holds here within half a minute, not at their next visit.
+            profileTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 30, 30, task -> {
+                de.raindancer.core.platform.link.LinkProfiles current = profiles;
+                if (current != null) {
+                    getServer().getOnlinePlayers().forEach(online -> current.fetch(online.getUniqueId()));
+                }
+            });
+            // After every plugin is enabled: only a server with no economy of its own uses the other's.
+            de.raindancer.core.platform.util.Scheduling.globalLater(this, 1L, () -> {
+                if (link != null && de.raindancer.core.social.economy.Economies.current().isEmpty()) {
+                    linkedEconomy = new de.raindancer.core.social.economy.LinkedEconomy(link);
+                    de.raindancer.core.social.economy.Economies.provide(this, linkedEconomy);
+                    linkedEconomy.refreshCurrency().exceptionally(unreachable -> null);
+                    log.info("Server link: money is the other server's — one balance on both.");
+                }
+            });
         }
 
         // From here on, database work on a thread running the world is a mistake and is reported as
@@ -1119,18 +1144,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             rosterTimer.cancel();
             rosterTimer = null;
         }
-        if (roster != null) {
-            roster.stop();
-            roster = null;
-        }
+        rosters.values().forEach(de.raindancer.core.platform.link.LinkRoster::stop);
+        rosters.clear();
+        roster = null;
         if (profileTimer != null) {
             profileTimer.cancel();
             profileTimer = null;
         }
-        if (profiles != null) {
-            profiles.stop();
-            profiles = null;
-        }
+        allProfiles.forEach(de.raindancer.core.platform.link.LinkProfiles::stop);
+        allProfiles.clear();
+        profiles = null;
         if (linkedEconomy != null) {
             de.raindancer.core.social.economy.Economies.retract(linkedEconomy);
             linkedEconomy = null;
@@ -1138,6 +1161,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (link != null && !linkFollows) {
             de.raindancer.core.social.economy.LinkedEconomy.stopServing(link);
         }
+        peerLinks.values().forEach(de.raindancer.core.platform.link.ServerLink::close);
+        peerLinks = java.util.Map.of();
         if (link != null) {
             // Like the pack server: a port and threads that a reload must not leave behind.
             link.close();
@@ -1530,11 +1555,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public void sharePlayerData(String namespace) {
         de.raindancer.core.platform.link.LinkProfiles current = profiles;
-        if (current == null || namespace == null || namespace.isBlank()) {
+        if (allProfiles.isEmpty() || namespace == null || namespace.isBlank()) {
             return;
         }
         String part = "data:" + namespace;
-        current.provide(part, player -> {
+        java.util.function.Function<java.util.UUID, java.util.Map<String, String>> answer = player -> {
             // The saved data of somebody not here is read on the server's thread, as Bukkit expects.
             java.util.concurrent.CompletableFuture<java.util.Map<String, String>> read = new java.util.concurrent.CompletableFuture<>();
             de.raindancer.core.platform.util.Scheduling.global(this, () -> {
@@ -1550,8 +1575,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             } catch (Exception slow) {
                 return java.util.Map.of();
             }
-        });
-        if (linkFollows) {
+        };
+        allProfiles.forEach(parts -> parts.provide(part, answer));
+        if (linkFollows && current != null) {
             current.follow(part, (player, exported) -> {
                 org.bukkit.entity.Player online = getServer().getPlayer(player);
                 if (online != null && exported.containsKey("bytes")) {
@@ -1570,8 +1596,20 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public java.util.Set<String> playersElsewhere() {
-        de.raindancer.core.platform.link.LinkRoster current = roster;
-        return current == null ? java.util.Set.of() : current.elsewhere();
+        java.util.Set<String> all = new java.util.HashSet<>();
+        rosters.values().forEach(each -> all.addAll(each.elsewhere()));
+        return all;
+    }
+
+    @Override
+    public java.util.Map<String, java.util.Set<String>> playersByServer() {
+        java.util.Map<String, java.util.Set<String>> byServer = new java.util.TreeMap<>();
+        rosters.forEach((peerName, each) -> {
+            String shown = !each.serverName().isBlank() ? each.serverName()
+                    : peerName.isBlank() ? "the linked server" : peerName;
+            byServer.computeIfAbsent(shown, key -> new java.util.TreeSet<>()).addAll(each.elsewhere());
+        });
+        return byServer;
     }
 
     @Override

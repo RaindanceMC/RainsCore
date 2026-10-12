@@ -339,6 +339,24 @@ public final class TablistModel {
     }
 
     /**
+     * Who is on the other servers of the network, a line each under the footer: its name, how many, who. Nothing for a
+     * server nobody is on, nothing at all when nobody is elsewhere.
+     */
+    public Component elsewhere(Map<String, ? extends java.util.Collection<String>> byServer) {
+        StringBuilder built = new StringBuilder();
+        for (Map.Entry<String, ? extends java.util.Collection<String>> server : byServer.entrySet()) {
+            if (server.getValue().isEmpty()) {
+                continue;
+            }
+            List<String> names = server.getValue().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            built.append(built.isEmpty() ? "" : "\n").append("<gold>⚔ ").append(escape(server.getKey()))
+                    .append(" <gray>(").append(names.size()).append("): <white>")
+                    .append(escape(String.join(", ", names)));
+        }
+        return built.isEmpty() ? Component.empty() : MINI.deserialize(built.toString());
+    }
+
+    /**
      * A header or footer a server owner wrote, with the placeholders filled in.
      *
      * <p>Deliberately few of them, and each answers a question somebody actually asks: how many are

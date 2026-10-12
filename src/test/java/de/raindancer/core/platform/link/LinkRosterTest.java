@@ -51,4 +51,22 @@ class LinkRosterTest {
         assertThat(LinkRoster.parse("Ada,,Bo, ")).containsExactlyInAnyOrder("Ada", "Bo");
         assertThat(LinkRoster.join(List.of("Ada", "Bo"))).isEqualTo("Ada,Bo");
     }
+
+    @Test
+    @DisplayName("each side says what it is called, so a list of players can say where they are")
+    void named() throws Exception {
+        LinkHost host = LinkHost.listen("127.0.0.1", 0, SECRET, Duration.ofSeconds(2));
+        open.add(host);
+        LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + host.port()), SECRET,
+                Duration.ofSeconds(2), Duration.ofMillis(50));
+        open.add(guest);
+        AtomicLong clock = new AtomicLong(1_000);
+        LinkRoster arena = new LinkRoster(host, "Arena", () -> List.of("Engine_963"), clock::get);
+        LinkRoster survival = new LinkRoster(guest, "SMP", () -> List.of("Ada"), clock::get);
+
+        survival.exchange().get();
+
+        assertThat(survival.serverName()).isEqualTo("Arena");
+        assertThat(arena.serverName()).isEqualTo("SMP");
+    }
 }

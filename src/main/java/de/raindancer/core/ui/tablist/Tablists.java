@@ -55,6 +55,9 @@ public final class Tablists {
     /** What the owner wrote instead of the built-in header, or empty for the built-in one. */
     private volatile String customHeader = "";
     private volatile String customFooter = "";
+    /** Who is on the other servers of the network, by server — listed under the footer. */
+    private volatile java.util.function.Supplier<java.util.Map<String, java.util.Set<String>>> elsewhere =
+            java.util.Map::of;
     /** Extra frames the header and footer cycle through, and how long each lasts. */
     private volatile Animated headerFrames = Animated.of("");
     private volatile Animated footerFrames = Animated.of("");
@@ -79,6 +82,11 @@ public final class Tablists {
      */
     public void hiddenPlayers(Supplier<Set<UUID>> hidden) {
         this.hidden = hidden == null ? Set::<UUID>of : hidden;
+    }
+
+    /** Where to ask who is on the other servers of the network; their names are listed under the footer. */
+    public void elsewhere(java.util.function.Supplier<java.util.Map<String, java.util.Set<String>>> source) {
+        this.elsewhere = source == null ? java.util.Map::of : source;
     }
 
     public void serverName(String name) {
@@ -209,6 +217,10 @@ public final class Tablists {
         Component footer = resolvedCustomFooter.isBlank()
                 ? model.footer(visibleEntries)
                 : model.custom(resolvedCustomFooter, visibleEntries, serverName);
+        Component away = model.elsewhere(elsewhere.get());
+        if (!away.equals(Component.empty())) {
+            footer = footer.append(Component.newline()).append(away).append(Component.newline());
+        }
 
         for (Player player : allOnline) {
             try {

@@ -590,6 +590,11 @@ public interface RainsCore {
         return java.util.Set.of();
     }
 
+    /** {@link #playersElsewhere} by the server they are on, under the name it gives itself (server-name in link.yml). */
+    default java.util.Map<String, java.util.Set<String>> playersByServer() {
+        return java.util.Map.of();
+    }
+
     /**
      * A player's data kept on the other server of the link and shown here, by part — see
      * {@link de.raindancer.core.platform.link.LinkProfiles}. Core provides and follows "identity" itself; a plugin

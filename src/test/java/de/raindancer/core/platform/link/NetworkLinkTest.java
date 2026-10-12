@@ -72,4 +72,33 @@ class NetworkLinkTest {
             guest.ifPresent(ServerLink::close);
         }
     }
+
+    @Test
+    @DisplayName("further links under peers: each its own end, the main one untouched; the server's name is read")
+    void peers() throws Exception {
+        int port;
+        try (ServerSocket free = new ServerSocket(0)) {
+            port = free.getLocalPort();
+        }
+        Path hub = folder.resolve("hub.yml");
+        Files.writeString(hub, "role: host\nlisten-address: 127.0.0.1\nlisten-port: " + port + "\nsecret: " + SECRET
+                + "\nserver-name: Hub\nfollows: true\n");
+        Path smp = folder.resolve("smp.yml");
+        Files.writeString(smp, "role: off\nserver-name: SMP\npeers:\n  hub:\n    role: guest\n    host-url: http://127.0.0.1:"
+                + port + "\n    secret: " + SECRET + "\n");
+
+        Optional<ServerLink> hubEnd = NetworkLink.start(hub, Log.of("test"));
+        Map<String, ServerLink> smpPeers = NetworkLink.peers(smp, Log.of("test"));
+        try {
+            assertThat(NetworkLink.serverName(smp)).isEqualTo("SMP");
+            assertThat(NetworkLink.serverName(hub)).isEqualTo("Hub");
+            assertThat(smpPeers).containsKey("hub");
+            hubEnd.orElseThrow().on("ping", data -> Map.of("pong", data.get("n")));
+            assertThat(smpPeers.get("hub").request("ping", Map.of("n", "7"), Duration.ofSeconds(5))
+                    .get(5, TimeUnit.SECONDS)).containsEntry("pong", "7");
+        } finally {
+            hubEnd.ifPresent(ServerLink::close);
+            smpPeers.values().forEach(ServerLink::close);
+        }
+    }
 }

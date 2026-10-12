@@ -41,9 +41,19 @@ public final class NetworkLink {
             # At least 24 characters, the same on both servers. Treat it like a password.
             secret: ""
 
+            # What this server is called to the others, e.g. SMP, Arena, Hub — shown where people are listed.
+            server-name: ""
+
             # true on a server that shows the other one's player data — name styles, prefixes, nicknames — fetched
             # when a player arrives (an arena next to a survival server). The other server keeps it.
             follows: false
+
+            # Further links, each with the keys above (role, listen-port or host-url, secret):
+            # peers:
+            #   hub:
+            #     role: guest
+            #     host-url: http://172.18.0.1:25596
+            #     secret: ""
             """;
 
     private NetworkLink() {
@@ -76,14 +86,53 @@ public final class NetworkLink {
             log.error("{} could not be read ({}); there is no server link.", file.getFileName(), store.problems());
             return Optional.empty();
         }
+        return startEnd(yaml, "Server link", log);
+    }
+
+    /**
+     * Further links, each under {@code peers.<name>} with the same keys as the main one — a survival server talking to
+     * an arena and to a hub. Each is its own end; a peer that cannot start is left out with a log line.
+     */
+    public static java.util.Map<String, ServerLink> peers(Path file, LogChannel log) {
+        java.util.Map<String, ServerLink> started = new java.util.LinkedHashMap<>();
+        if (!Files.exists(file)) {
+            return started;
+        }
+        YamlStore store = new YamlStore(file);
+        YamlConfiguration yaml = store.read();
+        org.bukkit.configuration.ConfigurationSection peers = yaml.getConfigurationSection("peers");
+        if (!store.problems().isEmpty() || peers == null) {
+            return started;
+        }
+        for (String name : peers.getKeys(false)) {
+            org.bukkit.configuration.ConfigurationSection peer = peers.getConfigurationSection(name);
+            if (peer != null) {
+                startEnd(peer, "Server link '" + name + "'", log).ifPresent(end -> started.put(name, end));
+            }
+        }
+        return started;
+    }
+
+    /** What this server calls itself to the others ({@code server-name}); empty when not set. */
+    public static String serverName(Path file) {
+        if (!Files.exists(file)) {
+            return "";
+        }
+        YamlStore store = new YamlStore(file);
+        YamlConfiguration yaml = store.read();
+        return store.problems().isEmpty() ? yaml.getString("server-name", "").trim() : "";
+    }
+
+    private static Optional<ServerLink> startEnd(org.bukkit.configuration.ConfigurationSection yaml, String label,
+                                                 LogChannel log) {
         String role = yaml.getString("role", "off").trim().toLowerCase(Locale.ROOT);
         if (role.equals("off")) {
             return Optional.empty();
         }
         String secret = yaml.getString("secret", "");
         if (secret == null || secret.length() < LinkAuth.SHORTEST_SECRET) {
-            log.error("The server link is set to '{}' but its secret is shorter than {} characters; it is not started.",
-                    role, LinkAuth.SHORTEST_SECRET);
+            log.error("{} is set to '{}' but its secret is shorter than {} characters; it is not started.",
+                    label, role, LinkAuth.SHORTEST_SECRET);
             return Optional.empty();
         }
         try {
@@ -91,21 +140,21 @@ public final class NetworkLink {
                 case "host" -> {
                     LinkHost host = LinkHost.listen(yaml.getString("listen-address", "0.0.0.0"),
                             yaml.getInt("listen-port", 25594), secret, POLL_WAIT);
-                    log.info("Server link: listening on port {}.", host.port());
+                    log.info("{}: listening on port {}.", label, host.port());
                     yield Optional.of(host);
                 }
                 case "guest" -> {
                     URI url = URI.create(yaml.getString("host-url", ""));
-                    log.info("Server link: connecting to {}.", url);
+                    log.info("{}: connecting to {}.", label, url);
                     yield Optional.of(LinkGuest.connect(url, secret, POLL_WAIT, RETRY));
                 }
                 default -> {
-                    log.error("The server link's role '{}' is none of off, host, guest.", role);
+                    log.error("{}: the role '{}' is none of off, host, guest.", label, role);
                     yield Optional.empty();
                 }
             };
         } catch (IOException | IllegalArgumentException failure) {
-            log.error("The server link could not start: {}", failure.getMessage());
+            log.error("{} could not start: {}", label, failure.getMessage());
             return Optional.empty();
         }
     }
