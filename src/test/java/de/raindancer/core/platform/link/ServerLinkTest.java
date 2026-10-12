@@ -198,7 +198,7 @@ class ServerLinkTest {
         String body = LinkCodec.encode(List.of(new LinkMessage(1, "pay", Map.of("amount", "100"), 0, false)));
         long stale = System.currentTimeMillis() - 120_000;
 
-        HttpResponse<String> response = post(host, body, stale, "n1", LinkAuth.sign(SECRET, stale, "n1", body));
+        HttpResponse<String> response = post(host, body, stale, "0123456789abcdef01", LinkAuth.sign(SECRET, stale, "0123456789abcdef01", body));
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(got).isEmpty();
@@ -215,10 +215,10 @@ class ServerLinkTest {
         });
         String body = LinkCodec.encode(List.of(new LinkMessage(1, "pay", Map.of("amount", "100"), 0, false)));
         long now = System.currentTimeMillis();
-        String signature = LinkAuth.sign(SECRET, now, "once", body);
+        String signature = LinkAuth.sign(SECRET, now, "00112233445566778899aabbccddeeff", body);
 
-        assertThat(post(host, body, now, "once", signature).statusCode()).isEqualTo(200);
-        assertThat(post(host, body, now, "once", signature).statusCode()).isEqualTo(401);
+        assertThat(post(host, body, now, "00112233445566778899aabbccddeeff", signature).statusCode()).isEqualTo(200);
+        assertThat(post(host, body, now, "00112233445566778899aabbccddeeff", signature).statusCode()).isEqualTo(401);
         assertThat(got).hasSize(1);
     }
 
@@ -229,7 +229,7 @@ class ServerLinkTest {
         String body = "x".repeat(LinkHost.MOST_BODY_BYTES + 10);
         long now = System.currentTimeMillis();
 
-        HttpResponse<String> response = post(host, body, now, "big", LinkAuth.sign(SECRET, now, "big", body));
+        HttpResponse<String> response = post(host, body, now, "b1b1b1b1b1b1b1b1b1", LinkAuth.sign(SECRET, now, "b1b1b1b1b1b1b1b1b1", body));
 
         assertThat(response.statusCode()).isEqualTo(413);
     }
@@ -305,5 +305,47 @@ class ServerLinkTest {
                 new LinkMessage(8, "reply", Map.of(), 7, false));
 
         assertThat(LinkCodec.decode(LinkCodec.encode(messages))).isEqualTo(messages);
+    }
+
+    @Test
+    @DisplayName("a request's signature and an answer's are never interchangeable, whatever the nonce says")
+    void signaturesAreSeparated() {
+        long time = 1_000L;
+        String asAnswer = LinkAuth.signAnswer(SECRET, time, "abc", "body");
+
+        assertThat(LinkAuth.sign(SECRET, time, "answer:abc", "body")).isNotEqualTo(asAnswer);
+        assertThat(LinkAuth.verify(SECRET, String.valueOf(System.currentTimeMillis()), "answer:abc", asAnswer, "body",
+                System.currentTimeMillis())).as("a nonce is plain hex, nothing else").isFalse();
+        assertThat(LinkAuth.sign(SECRET, time, "ab", "c\nbody")).as("where one field ends is part of what is signed")
+                .isNotEqualTo(LinkAuth.sign(SECRET, time, "ab\nc", "body"));
+    }
+
+    @Test
+    @DisplayName("a guest does not read an answer larger than any real one into memory")
+    void oversizedAnswerRefused() throws Exception {
+        com.sun.net.httpserver.HttpServer fake = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        fake.createContext("/", exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            try (var out = exchange.getResponseBody()) {
+                byte[] chunk = new byte[64 * 1024];
+                for (int written = 0; written < LinkHost.MOST_BODY_BYTES * 3; written += chunk.length) {
+                    out.write(chunk);
+                }
+            } catch (IOException closedByTheGuest) {
+                // The guest hanging up partway is exactly what is being tested.
+            }
+        });
+        fake.start();
+        try {
+            LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + fake.getAddress().getPort()),
+                    SECRET, Duration.ofMillis(200), Duration.ofMillis(50));
+            open.add(guest);
+
+            assertThatThrownBy(() -> guest.request("x", Map.of(), Duration.ofSeconds(2)).get(3, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class);
+        } finally {
+            fake.stop(0);
+        }
     }
 }

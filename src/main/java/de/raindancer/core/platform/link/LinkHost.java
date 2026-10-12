@@ -17,7 +17,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -42,6 +41,7 @@ public final class LinkHost extends AbstractLink {
     /** Threads serving requests, and how many of them a held-open poll may take — the rest stay free to send. */
     private static final int THREADS = 12;
     private static final int MOST_POLLS = 4;
+    private static final int QUEUED = 64;
 
     /** Nonces accepted inside the signature window; past this many the window is simply full and refuses. */
     private static final int MOST_NONCES = 200_000;
@@ -72,12 +72,19 @@ public final class LinkHost extends AbstractLink {
      */
     public static LinkHost listen(String address, int port, String secret, Duration pollWait) throws IOException {
         LinkAuth.requireStrong(secret);
+        // The JDK server's own limits on a slow or idle client; only set when the owner has not set them.
+        System.setProperty("sun.net.httpserver.maxReqTime",
+                System.getProperty("sun.net.httpserver.maxReqTime", "15"));
+        System.setProperty("sun.net.httpserver.maxReqHeaders",
+                System.getProperty("sun.net.httpserver.maxReqHeaders", "64"));
         HttpServer server = HttpServer.create(new InetSocketAddress(address, port), 0);
-        ExecutorService threads = Executors.newFixedThreadPool(THREADS, task -> {
-            Thread thread = new Thread(task, "link-host");
-            thread.setDaemon(true);
-            return thread;
-        });
+        // A bounded queue: past it, a request is turned away rather than kept in memory until there is a thread.
+        ExecutorService threads = new java.util.concurrent.ThreadPoolExecutor(THREADS, THREADS, 30, TimeUnit.SECONDS,
+                new java.util.concurrent.ArrayBlockingQueue<>(QUEUED), task -> {
+                    Thread thread = new Thread(task, "link-host");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
         LinkHost host = new LinkHost(server, threads, secret, pollWait);
         server.createContext("/send", host::onSend);
         server.createContext("/poll", host::onPoll);

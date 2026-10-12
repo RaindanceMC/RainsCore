@@ -17,6 +17,20 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class LinkGuest extends AbstractLink {
 
+    /** Reads an answer up to the size the host would ever send, and fails past it instead of filling memory. */
+    private static final HttpResponse.BodyHandler<String> LIMITED = info ->
+            HttpResponse.BodySubscribers.mapping(HttpResponse.BodySubscribers.ofInputStream(), in -> {
+                try (in) {
+                    byte[] bytes = in.readNBytes(LinkHost.MOST_BODY_BYTES * 4 + 1);
+                    if (bytes.length > LinkHost.MOST_BODY_BYTES * 4) {
+                        throw new java.io.UncheckedIOException(new IOException("the answer is too large"));
+                    }
+                    return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                } catch (IOException failure) {
+                    throw new java.io.UncheckedIOException(failure);
+                }
+            });
+
     private final HttpClient client;
     private final URI base;
     private final String secret;
@@ -89,7 +103,7 @@ public final class LinkGuest extends AbstractLink {
                 .header(LinkAuth.NONCE, nonce)
                 .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, nonce, body))
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
+        return client.sendAsync(request, LIMITED).thenAccept(response -> {
             if (response.statusCode() != 200) {
                 throw new IllegalStateException("the host answered " + response.statusCode());
             }
@@ -125,7 +139,7 @@ public final class LinkGuest extends AbstractLink {
                 .header(LinkAuth.NONCE, nonce)
                 .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, nonce, query))
                 .GET().build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(request, LIMITED);
         if (response.statusCode() != 200 || !genuine(response, nonce)) {
             pause();
             return;
