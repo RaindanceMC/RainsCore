@@ -111,6 +111,58 @@ public final class Punishments {
     }
 
     /**
+     * The player's mute and ban as they stand here, as plain strings — for another server of the network to
+     * {@link #adopt}. An end of "" is "until lifted".
+     */
+    public java.util.Map<String, String> export(UUID player) {
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        for (PunishmentKind kind : java.util.List.of(PunishmentKind.MUTE, PunishmentKind.BAN)) {
+            active(player, kind).ifPresent(given -> {
+                String key = kind.name().toLowerCase(java.util.Locale.ROOT);
+                out.put(key, "true");
+                out.put(key + ".reason", given.reason());
+                out.put(key + ".moderator", given.moderator() == null ? "" : given.moderator().toString());
+                out.put(key + ".ends", given.endsAt() == null ? "" : String.valueOf(given.endsAt().toEpochMilli()));
+            });
+        }
+        return out;
+    }
+
+    /**
+     * Makes this server's mute match what another server {@link #export exported}: given here for the time it has
+     * left there, lifted here when it is gone there. A ban is not copied — see {@link #banned}; the server that keeps
+     * the bans keeps people out.
+     */
+    public void adopt(UUID player, java.util.Map<String, String> exported) {
+        if (player == null || exported == null) {
+            return;
+        }
+        Optional<Punishment> here = active(player, PunishmentKind.MUTE);
+        if (!"true".equals(exported.get("mute"))) {
+            here.ifPresent(mute -> lift(player, PunishmentKind.MUTE, null, "lifted on the linked server"));
+            return;
+        }
+        String ends = exported.getOrDefault("mute.ends", "");
+        Instant endsAt = ends.isBlank() ? null : Instant.ofEpochMilli(Long.parseLong(ends));
+        String reason = exported.getOrDefault("mute.reason", "");
+        if (here.isPresent() && java.util.Objects.equals(here.get().endsAt(), endsAt)
+                && here.get().reason().equals(reason.isBlank() ? "no reason given" : reason.trim())) {
+            return;
+        }
+        if (endsAt != null && !endsAt.isAfter(now())) {
+            return;
+        }
+        String moderator = exported.getOrDefault("mute.moderator", "");
+        punish(player, PunishmentKind.MUTE, moderator.isBlank() ? null : UUID.fromString(moderator), reason,
+                endsAt == null ? null : Duration.between(now(), endsAt));
+    }
+
+    /** Whether an {@link #export} says the player is banned there. */
+    public static boolean banned(java.util.Map<String, String> exported) {
+        return exported != null && "true".equals(exported.get("ban"));
+    }
+
+    /**
      * Ends a punishment early.
      *
      * @return whether there was one to end

@@ -40,9 +40,23 @@ public final class NetworkLink {
 
             # At least 24 characters, the same on both servers. Treat it like a password.
             secret: ""
+
+            # true on a server that shows the other one's player data — name styles, prefixes, nicknames — fetched
+            # when a player arrives (an arena next to a survival server). The other server keeps it.
+            follows: false
             """;
 
     private NetworkLink() {
+    }
+
+    /** Whether {@code file} says this server shows the other one's player data rather than keeping its own. */
+    public static boolean follows(Path file) {
+        if (!Files.exists(file)) {
+            return false;
+        }
+        YamlStore store = new YamlStore(file);
+        YamlConfiguration yaml = store.read();
+        return store.problems().isEmpty() && yaml.getBoolean("follows", false);
     }
 
     /** Reads {@code file} (writing the switched-off default when there is none) and starts the end it describes. */

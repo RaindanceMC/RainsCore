@@ -590,6 +590,20 @@ public interface RainsCore {
         return java.util.Set.of();
     }
 
+    /**
+     * A player's data kept on the other server of the link and shown here, by part — see
+     * {@link de.raindancer.core.platform.link.LinkProfiles}. Core provides and follows "identity" itself; a plugin
+     * adds its own parts. Empty without a link.
+     */
+    default java.util.Optional<de.raindancer.core.platform.link.LinkProfiles> profiles() {
+        return java.util.Optional.empty();
+    }
+
+    /** Whether this server shows the other one's player data ({@code follows: true} in link.yml) rather than its own. */
+    default boolean linkFollows() {
+        return false;
+    }
+
     /** The registry behind those buttons, for a plugin that wants to revoke one itself. */
     ClickActions clickActions();
 

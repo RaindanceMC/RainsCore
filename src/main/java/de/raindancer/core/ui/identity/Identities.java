@@ -326,6 +326,33 @@ public final class Identities {
                 identity.suffix(), identity.nametagPrefix(), identity.colour(), value));
     }
 
+    /**
+     * Everything this server shows for a player, as plain strings — for another server of the network to
+     * {@link #adopt} when they arrive there. Empty strings for what is not set.
+     */
+    public Map<String, String> export(UUID player) {
+        Identity identity = identityOf(player);
+        return Map.of("prefix", identity.prefix(), "suffix", identity.suffix(),
+                "nametagPrefix", identity.nametagPrefix(), "colour", identity.colour(),
+                "subtitle", identity.subtitle(), "nickname", player == null ? "" : nicknames.getOrDefault(player, ""));
+    }
+
+    /**
+     * Takes over what another server {@link #export exported}, whole: a part set there is set here, a part
+     * empty there is cleared here. Each part goes through the same checks as when it was first set.
+     */
+    public void adopt(UUID player, Map<String, String> exported) {
+        if (player == null || exported == null) {
+            return;
+        }
+        setPrefix(player, exported.getOrDefault("prefix", ""));
+        setSuffix(player, exported.getOrDefault("suffix", ""));
+        setNametagPrefix(player, exported.getOrDefault("nametagPrefix", ""));
+        setNameStyle(player, NameStyle.parse(exported.getOrDefault("colour", "")));
+        setSubtitle(player, exported.getOrDefault("subtitle", ""));
+        setNickname(player, exported.getOrDefault("nickname", ""));
+    }
+
     /** Forgets everything about a player. */
     public void clear(UUID player) {
         if (player != null && identities.remove(player) != null) {

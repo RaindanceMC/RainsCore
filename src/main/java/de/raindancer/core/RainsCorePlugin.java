@@ -316,6 +316,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     /** This server's link to another of its network, when link.yml asks for one. */
     private volatile de.raindancer.core.platform.link.ServerLink link;
     private volatile de.raindancer.core.platform.link.LinkRoster roster;
+    private volatile de.raindancer.core.platform.link.LinkProfiles profiles;
+    private boolean linkFollows;
+    private volatile de.raindancer.core.social.economy.LinkedEconomy linkedEconomy;
+    private io.papermc.paper.threadedregions.scheduler.ScheduledTask profileTimer;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask rosterTimer;
 
     static RainsCorePlugin instance() {
@@ -775,6 +779,42 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
             rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
                     task -> roster.exchange().exceptionally(unreachable -> null));
+            profiles = new de.raindancer.core.platform.link.LinkProfiles(link);
+            linkFollows = de.raindancer.core.platform.link.NetworkLink.follows(getDataFolder().toPath().resolve("link.yml"));
+            profiles.provide("identity", identities::export);
+            profiles.provide("punishments", punishments::export);
+            if (linkFollows) {
+                profiles.follow("identity", identities::adopt);
+                profiles.follow("punishments", (player, exported) -> {
+                    punishments.adopt(player, exported);
+                    org.bukkit.entity.Player online = getServer().getPlayer(player);
+                    if (online != null && de.raindancer.core.moderation.punishment.Punishments.banned(exported)) {
+                        de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> online.kick(
+                                net.kyori.adventure.text.Component.text("You are banned: "
+                                        + exported.getOrDefault("ban.reason", "no reason given"))));
+                    }
+                });
+                log.info("Server link: player names and styles are taken from the other server.");
+                // A mute given over there while somebody is here holds here within half a minute, not at their next visit.
+                profileTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 30, 30, task -> {
+                    de.raindancer.core.platform.link.LinkProfiles current = profiles;
+                    if (current != null) {
+                        getServer().getOnlinePlayers().forEach(online -> current.fetch(online.getUniqueId()));
+                    }
+                });
+                // After every plugin is enabled: only a server with no economy of its own uses the other's.
+                de.raindancer.core.platform.util.Scheduling.globalLater(this, 1L, () -> {
+                    if (link != null && de.raindancer.core.social.economy.Economies.current().isEmpty()) {
+                        linkedEconomy = new de.raindancer.core.social.economy.LinkedEconomy(link);
+                        de.raindancer.core.social.economy.Economies.provide(this, linkedEconomy);
+                        linkedEconomy.refreshCurrency().exceptionally(unreachable -> null);
+                        log.info("Server link: money is the other server's — one balance on both.");
+                    }
+                });
+            } else {
+                de.raindancer.core.social.economy.LinkedEconomy.serve(link,
+                        de.raindancer.core.social.economy.Economies::current);
+            }
         }
 
         // From here on, database work on a thread running the world is a mistake and is reported as
@@ -1080,6 +1120,21 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (roster != null) {
             roster.stop();
             roster = null;
+        }
+        if (profileTimer != null) {
+            profileTimer.cancel();
+            profileTimer = null;
+        }
+        if (profiles != null) {
+            profiles.stop();
+            profiles = null;
+        }
+        if (linkedEconomy != null) {
+            de.raindancer.core.social.economy.Economies.retract(linkedEconomy);
+            linkedEconomy = null;
+        }
+        if (link != null && !linkFollows) {
+            de.raindancer.core.social.economy.LinkedEconomy.stopServing(link);
         }
         if (link != null) {
             // Like the pack server: a port and threads that a reload must not leave behind.
@@ -1466,6 +1521,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public java.util.Optional<de.raindancer.core.platform.link.LinkProfiles> profiles() {
+        return java.util.Optional.ofNullable(profiles);
+    }
+
+    @Override
+    public boolean linkFollows() {
+        return profiles != null && linkFollows;
+    }
+
+    @Override
     public java.util.Set<String> playersElsewhere() {
         de.raindancer.core.platform.link.LinkRoster current = roster;
         return current == null ? java.util.Set.of() : current.elsewhere();
@@ -1817,6 +1882,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         offerOwnerHint(event.getPlayer());
+        de.raindancer.core.platform.link.LinkProfiles following = profiles;
+        if (following != null && linkFollows) {
+            following.fetch(event.getPlayer().getUniqueId());
+        }
         if (mentionCompletions != null) {
             mentionCompletions.refresh();
         }
