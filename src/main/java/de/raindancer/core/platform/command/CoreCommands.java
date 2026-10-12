@@ -172,6 +172,25 @@ public final class CoreCommands {
         return changelog(registrar, "changelog", "news");
     }
 
+    private static final AtomicBoolean HUB_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /hub} (alias {@code /smp}): the front door to everything installed. One per server, so taken by
+     * the first plugin that asks, like {@link #commandList}.
+     */
+    public static boolean hub(Commands registrar, String name, String... aliases) {
+        if (!HUB_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register(name, "The server's hub: every feature installed, and how to use it.",
+                List.of(aliases), new de.raindancer.core.ui.hub.HubCommand());
+        return true;
+    }
+
+    public static boolean hub(Commands registrar) {
+        return hub(registrar, "hub", "smp");
+    }
+
     private static final AtomicBoolean MAINTENANCE_TAKEN = new AtomicBoolean();
 
     /** {@code /maintenance}: one per server, so taken by the first plugin that asks. */

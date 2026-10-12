@@ -528,6 +528,9 @@ public interface RainsCore {
      */
     CommandDirectory commands();
 
+    /** The doors of {@code /hub}; a module declares itself here as it enables. */
+    de.raindancer.core.ui.hub.Hub hub();
+
     Audit audit();
 
     /**

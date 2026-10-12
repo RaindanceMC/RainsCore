@@ -1658,6 +1658,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return commandDirectory;
     }
 
+    private final de.raindancer.core.ui.hub.Hub hub = new de.raindancer.core.ui.hub.Hub();
+
+    @Override
+    public de.raindancer.core.ui.hub.Hub hub() {
+        return hub;
+    }
+
     @Override
     public Audit audit() {
         return audit;
