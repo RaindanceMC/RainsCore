@@ -26,6 +26,8 @@ public record PlayerLookup(String typed, Kind kind, List<OfflinePlayer> matches)
         NAME,
         /** Somebody's nickname. */
         NICKNAME,
+        /** {@code @TAG}: a group a plugin offers through {@link PlayerGroups} — its members, online or not. */
+        GROUP,
         /** Nobody. */
         NONE
     }

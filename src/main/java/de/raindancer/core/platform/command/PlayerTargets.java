@@ -185,6 +185,9 @@ public final class PlayerTargets {
         if (!typed.startsWith("@")) {
             return online(server, typed).map(List::of).orElse(List.of());
         }
+        if (PlayerGroups.isGroup(typed)) {
+            return PlayerGroups.members(typed).stream().map(server::getPlayer).filter(java.util.Objects::nonNull).toList();
+        }
         List<Entity> matched;
         try {
             matched = server.selectEntities(sender, typed);
@@ -218,6 +221,14 @@ public final class PlayerTargets {
             return PlayerLookup.none(text == null ? "" : text, PlayerLookup.Kind.NONE);
         }
         String typed = text.trim();
+        if (PlayerGroups.isGroup(typed)) {
+            List<OfflinePlayer> members = new ArrayList<>();
+            for (UUID member : PlayerGroups.members(typed)) {
+                Player here = server.getPlayer(member);
+                members.add(here != null ? here : server.getOfflinePlayer(member));
+            }
+            return new PlayerLookup(typed, PlayerLookup.Kind.GROUP, members);
+        }
         if (isSelector(typed)) {
             if (sender != null && !sender.hasPermission(SELECTOR_NODE)) {
                 return PlayerLookup.none(typed, PlayerLookup.Kind.SELECTOR_REFUSED);
@@ -287,6 +298,7 @@ public final class PlayerTargets {
         if (sender == null || sender.hasPermission(SELECTOR_NODE)) {
             names.addAll(SELECTORS);
         }
+        names.addAll(PlayerGroups.suggest(typed == null || typed.isEmpty() ? "@" : typed));
         Set<UUID> shown = new java.util.HashSet<>();
         if (server != null) {
             for (Player player : server.getOnlinePlayers()) {
