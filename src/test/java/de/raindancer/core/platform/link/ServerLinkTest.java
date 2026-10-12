@@ -348,4 +348,70 @@ class ServerLinkTest {
             fake.stop(0);
         }
     }
+
+    /** A host that answers every poll at once, signed properly, with whatever body the test gives it. */
+    private static com.sun.net.httpserver.HttpServer signingFake(java.util.function.Supplier<String> body,
+                                                                 List<String> queries) throws IOException {
+        com.sun.net.httpserver.HttpServer fake = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        fake.createContext("/poll", exchange -> {
+            queries.add(exchange.getRequestURI().getRawQuery());
+            String text = body.get();
+            long time = System.currentTimeMillis();
+            String nonce = exchange.getRequestHeaders().getFirst(LinkAuth.NONCE);
+            exchange.getResponseHeaders().set("X-Link-Instance", "fake-instance");
+            exchange.getResponseHeaders().set(LinkAuth.TIME, String.valueOf(time));
+            exchange.getResponseHeaders().set(LinkAuth.SIGNATURE,
+                    LinkAuth.signAnswer(SECRET, time, nonce, "fake-instance\n" + text));
+            byte[] bytes = text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        fake.start();
+        return fake;
+    }
+
+    @Test
+    @DisplayName("one message that cannot be read is skipped; the others arrive and the poll moves past all of them")
+    void poisonMessageDoesNotStall() throws Exception {
+        List<String> queries = new CopyOnWriteArrayList<>();
+        String body = "[{\"id\":1,\"topic\":\"t\",\"data\":{\"n\":\"one\"}},"
+                + "{\"id\":2,\"topic\":\"t\",\"data\":\"not an object\"},"
+                + "{\"id\":3,\"topic\":\"t\",\"data\":{\"n\":\"three\"}}]";
+        com.sun.net.httpserver.HttpServer fake = signingFake(() -> body, queries);
+        try {
+            LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + fake.getAddress().getPort()),
+                    SECRET, Duration.ofMillis(200), Duration.ofMillis(50));
+            open.add(guest);
+            List<String> got = new CopyOnWriteArrayList<>();
+            guest.on("t", data -> {
+                got.add(data.get("n"));
+                return null;
+            });
+
+            eventually(() -> assertThat(queries).anyMatch(query -> query.endsWith("after=3")));
+            assertThat(got).startsWith("one", "three");
+        } finally {
+            fake.stop(0);
+        }
+    }
+
+    @Test
+    @DisplayName("a host that answers every poll at once does not drive the guest into a busy loop")
+    void noBusyLoop() throws Exception {
+        List<String> queries = new CopyOnWriteArrayList<>();
+        com.sun.net.httpserver.HttpServer fake = signingFake(() -> "[]", queries);
+        try {
+            LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + fake.getAddress().getPort()),
+                    SECRET, Duration.ofSeconds(20), Duration.ofMillis(50));
+            open.add(guest);
+
+            Thread.sleep(1000);
+
+            assertThat(queries.size()).as("polls in one second").isLessThanOrEqualTo(12);
+        } finally {
+            fake.stop(0);
+        }
+    }
 }

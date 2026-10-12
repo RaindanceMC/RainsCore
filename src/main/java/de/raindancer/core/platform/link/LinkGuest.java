@@ -31,6 +31,9 @@ public final class LinkGuest extends AbstractLink {
                 }
             });
 
+    /** The shortest a poll that brought nothing may take before the next is sent. */
+    private static final long MIN_POLL_MILLIS = 100;
+
     private final HttpClient client;
     private final URI base;
     private final String secret;
@@ -130,7 +133,9 @@ public final class LinkGuest extends AbstractLink {
     }
 
     private void pollOnce() throws IOException, InterruptedException {
-        String query = "instance=" + instance + "&after=" + seen;
+        String query = "instance=" + java.net.URLEncoder.encode(instance, java.nio.charset.StandardCharsets.UTF_8)
+                + "&after=" + seen;
+        long started = System.currentTimeMillis();
         long time = System.currentTimeMillis();
         String nonce = LinkAuth.nonce();
         HttpRequest request = HttpRequest.newBuilder(base.resolve("/poll?" + query))
@@ -152,7 +157,16 @@ public final class LinkGuest extends AbstractLink {
             seen = 0;
         }
         List<LinkMessage> answers = new ArrayList<>();
-        for (LinkMessage message : LinkCodec.decode(response.body())) {
+        long[] lastSkipped = {0};
+        List<LinkMessage> arrived = LinkCodec.decodeEach(response.body(), id -> {
+            log.error("A message from the host could not be read and is skipped (id {}).", id);
+            lastSkipped[0] = Math.max(lastSkipped[0], id);
+        });
+        if (arrived.isEmpty() && System.currentTimeMillis() - started < MIN_POLL_MILLIS) {
+            // A host that answers at once with nothing is not holding the poll open; do not ask it again at once.
+            pause(MIN_POLL_MILLIS);
+        }
+        for (LinkMessage message : arrived) {
             if (message.id() <= seen) {
                 continue;
             }
@@ -161,6 +175,11 @@ public final class LinkGuest extends AbstractLink {
             if (answer != null) {
                 answers.add(answer);
             }
+        }
+        // Acknowledged all the same, once the readable ones are through: kept, an unreadable message would come back
+        // on every poll and never let anything after it through.
+        if (lastSkipped[0] > seen) {
+            seen = lastSkipped[0];
         }
         if (!answers.isEmpty()) {
             post(answers).exceptionally(failure -> {
@@ -179,8 +198,12 @@ public final class LinkGuest extends AbstractLink {
     }
 
     private void pause() {
+        pause(retry.toMillis());
+    }
+
+    private void pause(long millis) {
         try {
-            Thread.sleep(retry.toMillis());
+            Thread.sleep(millis);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             closed = true;
