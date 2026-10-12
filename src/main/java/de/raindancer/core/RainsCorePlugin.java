@@ -512,6 +512,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         landPolicyStore.problem().ifPresent(trouble -> log.warn("land-flags.yml: {}", trouble));
         land = new Land(landPolicies, messages, System::currentTimeMillis);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(land), this);
+        // Worlds a plugin locked (a hub, an arena) are enforced here, the same for every plugin that locks one.
+        getServer().getPluginManager().registerEvents(new de.raindancer.core.world.protection.LockedWorldListener(), this);
+        if (getServer().getPluginManager().getPermission(de.raindancer.core.world.protection.LockedWorlds.BUILD_PERMISSION) == null) {
+            getServer().getPluginManager().addPermission(new org.bukkit.permissions.Permission(
+                    de.raindancer.core.world.protection.LockedWorlds.BUILD_PERMISSION,
+                    "Build in worlds a plugin locked (in creative)", org.bukkit.permissions.PermissionDefault.OP));
+        }
         getServer().getPluginManager().registerEvents(new AnvilInput.Listener(this), this);
         interactionProtection = new InteractionProtectionListener(land, messages, audit);
         getServer().getPluginManager().registerEvents(interactionProtection, this);
@@ -1851,6 +1858,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.moderation.rules.RuleBreaches.forgetFrom(loader)
                 + de.raindancer.core.moderation.reports.AutoReports.forgetFrom(loader)
                 + de.raindancer.core.moderation.players.AdminModes.forgetFrom(loader)
+                + de.raindancer.core.world.protection.LockedWorlds.forgetFrom(loader)
                 + de.raindancer.core.moderation.players.CheatRecords.forgetFrom(loader)
                 + de.raindancer.core.moderation.chatlog.ChatLog.forgetFrom(loader)
                 + de.raindancer.core.moderation.punishment.BlockedAttempts.forgetFrom(loader);
