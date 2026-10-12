@@ -315,6 +315,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private PackServer packServer;
     /** This server's link to another of its network, when link.yml asks for one. */
     private volatile de.raindancer.core.platform.link.ServerLink link;
+    private volatile de.raindancer.core.platform.link.LinkRoster roster;
+    private io.papermc.paper.threadedregions.scheduler.ScheduledTask rosterTimer;
 
     static RainsCorePlugin instance() {
         return instance;
@@ -767,6 +769,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         startResourcePacks(settings.current());
         link = de.raindancer.core.platform.link.NetworkLink.start(getDataFolder().toPath().resolve("link.yml"),
                 de.raindancer.core.platform.log.Log.of("link")).orElse(null);
+        if (link != null) {
+            roster = new de.raindancer.core.platform.link.LinkRoster(link, () -> getServer().getOnlinePlayers().stream()
+                    .map(org.bukkit.entity.Player::getName).toList(), System::currentTimeMillis);
+            // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
+            rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
+                    task -> roster.exchange().exceptionally(unreachable -> null));
+        }
 
         // From here on, database work on a thread running the world is a mistake and is reported as
         // one. Before here it was the startup read, which is allowed.
@@ -1063,6 +1072,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             if (released > 0) {
                 log.info("Let go of {} chunk(s) that were being kept loaded.", released);
             }
+        }
+        if (rosterTimer != null) {
+            rosterTimer.cancel();
+            rosterTimer = null;
+        }
+        if (roster != null) {
+            roster.stop();
+            roster = null;
         }
         if (link != null) {
             // Like the pack server: a port and threads that a reload must not leave behind.
@@ -1446,6 +1463,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public java.util.Optional<de.raindancer.core.platform.link.ServerLink> link() {
         return java.util.Optional.ofNullable(link);
+    }
+
+    @Override
+    public java.util.Set<String> playersElsewhere() {
+        de.raindancer.core.platform.link.LinkRoster current = roster;
+        return current == null ? java.util.Set.of() : current.elsewhere();
     }
 
     @Override

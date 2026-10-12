@@ -582,6 +582,14 @@ public interface RainsCore {
         return java.util.Optional.empty();
     }
 
+    /**
+     * The names online on the other server of the link, refreshed every few seconds — for tab completion and for
+     * addressing somebody over there. Empty without a link, or when the other side has not answered for a while.
+     */
+    default java.util.Set<String> playersElsewhere() {
+        return java.util.Set.of();
+    }
+
     /** The registry behind those buttons, for a plugin that wants to revoke one itself. */
     ClickActions clickActions();
 
