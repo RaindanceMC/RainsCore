@@ -42,7 +42,7 @@ public final class HubModuleMenu extends HubPage {
 
     @Override
     void header() {
-        set(MenuLayout.HEADER_SUBJECT, HubMenu.door(entry, Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission).size()));
+        set(MenuLayout.HEADER_SUBJECT, HubMenu.door(entry, Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission).size(), false));
     }
 
     @Override
@@ -65,7 +65,8 @@ public final class HubModuleMenu extends HubPage {
         }
         lore.add("");
         lore.add("<dark_gray>» <white>" + (runsDirectly(note) ? "Click to run" : "Click to type it"));
-        return Icons.of(Material.PAPER, "<" + entry.accent() + ">" + Text.literal(note.slashed()), lore);
+        return tidy(Icons.of(HubLook.forCommand(note.command(), entry.icon()),
+                "<" + entry.accent() + ">" + Text.literal(note.slashed()), lore), false);
     }
 
     /** A command with no arguments can simply be run; one that takes some needs the player to finish it. */

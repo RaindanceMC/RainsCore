@@ -74,8 +74,8 @@ public final class HubMenu extends HubPage {
                     + Times.describe(RainsCore.get().playtime().played(viewer().getUniqueId())));
         }
         lore.add("<dark_gray>▪ <gray>Features here: <white>" + tiles().size());
-        return Icons.of(Material.NETHER_STAR, "<bold><gradient:" + Style.brandFrom() + ":" + Style.brandTo() + ">"
-                + Text.literal(serverName()) + "</gradient></bold>", lore);
+        return tidy(Icons.of(Material.NETHER_STAR, "<bold><gradient:" + Style.brandFrom() + ":" + Style.brandTo() + ">"
+                + Text.literal(serverName()) + "</gradient></bold>", lore), true);
     }
 
     static String serverName() {
@@ -89,15 +89,15 @@ public final class HubMenu extends HubPage {
         List<Tile> tiles = new ArrayList<>();
         for (HubEntry entry : RainsCore.get().hub().visibleTo(viewer()::hasPermission, directory)) {
             int commands = Hub.notesFor(entry, directory, viewer()::hasPermission).size();
-            tiles.add(new Tile(door(entry, commands),
+            tiles.add(new Tile(door(entry, commands, true),
                     event -> new HubModuleMenu(viewer(), brand(), this, entry).open()));
         }
         return tiles;
     }
 
-    static ItemStack door(HubEntry entry, int commands) {
+    static ItemStack door(HubEntry entry, int commands, boolean clickable) {
         List<String> lore = new ArrayList<>();
-        for (String line : HubLook.wrap(entry.description(), WRAP)) {
+        for (String line : HubLook.clip(HubLook.wrap(entry.description(), WRAP), 3)) {
             lore.add("<gray>" + Text.literal(line));
         }
         if (!lore.isEmpty()) {
@@ -109,10 +109,12 @@ public final class HubMenu extends HubPage {
         if (!entry.version().isEmpty()) {
             lore.add("<dark_gray>▪ <gray>Version <white>" + Text.literal(entry.version()));
         }
-        lore.add("");
-        lore.add("<dark_gray>» <white>Click to open");
-        return Icons.of(entry.icon(), "<bold><gradient:" + entry.accent() + ":" + HubLook.lighter(entry.accent(), 0.55)
-                + ">" + Text.literal(entry.name()) + "</gradient></bold>", lore);
+        if (clickable) {
+            lore.add("");
+            lore.add("<dark_gray>» <white>Click to open");
+        }
+        return tidy(Icons.of(entry.icon(), "<bold><gradient:" + entry.accent() + ":" + HubLook.lighter(entry.accent(), 0.55)
+                + ">" + Text.literal(entry.name()) + "</gradient></bold>", lore), !clickable);
     }
 
     @Override

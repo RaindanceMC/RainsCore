@@ -42,6 +42,26 @@ public record HubLook(Material icon, String accent) {
             look("xaeromap", Material.FILLED_MAP, "#FCD34D"),
             look("xpbottle", Material.EXPERIENCE_BOTTLE, "#A3E635"));
 
+    /** Substrings of a command name and what they look like; the first that fits wins, so order matters. */
+    private static final Map<String, Material> COMMAND_HINTS = java.util.stream.Stream.of(new Object[][]{
+            {"home", Material.RED_BED}, {"warp", Material.END_PORTAL_FRAME}, {"tpa", Material.ENDER_EYE},
+            {"tp", Material.ENDER_PEARL}, {"spawn", Material.GRASS_BLOCK}, {"back", Material.RECOVERY_COMPASS},
+            {"pay", Material.GOLD_NUGGET}, {"bal", Material.GOLD_INGOT}, {"bank", Material.GOLD_BLOCK},
+            {"shop", Material.EMERALD}, {"sell", Material.EMERALD}, {"auction", Material.CLOCK},
+            {"loan", Material.PAPER}, {"bill", Material.MAP}, {"daily", Material.SUNFLOWER},
+            {"casino", Material.DIAMOND}, {"slots", Material.DIAMOND}, {"dice", Material.DIAMOND},
+            {"coinflip", Material.SUNFLOWER}, {"lottery", Material.NAME_TAG}, {"baltop", Material.GOLDEN_HELMET},
+            {"claim", Material.GOLDEN_SHOVEL}, {"trust", Material.LIME_DYE}, {"msg", Material.WRITABLE_BOOK},
+            {"mail", Material.WRITTEN_BOOK}, {"chat", Material.WRITABLE_BOOK}, {"rules", Material.BOOK},
+            {"report", Material.RED_DYE}, {"ban", Material.BARRIER}, {"mute", Material.SKELETON_SKULL},
+            {"kick", Material.IRON_BOOTS}, {"vanish", Material.GLASS}, {"invsee", Material.CHEST},
+            {"settings", Material.COMPARATOR}, {"role", Material.GOLDEN_HELMET}, {"quest", Material.MAP},
+            {"job", Material.IRON_PICKAXE}, {"rtp", Material.COMPASS}, {"seen", Material.SPYGLASS},
+            {"nick", Material.NAME_TAG}, {"afk", Material.CLOCK}, {"admin", Material.COMMAND_BLOCK},
+            {"prefix", Material.NAME_TAG}, {"changelog", Material.WRITTEN_BOOK}, {"help", Material.KNOWLEDGE_BOOK},
+    }).collect(java.util.stream.Collectors.toMap(row -> (String) row[0], row -> (Material) row[1],
+            (a, b) -> a, java.util.LinkedHashMap::new));
+
     private static final Material[] FALLBACK_ICONS = {Material.BOOK, Material.LANTERN, Material.BELL,
             Material.BEACON, Material.PRISMARINE_SHARD, Material.COPPER_INGOT};
     private static final String[] FALLBACK_ACCENTS = {"#7DD3FC", "#F9A8D4", "#FDE68A", "#A7F3D0", "#C4B5FD",
@@ -62,6 +82,17 @@ public record HubLook(Material icon, String accent) {
         return new HubLook(FALLBACK_ICONS[pick], FALLBACK_ACCENTS[pick]);
     }
 
+    /** An icon for a command from its name, or {@code fallback} when nothing in the name suggests one. */
+    public static Material forCommand(String command, Material fallback) {
+        String name = command == null ? "" : command.toLowerCase(Locale.ROOT).replaceAll("^/+", "");
+        for (Map.Entry<String, Material> hint : COMMAND_HINTS.entrySet()) {
+            if (name.contains(hint.getKey())) {
+                return hint.getValue();
+            }
+        }
+        return fallback;
+    }
+
     /** {@code accent} mixed toward white by {@code amount} (0 = unchanged, 1 = white). */
     public static String lighter(String accent, double amount) {
         int rgb = Integer.parseInt(accent.substring(1), 16);
@@ -72,6 +103,16 @@ public record HubLook(Material icon, String accent) {
             out = (out << 8) | (int) Math.round(channel + (255 - channel) * mix);
         }
         return String.format("#%06X", out);
+    }
+
+    /** The first {@code max} lines, the last one ending in an ellipsis when something was cut. */
+    public static List<String> clip(List<String> lines, int max) {
+        if (lines.size() <= max) {
+            return lines;
+        }
+        List<String> kept = new ArrayList<>(lines.subList(0, max));
+        kept.set(max - 1, kept.get(max - 1) + "…");
+        return kept;
     }
 
     /** Greedy word wrap; a word longer than the width gets its own line instead of being cut. */

@@ -90,6 +90,18 @@ abstract class HubPage extends Menu {
         viewer().playSound(viewer().getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.5f, pitch);
     }
 
+    /** Hides the vanilla stat lines a sword or shovel would add under the lore, and optionally makes it shine. */
+    static ItemStack tidy(ItemStack item, boolean shine) {
+        item.editMeta(meta -> {
+            meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ATTRIBUTES,
+                    org.bukkit.inventory.ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
+            if (shine) {
+                meta.setEnchantmentGlintOverride(true);
+            }
+        });
+        return item;
+    }
+
     /** Whether a command name is registered, so a shortcut to a plugin that is not installed is not drawn. */
     static boolean exists(String command) {
         return Bukkit.getCommandMap().getCommand(command) != null;

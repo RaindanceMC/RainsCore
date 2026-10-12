@@ -50,4 +50,22 @@ class HubLookTest {
         assertThat(HubLook.wrap("", 10)).isEmpty();
         assertThat(HubLook.wrap(null, 10)).isEmpty();
     }
+
+    @Test
+    @DisplayName("clipping keeps the first lines and marks the cut with an ellipsis; short text is untouched")
+    void clip() {
+        assertThat(HubLook.clip(List.of("a", "b", "c", "d"), 3)).containsExactly("a", "b", "c…");
+        assertThat(HubLook.clip(List.of("a", "b"), 3)).containsExactly("a", "b");
+        assertThat(HubLook.clip(List.of(), 3)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a command gets an icon from what its name says; anything unrecognised keeps the module's own")
+    void commandIcons() {
+        assertThat(HubLook.forCommand("home", Material.GOLD_INGOT)).isEqualTo(Material.RED_BED);
+        assertThat(HubLook.forCommand("home set", Material.GOLD_INGOT)).isEqualTo(Material.RED_BED);
+        assertThat(HubLook.forCommand("sethome", Material.GOLD_INGOT)).isEqualTo(Material.RED_BED);
+        assertThat(HubLook.forCommand("/PAY", Material.PAPER)).isEqualTo(Material.GOLD_NUGGET);
+        assertThat(HubLook.forCommand("xyzzy", Material.LANTERN)).isEqualTo(Material.LANTERN);
+    }
 }
