@@ -25,6 +25,12 @@ public final class LinkedEconomy implements Economy {
     public static final String BALANCE = "economy.balance";
     public static final String MOVE = "economy.move";
     public static final String CURRENCY = "economy.currency";
+    /**
+     * A payment made on the following server, run by the economy plugin of the server that keeps the money under all
+     * of its own rules (the raw {@link #transfer} skips them): {@code payer}, {@code payerName}, {@code target},
+     * {@code amount}, {@code confirmed}. Answer: {@code lines} (JSON, one per line) and {@code confirm}.
+     */
+    public static final String PAY = "economy.pay";
     private static final Duration WAIT = Duration.ofSeconds(3);
 
     private final ServerLink link;

@@ -774,7 +774,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         link = de.raindancer.core.platform.link.NetworkLink.start(getDataFolder().toPath().resolve("link.yml"),
                 de.raindancer.core.platform.log.Log.of("link")).orElse(null);
         if (link != null) {
+            // Vanished staff are not on the list: a name that completes over there is somebody seen here.
             roster = new de.raindancer.core.platform.link.LinkRoster(link, () -> getServer().getOnlinePlayers().stream()
+                    .filter(online -> !vanish.isVanished(online.getUniqueId()))
                     .map(org.bukkit.entity.Player::getName).toList(), System::currentTimeMillis);
             // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
             rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
