@@ -25,6 +25,11 @@ abstract class AbstractLink implements ServerLink {
         handlers.put(topic, handler);
     }
 
+    @Override
+    public void off(String topic) {
+        handlers.remove(topic);
+    }
+
     protected long nextId() {
         return ids.incrementAndGet();
     }

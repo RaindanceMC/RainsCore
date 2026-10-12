@@ -5,15 +5,24 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.HexFormat;
 
 /**
- * Signing a request with the shared secret: an HMAC over the time and the body, so a request cannot be forged, changed
- * on the way, or replayed later — one older than {@link #MOST_SKEW_MILLIS} is refused.
+ * Signing with the shared secret: an HMAC over a time, a nonce and the body.
+ *
+ * <ul>
+ *   <li>A request cannot be forged or changed on the way — the signature covers all of it.</li>
+ *   <li>It cannot be replayed: one older than {@link #MOST_SKEW_MILLIS} is refused, and inside that window the host
+ *       remembers every nonce it has accepted.</li>
+ *   <li>An answer is signed too, over the nonce of the request it answers — so a guest believes only what the real
+ *       host said to <em>this</em> request, not whatever is listening on the port, and not an old answer replayed.</li>
+ * </ul>
  */
 public final class LinkAuth {
 
     public static final String TIME = "X-Link-Time";
+    public static final String NONCE = "X-Link-Nonce";
     public static final String SIGNATURE = "X-Link-Signature";
 
     /** How far apart two clocks on the same machine (or LAN) may be, and how long a signature is good for. */
@@ -21,6 +30,8 @@ public final class LinkAuth {
 
     /** Shorter than this and the secret is guessable; it is a password between two servers. */
     public static final int SHORTEST_SECRET = 24;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private LinkAuth() {
     }
@@ -31,33 +42,60 @@ public final class LinkAuth {
         }
     }
 
-    public static String sign(String secret, long time, String body) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            mac.update(Long.toString(time).getBytes(StandardCharsets.UTF_8));
-            mac.update((byte) '\n');
-            mac.update(body.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(mac.doFinal());
-        } catch (GeneralSecurityException impossible) {
-            throw new IllegalStateException("HmacSHA256 is part of every JDK", impossible);
-        }
+    public static String nonce() {
+        byte[] bytes = new byte[16];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
-    public static boolean verify(String secret, String time, String signature, String body, long now) {
-        if (time == null || signature == null) {
+    /** A request's signature. */
+    public static String sign(String secret, long time, String nonce, String body) {
+        return hmac(secret, time + "\n" + nonce + "\n" + body);
+    }
+
+    /** An answer's signature, tied to the request it answers. */
+    public static String signAnswer(String secret, long time, String requestNonce, String body) {
+        return hmac(secret, time + "\nanswer:" + requestNonce + "\n" + body);
+    }
+
+    /** Whether a time header is a number within the window — checked before a body is even read. */
+    public static boolean isFresh(String time, long now) {
+        if (time == null) {
             return false;
         }
-        long sent;
         try {
-            sent = Long.parseLong(time);
+            return Math.abs(now - Long.parseLong(time)) <= MOST_SKEW_MILLIS;
         } catch (NumberFormatException garbage) {
             return false;
         }
-        if (Math.abs(now - sent) > MOST_SKEW_MILLIS) {
+    }
+
+    public static boolean verify(String secret, String time, String nonce, String signature, String body, long now) {
+        if (nonce == null || nonce.isEmpty() || nonce.length() > 64 || signature == null || !isFresh(time, now)) {
             return false;
         }
-        byte[] expected = sign(secret, sent, body).getBytes(StandardCharsets.UTF_8);
-        return MessageDigest.isEqual(expected, signature.getBytes(StandardCharsets.UTF_8));
+        return same(sign(secret, Long.parseLong(time), nonce, body), signature);
+    }
+
+    public static boolean verifyAnswer(String secret, String time, String requestNonce, String signature, String body,
+                                       long now) {
+        if (signature == null || !isFresh(time, now)) {
+            return false;
+        }
+        return same(signAnswer(secret, Long.parseLong(time), requestNonce, body), signature);
+    }
+
+    private static boolean same(String expected, String given) {
+        return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), given.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String hmac(String secret, String text) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(text.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException impossible) {
+            throw new IllegalStateException("HmacSHA256 is part of every JDK", impossible);
+        }
     }
 }

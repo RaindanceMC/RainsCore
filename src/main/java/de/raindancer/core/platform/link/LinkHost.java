@@ -36,6 +36,16 @@ public final class LinkHost extends AbstractLink {
     /** More than this waiting for a guest that never comes, and the oldest go — a link is not a mail queue. */
     private static final int MOST_WAITING = 10_000;
 
+    /** No real message comes near this; anything larger is refused before it is read into memory. */
+    public static final int MOST_BODY_BYTES = 1 << 20;
+
+    /** Threads serving requests, and how many of them a held-open poll may take — the rest stay free to send. */
+    private static final int THREADS = 12;
+    private static final int MOST_POLLS = 4;
+
+    /** Nonces accepted inside the signature window; past this many the window is simply full and refuses. */
+    private static final int MOST_NONCES = 200_000;
+
     private final HttpServer server;
     private final ExecutorService threads;
     private final String secret;
@@ -43,6 +53,8 @@ public final class LinkHost extends AbstractLink {
     private final String instance = UUID.randomUUID().toString();
     private final Deque<LinkMessage> outbox = new ConcurrentLinkedDeque<>();
     private final Object arrived = new Object();
+    private final java.util.concurrent.Semaphore polls = new java.util.concurrent.Semaphore(MOST_POLLS);
+    private final Map<String, Long> nonces = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile long lastPoll;
     private volatile boolean closed;
 
@@ -61,7 +73,7 @@ public final class LinkHost extends AbstractLink {
     public static LinkHost listen(String address, int port, String secret, Duration pollWait) throws IOException {
         LinkAuth.requireStrong(secret);
         HttpServer server = HttpServer.create(new InetSocketAddress(address, port), 0);
-        ExecutorService threads = Executors.newCachedThreadPool(task -> {
+        ExecutorService threads = Executors.newFixedThreadPool(THREADS, task -> {
             Thread thread = new Thread(task, "link-host");
             thread.setDaemon(true);
             return thread;
@@ -118,16 +130,21 @@ public final class LinkHost extends AbstractLink {
             if (body == null) {
                 return;
             }
+            List<LinkMessage> messages;
+            try {
+                messages = LinkCodec.decode(body);
+            } catch (IllegalArgumentException malformed) {
+                respond(exchange, 400, "[]");
+                return;
+            }
             List<LinkMessage> answers = new ArrayList<>();
-            for (LinkMessage message : LinkCodec.decode(body)) {
+            for (LinkMessage message : messages) {
                 LinkMessage answer = receive(message);
                 if (answer != null) {
                     answers.add(answer);
                 }
             }
-            respond(exchange, 200, LinkCodec.encode(answers));
-        } catch (IllegalArgumentException malformed) {
-            respond(exchange, 400, "[]");
+            answer(exchange, LinkCodec.encode(answers));
         }
     }
 
@@ -136,31 +153,55 @@ public final class LinkHost extends AbstractLink {
             if (authorised(exchange, "GET") == null) {
                 return;
             }
-            Map<String, String> query = query(exchange.getRequestURI());
-            lastPoll = System.currentTimeMillis();
-            if (instance.equals(query.get("instance"))) {
-                long seen = parse(query.get("after"));
-                outbox.removeIf(message -> message.id() <= seen);
+            if (!polls.tryAcquire()) {
+                respond(exchange, 429, "[]");
+                return;
             }
-            long until = System.currentTimeMillis() + pollWait.toMillis();
-            synchronized (arrived) {
-                while (outbox.isEmpty() && !closed) {
-                    long left = until - System.currentTimeMillis();
-                    if (left <= 0) {
-                        break;
-                    }
-                    try {
-                        arrived.wait(left);
-                    } catch (InterruptedException interrupted) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+            try {
+                hold(exchange);
+            } finally {
+                polls.release();
+            }
+        }
+    }
+
+    private void hold(HttpExchange exchange) throws IOException {
+        Map<String, String> query = query(exchange.getRequestURI());
+        lastPoll = System.currentTimeMillis();
+        if (instance.equals(query.get("instance"))) {
+            long seen = parse(query.get("after"));
+            outbox.removeIf(message -> message.id() <= seen);
+        }
+        long until = System.currentTimeMillis() + pollWait.toMillis();
+        synchronized (arrived) {
+            while (outbox.isEmpty() && !closed) {
+                long left = until - System.currentTimeMillis();
+                if (left <= 0) {
+                    break;
+                }
+                try {
+                    arrived.wait(left);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
-            lastPoll = System.currentTimeMillis();
-            exchange.getResponseHeaders().set("X-Link-Instance", instance);
-            respond(exchange, 200, LinkCodec.encode(List.copyOf(outbox)));
         }
+        lastPoll = System.currentTimeMillis();
+        exchange.getResponseHeaders().set("X-Link-Instance", instance);
+        answer(exchange, LinkCodec.encode(List.copyOf(outbox)));
+    }
+
+    /** A 200 with the body signed over the nonce of the request it answers. */
+    private void answer(HttpExchange exchange, String body) throws IOException {
+        long time = System.currentTimeMillis();
+        String requestNonce = exchange.getRequestHeaders().getFirst(LinkAuth.NONCE);
+        exchange.getResponseHeaders().set(LinkAuth.TIME, String.valueOf(time));
+        // The instance id travels in the signed body's company: signing it too stops a forged restart.
+        String instanceHeader = exchange.getResponseHeaders().getFirst("X-Link-Instance");
+        String signed = (instanceHeader == null ? "" : instanceHeader) + "\n" + body;
+        exchange.getResponseHeaders().set(LinkAuth.SIGNATURE, LinkAuth.signAnswer(secret, time, requestNonce, signed));
+        respond(exchange, 200, body);
     }
 
     /** @return the body when the request is signed right, or null after answering 401/405 */
@@ -169,15 +210,38 @@ public final class LinkHost extends AbstractLink {
             respond(exchange, 405, "[]");
             return null;
         }
-        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        long now = System.currentTimeMillis();
+        String time = exchange.getRequestHeaders().getFirst(LinkAuth.TIME);
+        // The cheap refusal first: without a fresh time nothing of the body is worth reading.
+        if (!LinkAuth.isFresh(time, now)) {
+            respond(exchange, 401, "[]");
+            return null;
+        }
+        byte[] read = exchange.getRequestBody().readNBytes(MOST_BODY_BYTES + 1);
+        if (read.length > MOST_BODY_BYTES) {
+            respond(exchange, 413, "[]");
+            return null;
+        }
+        String body = new String(read, StandardCharsets.UTF_8);
         String signed = method.equals("GET") ? exchange.getRequestURI().getRawQuery() : body;
-        if (!LinkAuth.verify(secret, exchange.getRequestHeaders().getFirst(LinkAuth.TIME),
-                exchange.getRequestHeaders().getFirst(LinkAuth.SIGNATURE), signed == null ? "" : signed,
-                System.currentTimeMillis())) {
+        String nonce = exchange.getRequestHeaders().getFirst(LinkAuth.NONCE);
+        if (!LinkAuth.verify(secret, time, nonce, exchange.getRequestHeaders().getFirst(LinkAuth.SIGNATURE),
+                signed == null ? "" : signed, now) || !firstUse(nonce, now)) {
             respond(exchange, 401, "[]");
             return null;
         }
         return body;
+    }
+
+    /** Whether this nonce is new inside the window — the half of replay protection the time alone cannot give. */
+    private boolean firstUse(String nonce, long now) {
+        if (nonces.size() > MOST_NONCES / 2) {
+            nonces.values().removeIf(seen -> now - seen > 2 * LinkAuth.MOST_SKEW_MILLIS);
+        }
+        if (nonces.size() >= MOST_NONCES) {
+            return false;
+        }
+        return nonces.putIfAbsent(nonce, now) == null;
     }
 
     private static void respond(HttpExchange exchange, int status, String body) throws IOException {

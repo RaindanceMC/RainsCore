@@ -573,6 +573,15 @@ public interface RainsCore {
     /** Clickable chat buttons, already pointed at the command that runs their callbacks. */
     ChatButtons buttons();
 
+    /**
+     * This server's link to another server of its network, as {@code link.yml} describes it — empty when there is none.
+     * Shared: a plugin talks on its own topics and switches them {@code off} when it stops. See
+     * {@link de.raindancer.core.platform.link.ServerLink}.
+     */
+    default java.util.Optional<de.raindancer.core.platform.link.ServerLink> link() {
+        return java.util.Optional.empty();
+    }
+
     /** The registry behind those buttons, for a plugin that wants to revoke one itself. */
     ClickActions clickActions();
 

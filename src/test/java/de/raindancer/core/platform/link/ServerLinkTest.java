@@ -176,9 +176,19 @@ class ServerLinkTest {
         assertThat(host.isConnected()).as("a refused poll is not a connection").isFalse();
     }
 
+    private static HttpResponse<String> post(LinkHost host, String body, long time, String nonce, String signature)
+            throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + host.port() + "/send"))
+                .header(LinkAuth.TIME, String.valueOf(time))
+                .header(LinkAuth.NONCE, nonce)
+                .header(LinkAuth.SIGNATURE, signature)
+                .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
     @Test
     @DisplayName("a signed request replayed later is refused — an old message cannot be sent again")
-    void replayRefused() throws Exception {
+    void staleRefused() throws Exception {
         LinkHost host = host(SECRET);
         List<Map<String, String>> got = new CopyOnWriteArrayList<>();
         host.on("pay", data -> {
@@ -187,15 +197,76 @@ class ServerLinkTest {
         });
         String body = LinkCodec.encode(List.of(new LinkMessage(1, "pay", Map.of("amount", "100"), 0, false)));
         long stale = System.currentTimeMillis() - 120_000;
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + host.port() + "/send"))
-                .header(LinkAuth.TIME, String.valueOf(stale))
-                .header(LinkAuth.SIGNATURE, LinkAuth.sign(SECRET, stale, body))
-                .POST(HttpRequest.BodyPublishers.ofString(body)).build();
 
-        HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = post(host, body, stale, "n1", LinkAuth.sign(SECRET, stale, "n1", body));
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(got).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the same signed request sent twice inside the time window counts once")
+    void duplicateNonceRefused() throws Exception {
+        LinkHost host = host(SECRET);
+        List<Map<String, String>> got = new CopyOnWriteArrayList<>();
+        host.on("pay", data -> {
+            got.add(data);
+            return null;
+        });
+        String body = LinkCodec.encode(List.of(new LinkMessage(1, "pay", Map.of("amount", "100"), 0, false)));
+        long now = System.currentTimeMillis();
+        String signature = LinkAuth.sign(SECRET, now, "once", body);
+
+        assertThat(post(host, body, now, "once", signature).statusCode()).isEqualTo(200);
+        assertThat(post(host, body, now, "once", signature).statusCode()).isEqualTo(401);
+        assertThat(got).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("a body larger than any real message is refused without being read into memory")
+    void oversizedRefused() throws Exception {
+        LinkHost host = host(SECRET);
+        String body = "x".repeat(LinkHost.MOST_BODY_BYTES + 10);
+        long now = System.currentTimeMillis();
+
+        HttpResponse<String> response = post(host, body, now, "big", LinkAuth.sign(SECRET, now, "big", body));
+
+        assertThat(response.statusCode()).isEqualTo(413);
+    }
+
+    @Test
+    @DisplayName("a guest believes nothing that is not signed by the host — not a poll, not an answer")
+    void unsignedAnswersIgnored() throws Exception {
+        com.sun.net.httpserver.HttpServer fake = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        String forged = LinkCodec.encode(List.of(new LinkMessage(1, "payout", Map.of("to", "mallory"), 0, false)));
+        fake.createContext("/", exchange -> {
+            byte[] bytes = forged.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("X-Link-Instance", "fake");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
+        fake.start();
+        try {
+            LinkGuest guest = LinkGuest.connect(URI.create("http://127.0.0.1:" + fake.getAddress().getPort()),
+                    SECRET, Duration.ofMillis(200), Duration.ofMillis(50));
+            open.add(guest);
+            List<Map<String, String>> got = new CopyOnWriteArrayList<>();
+            guest.on("payout", data -> {
+                got.add(data);
+                return null;
+            });
+
+            Thread.sleep(600);
+
+            assertThat(got).isEmpty();
+            assertThat(guest.isConnected()).isFalse();
+            assertThatThrownBy(() -> guest.request("x", Map.of(), Duration.ofMillis(500)).get(2, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class);
+        } finally {
+            fake.stop(0);
+        }
     }
 
     @Test

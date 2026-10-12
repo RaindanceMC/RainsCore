@@ -82,14 +82,19 @@ public final class LinkGuest extends AbstractLink {
         }
         String body = LinkCodec.encode(messages);
         long time = System.currentTimeMillis();
+        String nonce = LinkAuth.nonce();
         HttpRequest request = HttpRequest.newBuilder(base.resolve("/send"))
                 .timeout(Duration.ofSeconds(10))
                 .header(LinkAuth.TIME, String.valueOf(time))
-                .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, body))
+                .header(LinkAuth.NONCE, nonce)
+                .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, nonce, body))
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build();
         return client.sendAsync(request, HttpResponse.BodyHandlers.ofString()).thenAccept(response -> {
             if (response.statusCode() != 200) {
                 throw new IllegalStateException("the host answered " + response.statusCode());
+            }
+            if (!genuine(response, nonce)) {
+                throw new IllegalStateException("the answer was not signed by the host");
             }
             lastHeard = System.currentTimeMillis();
             for (LinkMessage answer : LinkCodec.decode(response.body())) {
@@ -113,13 +118,15 @@ public final class LinkGuest extends AbstractLink {
     private void pollOnce() throws IOException, InterruptedException {
         String query = "instance=" + instance + "&after=" + seen;
         long time = System.currentTimeMillis();
+        String nonce = LinkAuth.nonce();
         HttpRequest request = HttpRequest.newBuilder(base.resolve("/poll?" + query))
                 .timeout(pollWait.plusSeconds(5))
                 .header(LinkAuth.TIME, String.valueOf(time))
-                .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, query))
+                .header(LinkAuth.NONCE, nonce)
+                .header(LinkAuth.SIGNATURE, LinkAuth.sign(secret, time, nonce, query))
                 .GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
+        if (response.statusCode() != 200 || !genuine(response, nonce)) {
             pause();
             return;
         }
@@ -147,6 +154,14 @@ public final class LinkGuest extends AbstractLink {
                 return null;
             });
         }
+    }
+
+    /** Whether the host really said this, to the request with this nonce — instance id and body both. */
+    private boolean genuine(HttpResponse<String> response, String nonce) {
+        String instanceHeader = response.headers().firstValue("X-Link-Instance").orElse("");
+        return LinkAuth.verifyAnswer(secret, response.headers().firstValue(LinkAuth.TIME).orElse(null), nonce,
+                response.headers().firstValue(LinkAuth.SIGNATURE).orElse(null),
+                instanceHeader + "\n" + response.body(), System.currentTimeMillis());
     }
 
     private void pause() {

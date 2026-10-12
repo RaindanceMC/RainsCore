@@ -313,6 +313,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private ScheduledTask savingTask;
     private Audit audit;
     private PackServer packServer;
+    /** This server's link to another of its network, when link.yml asks for one. */
+    private volatile de.raindancer.core.platform.link.ServerLink link;
 
     static RainsCorePlugin instance() {
         return instance;
@@ -756,6 +758,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         resourcePacks = new ResourcePacks(getDataFolder().toPath().resolve("packs"),
                 new BukkitPackSink());
         startResourcePacks(settings.current());
+        link = de.raindancer.core.platform.link.NetworkLink.start(getDataFolder().toPath().resolve("link.yml"),
+                de.raindancer.core.platform.log.Log.of("link")).orElse(null);
 
         // From here on, database work on a thread running the world is a mistake and is reported as
         // one. Before here it was the startup read, which is allowed.
@@ -1052,6 +1056,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             if (released > 0) {
                 log.info("Let go of {} chunk(s) that were being kept loaded.", released);
             }
+        }
+        if (link != null) {
+            // Like the pack server: a port and threads that a reload must not leave behind.
+            link.close();
+            link = null;
         }
         if (packServer != null) {
             // Before anything else: it holds a port and two threads, and a reload that left them
@@ -1425,6 +1434,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public WorldRegenerator worldRegenerator() {
         return worldRegenerator;
+    }
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.link.ServerLink> link() {
+        return java.util.Optional.ofNullable(link);
     }
 
     @Override

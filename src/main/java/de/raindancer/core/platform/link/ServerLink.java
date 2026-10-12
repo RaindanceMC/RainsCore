@@ -33,6 +33,9 @@ public interface ServerLink extends AutoCloseable {
      */
     void on(String topic, Function<Map<String, String>, Map<String, String>> handler);
 
+    /** Stops handling a topic — what a module does when it stops, so the link holds nothing of it. */
+    void off(String topic);
+
     /** Whether the other side has been heard from recently. */
     boolean isConnected();
 
