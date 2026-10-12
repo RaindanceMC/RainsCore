@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.ToIntFunction;
 
 /**
@@ -120,15 +121,27 @@ public final class TablistModel {
             return List.of();
         }
         Map<String, List<TablistEntry>> byWorld = new LinkedHashMap<>();
+        Map<String, List<TablistEntry>> bySection = new LinkedHashMap<>();
         for (TablistEntry entry : online) {
-            byWorld.computeIfAbsent(entry.world(), key -> new ArrayList<>()).add(entry);
+            Optional<String> section = sectionFor(entry);
+            if (section.isPresent()) {
+                bySection.computeIfAbsent(section.get(), key -> new ArrayList<>()).add(entry);
+            } else {
+                byWorld.computeIfAbsent(entry.world(), key -> new ArrayList<>()).add(entry);
+            }
         }
 
         List<String> worlds = new ArrayList<>(byWorld.keySet());
         worlds.sort(Comparator.comparingInt(TablistModel::worldRank)
                 .thenComparing(TablistModel::worldLabel, String.CASE_INSENSITIVE_ORDER));
 
-        List<TablistGroup> groups = new ArrayList<>(worlds.size());
+        List<TablistGroup> groups = new ArrayList<>(worlds.size() + bySection.size());
+        bySection.keySet().stream().sorted(String.CASE_INSENSITIVE_ORDER).forEach(section -> {
+            List<TablistEntry> entries = new ArrayList<>(bySection.get(section));
+            entries.sort(Comparator.<TablistEntry>comparingInt(this::rankOf).reversed()
+                    .thenComparing(TablistEntry::name, String.CASE_INSENSITIVE_ORDER));
+            groups.add(new TablistGroup(SECTION_PREFIX + section, section, SECTION_SYMBOL, List.copyOf(entries)));
+        });
         for (String world : worlds) {
             List<TablistEntry> entries = new ArrayList<>(byWorld.get(world));
             // Rank first, heaviest at the top, then by name so two people of the same rank keep a
@@ -404,7 +417,9 @@ public final class TablistModel {
      * means the second is silently not added.
      */
     public String sortKey(TablistEntry entry) {
-        String rank = String.valueOf((char) ('a' + Math.min(9, worldRank(entry.world()))));
+        // A section sorts before every world: '0' is below 'a' for the client's alphabetical order.
+        String rank = sectionFor(entry).isPresent() ? "0"
+                : String.valueOf((char) ('a' + Math.min(9, worldRank(entry.world()))));
         // The rank, inverted so that heavier sorts first — the client orders team names
         // alphabetically and there is no other lever. Two characters, so a hundred ranks fit; more
         // than that is a server with a hierarchy nobody could read off a list anyway.
@@ -448,6 +463,29 @@ public final class TablistModel {
     }
 
     private volatile ToIntFunction<TablistEntry> ranks = entry -> 0;
+
+    /** What a section's group is called inside, so it can never be mistaken for a world's. */
+    static final String SECTION_PREFIX = "section:";
+    private static final String SECTION_SYMBOL = "✦";
+
+    private volatile java.util.function.Function<TablistEntry, Optional<String>> sections = entry -> Optional.empty();
+
+    /**
+     * Who is listed on their own, above every world — the server's team. Empty for everybody else; null puts the
+     * list back the way it was. Like {@link #rankOf}, asked on every refresh and never allowed to break the list.
+     */
+    public void sectionOf(java.util.function.Function<TablistEntry, Optional<String>> section) {
+        this.sections = section == null ? entry -> Optional.empty() : section;
+    }
+
+    private Optional<String> sectionFor(TablistEntry entry) {
+        try {
+            Optional<String> section = sections.apply(entry);
+            return section == null ? Optional.empty() : section.filter(name -> !name.isBlank());
+        } catch (RuntimeException failure) {
+            return Optional.empty();
+        }
+    }
 
     private static String escape(String raw) {
         return Text.literal(raw);
