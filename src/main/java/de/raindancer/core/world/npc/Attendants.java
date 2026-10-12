@@ -66,7 +66,15 @@ public final class Attendants {
      */
     public static Mannequin place(Player player, Component name, Component description, ResolvableProfile look,
                                   Consumer<Mannequin> tag) {
-        Location at = player.getLocation();
+        return place(player.getLocation(), name, description, look, tag);
+    }
+
+    /**
+     * An attendant at a place given rather than stood in — for setting one up from the console. On the region thread
+     * that owns {@code at}.
+     */
+    public static Mannequin place(Location at, Component name, Component description, ResolvableProfile look,
+                                  Consumer<Mannequin> tag) {
         return at.getWorld().spawn(standing(at), Mannequin.class, attendant -> {
             attendant.setImmovable(true);
             attendant.setInvulnerable(true);
