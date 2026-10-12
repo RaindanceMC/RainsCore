@@ -599,8 +599,8 @@ public interface RainsCore {
     }
 
     /**
-     * What this server is called, for anything that names it to a player — the owner's setting, else
-     * link.yml's server-name, else the MOTD's first line. Plain text, never empty.
+     * What this server is called, for anything that names it to a player — the owner's server-name setting,
+     * else the MOTD's first line. Plain text, never empty.
      */
     default String serverName() {
         return de.raindancer.core.ui.text.ServerName.resolve("", "", org.bukkit.Bukkit.motd());

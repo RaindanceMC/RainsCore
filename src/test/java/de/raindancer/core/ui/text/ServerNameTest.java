@@ -35,4 +35,18 @@ class ServerNameTest {
     void notParsed() {
         assertThat(ServerName.resolve("<red>Lilly", "", null)).isEqualTo("<red>Lilly");
     }
+
+    @Test
+    @DisplayName("towards the network: the setting, else link.yml's name — never the MOTD, which is a sentence")
+    void network() {
+        assertThat(ServerName.forNetwork(" Lilly's SMP ", "SMP")).isEqualTo("Lilly's SMP");
+        assertThat(ServerName.forNetwork("", "SMP")).isEqualTo("SMP");
+        assertThat(ServerName.forNetwork(null, null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an empty setting changes nothing a running server shows: the display stays the MOTD")
+    void emptySettingKeepsTheMotd() {
+        assertThat(ServerName.resolve("", "", Component.text("Lilly's SMP"))).isEqualTo("Lilly's SMP");
+    }
 }

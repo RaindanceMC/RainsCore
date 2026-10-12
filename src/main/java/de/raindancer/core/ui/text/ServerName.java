@@ -23,4 +23,12 @@ public final class ServerName {
         String firstLine = Text.plain(motd).lines().findFirst().orElse("").strip();
         return firstLine.isEmpty() ? UNNAMED : firstLine;
     }
+
+    /** What the other servers of a network are told: the setting, else link.yml's server-name; empty for neither. */
+    public static String forNetwork(String setting, String linkName) {
+        if (setting != null && !setting.isBlank()) {
+            return setting.strip();
+        }
+        return linkName == null ? "" : linkName.strip();
+    }
 }

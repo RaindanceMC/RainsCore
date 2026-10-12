@@ -784,9 +784,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         peerLinks = de.raindancer.core.platform.link.NetworkLink.peers(linkFile, de.raindancer.core.platform.log.Log.of("link"));
         linkServerName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
-        if (tablists != null) {
-            tablists.serverName(serverName());
-        }
         java.util.Map<String, de.raindancer.core.platform.link.ServerLink> allLinks = new java.util.LinkedHashMap<>();
         if (link != null) {
             allLinks.put("", link);
@@ -799,7 +796,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 .map(org.bukkit.entity.Player::getName).toList();
         allLinks.forEach((peerName, end) -> {
             de.raindancer.core.platform.link.LinkRoster each =
-                    new de.raindancer.core.platform.link.LinkRoster(end, this::serverName, seen, System::currentTimeMillis);
+                    new de.raindancer.core.platform.link.LinkRoster(end, this::linkName, seen, System::currentTimeMillis);
             rosters.put(peerName, each);
             de.raindancer.core.platform.link.LinkProfiles parts = new de.raindancer.core.platform.link.LinkProfiles(end);
             parts.provide("identity", identities::export);
@@ -2138,8 +2135,19 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public String serverName() {
+        return de.raindancer.core.ui.text.ServerName.resolve(serverNameSetting(), "", getServer().motd());
+    }
+
+    /**
+     * What the other servers of the network are told this one is called: the setting, else link.yml's own
+     * server-name — not the MOTD, which is a sentence for the server list rather than a name.
+     */
+    private String linkName() {
+        return de.raindancer.core.ui.text.ServerName.forNetwork(serverNameSetting(), linkServerName);
+    }
+
+    private String serverNameSetting() {
         CoreConfig config = settings == null ? null : settings.current();
-        return de.raindancer.core.ui.text.ServerName.resolve(config == null ? "" : config.serverName(),
-                linkServerName, getServer().motd());
+        return config == null || config.serverName() == null ? "" : config.serverName();
     }
 }

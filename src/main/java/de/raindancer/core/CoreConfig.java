@@ -366,8 +366,8 @@ public record CoreConfig(
 
         @In("appearance") @Title("Server name")
         @Describe("What this server is called wherever a plugin names it: the tablist header and logo, "
-                + "the hub, and the other servers of a network. Plain text. Empty uses server-name in "
-                + "link.yml, then the MOTD's first line.")
+                + "the hub, and the other servers of a network. Plain text. Empty: the MOTD's first line, "
+                + "and server-name in link.yml towards the network.")
         String serverName
 
 ) {
