@@ -81,6 +81,26 @@ class StashStoreTest {
     }
 
     @Test
+    @DisplayName("a stash file that is not YAML loads empty but says it was unreadable — so nobody takes it for empty")
+    void unreadableFileIsReported(@TempDir Path folder) throws Exception {
+        StashStore store = storage(folder);
+        assertThat(store.isReadable(owner)).as("never loaded").isTrue();
+        store.load(owner, 10);
+        assertThat(store.isReadable(owner)).as("no file is an empty stash, not a broken one").isTrue();
+
+        Path file = folder.resolve("vaults").resolve(owner + ".yml");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "items: [unclosed\n  : : :\n");
+        StashStore again = storage(folder);
+        assertThat(again.load(owner, 10).isEmpty()).isTrue();
+        assertThat(again.isReadable(owner)).isFalse();
+
+        Files.writeString(file, "items: []\n");
+        again.load(owner, 10);
+        assertThat(again.isReadable(owner)).as("readable again once fixed").isTrue();
+    }
+
+    @Test
     @DisplayName("an item this server cannot read is kept on disk rather than dropped at the next save")
     void unreadableSurvives(@TempDir Path folder) throws Exception {
         String unreadable = Base64.getEncoder().encodeToString("MODDED_THING:1".getBytes(StandardCharsets.UTF_8));

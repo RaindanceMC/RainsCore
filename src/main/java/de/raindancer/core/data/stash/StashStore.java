@@ -112,6 +112,17 @@ public final class StashStore {
         }
     }
 
+    /**
+     * Whether the last {@link #load} of this owner's stash could read its file. A file that is there and cannot be
+     * parsed loads as an <em>empty</em> stash (and is never written over); a caller about to act on "it is empty" —
+     * a guild disbanding only when its vault is — must ask this first, or it acts on a stash that only looks empty.
+     * True for a stash never loaded and for one with no file yet.
+     */
+    public boolean isReadable(UUID owner) {
+        YamlStore store = files.get(owner);
+        return store == null || store.problems().isEmpty();
+    }
+
     private YamlStore file(UUID owner) {
         return files.computeIfAbsent(owner, id -> new YamlStore(folder.resolve(id + ".yml")));
     }
