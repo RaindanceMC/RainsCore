@@ -29,8 +29,9 @@ import java.util.concurrent.Executors;
  * <h2>What it will not do</h2>
  * {@code GET} and {@code HEAD}, for one file name, under one prefix. No listing, no writes, and a
  * name containing a slash or a {@code ..} is refused before the filesystem is touched — then the
- * resolved path is checked to be inside the folder anyway. This is the only part of the library that
- * opens a port; serving files by name from a request is how a pack server becomes a way to read
+ * resolved path is checked to be inside the folder anyway. Besides the signed server link
+ * ({@code platform.link}), this is the only part of the library that opens a port; serving files by name from a
+ * request is how a pack server becomes a way to read
  * {@code server.properties}, so it is deliberately dull.
  *
  * <h2>Where this came from</h2>
