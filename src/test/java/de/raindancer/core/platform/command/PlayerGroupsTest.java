@@ -50,6 +50,7 @@ class PlayerGroupsTest {
         when(server.getOfflinePlayer(cy)).thenReturn(cyOffline);
         PlayerGroups.register("guilds", name -> name.equalsIgnoreCase("DAWN") ? Optional.of(List.of(ada, cy))
                 : Optional.empty(), () -> List.of("DAWN"));
+        when(sender.hasPermission(PlayerTargets.SELECTOR_NODE)).thenReturn(true);
 
         PlayerLookup found = PlayerTargets.lookup(server, sender, "@dawn");
         assertThat(found.kind()).isEqualTo(PlayerLookup.Kind.GROUP);
@@ -59,12 +60,25 @@ class PlayerGroupsTest {
     }
 
     @Test
-    @DisplayName("a group needs no selector permission; the vanilla ones still go to the game's parser")
+    @DisplayName("without selector rights a player may only name a group they are in — no mass-targeting other guilds")
+    void ownGroupsOnly() {
+        Player me = online(ada, "Ada");
+        when(me.hasPermission(PlayerTargets.SELECTOR_NODE)).thenReturn(false);
+        online(bo, "Bo");
+        PlayerGroups.register("guilds", name -> name.equalsIgnoreCase("MINE") ? Optional.of(List.of(ada, bo))
+                : Optional.of(List.of(bo)), List::of);
+        assertThat(PlayerTargets.lookup(server, me, "@MINE").kind()).isEqualTo(PlayerLookup.Kind.GROUP);
+        assertThat(PlayerTargets.lookup(server, me, "@THEIRS").kind()).isEqualTo(PlayerLookup.Kind.SELECTOR_REFUSED);
+        assertThat(PlayerTargets.resolve(server, me, "@THEIRS")).isEmpty();
+        assertThat(PlayerTargets.lookup(server, null, "@THEIRS").kind()).as("the console may").isEqualTo(PlayerLookup.Kind.GROUP);
+    }
+
+    @Test
+    @DisplayName("the vanilla selectors still go to the game's parser and need its permission")
     void notASelector() {
         when(sender.hasPermission(PlayerTargets.SELECTOR_NODE)).thenReturn(false);
         online(bo, "Bo");
         PlayerGroups.register("guilds", name -> Optional.of(List.of(bo)), List::of);
-        assertThat(PlayerTargets.lookup(server, sender, "@ELF").kind()).isEqualTo(PlayerLookup.Kind.GROUP);
         assertThat(PlayerTargets.lookup(server, sender, "@a").kind()).isEqualTo(PlayerLookup.Kind.SELECTOR_REFUSED);
         assertThat(PlayerTargets.lookup(server, sender, "@e[type=player]").kind()).isEqualTo(PlayerLookup.Kind.SELECTOR_REFUSED);
     }
@@ -72,6 +86,7 @@ class PlayerGroupsTest {
     @Test
     @DisplayName("an @word no group knows matches nobody; a throwing group is skipped")
     void unknown() {
+        when(sender.hasPermission(PlayerTargets.SELECTOR_NODE)).thenReturn(true);
         PlayerGroups.register("broken", name -> {
             throw new IllegalStateException("gone");
         }, List::of);

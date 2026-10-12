@@ -186,7 +186,11 @@ public final class PlayerTargets {
             return online(server, typed).map(List::of).orElse(List.of());
         }
         if (PlayerGroups.isGroup(typed)) {
-            return PlayerGroups.members(typed).stream().map(server::getPlayer).filter(java.util.Objects::nonNull).toList();
+            List<UUID> members = PlayerGroups.members(typed);
+            if (!mayName(sender, members)) {
+                return List.of();
+            }
+            return members.stream().map(server::getPlayer).filter(java.util.Objects::nonNull).toList();
         }
         List<Entity> matched;
         try {
@@ -206,6 +210,17 @@ public final class PlayerTargets {
         return List.copyOf(players);
     }
 
+    /**
+     * Whether {@code sender} may name a group: the console and anybody with selector rights may name any; a
+     * player only one they are in — or {@code @TAG} would let anybody mass-target, and count, another guild.
+     */
+    private static boolean mayName(CommandSender sender, List<UUID> members) {
+        if (sender == null || !(sender instanceof org.bukkit.entity.Player player)) {
+            return true;
+        }
+        return player.hasPermission(SELECTOR_NODE) || members.contains(player.getUniqueId());
+    }
+
     /** The vanilla node that lets somebody use {@code @a} and the rest in a command at all. */
     public static final String SELECTOR_NODE = "minecraft.command.selector";
 
@@ -222,8 +237,12 @@ public final class PlayerTargets {
         }
         String typed = text.trim();
         if (PlayerGroups.isGroup(typed)) {
+            List<UUID> ids = PlayerGroups.members(typed);
+            if (!mayName(sender, ids)) {
+                return PlayerLookup.none(typed, PlayerLookup.Kind.SELECTOR_REFUSED);
+            }
             List<OfflinePlayer> members = new ArrayList<>();
-            for (UUID member : PlayerGroups.members(typed)) {
+            for (UUID member : ids) {
                 Player here = server.getPlayer(member);
                 members.add(here != null ? here : server.getOfflinePlayer(member));
             }
