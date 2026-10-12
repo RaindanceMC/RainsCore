@@ -457,11 +457,17 @@ public final class Database implements AutoCloseable {
         writing.lock();
         try {
             if (writer != null) {
-                checkpoint();
+                boolean folded = checkpoint();
                 try {
                     writer.close();
                 } catch (SQLException ignored) {
                     // On the way out, and the file is already checkpointed.
+                }
+                // Closing the last connection makes SQLite fold the log in by itself, so a checkpoint that
+                // could not finish above is only worth a warning if a log really is left beside the file.
+                if (!folded && walLeftBehind()) {
+                    log.warn("The write-ahead log of {} could not be folded back in. The .db-wal file beside it "
+                            + "is part of the database and has to be kept with it.", file.getFileName());
                 }
                 // Cleared while the lock is held, so a write that was waiting for it sees null and
                 // answers false instead of dereferencing a connection that has just been closed.
@@ -481,17 +487,26 @@ public final class Database implements AutoCloseable {
      * finish as a row of three numbers whose first is 1, not as an exception, so the obvious way to
      * call it cannot tell success from failure.
      */
-    private void checkpoint() {
+    private boolean checkpoint() {
         try (Statement statement = writer.createStatement();
              var rows = statement.executeQuery("PRAGMA wal_checkpoint(TRUNCATE)")) {
-            if (rows.next() && rows.getInt(1) != 0) {
-                log.warn("The write-ahead log of {} could not be folded back in — something is "
-                        + "still reading the database. The .db-wal file beside it is part of the "
-                        + "database and has to be kept with it.", file.getFileName());
-            }
+            return !rows.next() || rows.getInt(1) == 0;
         } catch (SQLException failed) {
-            log.warn(failed, "Could not fold the write-ahead log of {} back in.",
-                    file.getFileName());
+            // SQLITE_LOCKED when a statement is still open on this connection: closing it folds the log in
+            // anyway, and close() checks afterwards whether anything was really left.
+            log.debug("The checkpoint of {} did not finish before closing ({}).", file.getFileName(),
+                    failed.getMessage());
+            return false;
+        }
+    }
+
+    /** Whether a non-empty write-ahead log is still beside the file. */
+    private boolean walLeftBehind() {
+        java.nio.file.Path wal = file.resolveSibling(file.getFileName() + "-wal");
+        try {
+            return java.nio.file.Files.exists(wal) && java.nio.file.Files.size(wal) > 0;
+        } catch (java.io.IOException unreadable) {
+            return true;
         }
     }
 
