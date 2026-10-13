@@ -109,4 +109,22 @@ class FileSyncTest {
         assertThat(Files.exists(root.resolve("outside.txt.copy"))).isFalse();
         assertThat(pair.follower().isRegistered("../outside.txt")).isFalse();
     }
+
+    @Test
+    @DisplayName("several files pulled at once all arrive")
+    void manyAtOnce() throws Exception {
+        Pair pair = pair();
+        List<String> names = List.of("a.yml", "b.yml", "c.yml", "d.yml", "e.yml", "f.yml");
+        for (String name : names) {
+            Files.writeString(pair.authorityDir().resolve(name), "name: " + name + "\n");
+            pair.authority().register(name, () -> { });
+            pair.follower().register(name, () -> { });
+        }
+
+        pair.follower().pullAll().get();
+
+        for (String name : names) {
+            assertThat(Files.readString(pair.followerDir().resolve(name))).isEqualTo("name: " + name + "\n");
+        }
+    }
 }

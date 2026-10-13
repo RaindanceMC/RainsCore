@@ -37,6 +37,8 @@ public final class FileSync {
     private final ServerLink followed;
     private final Map<String, Runnable> registered = new ConcurrentHashMap<>();
     private final Map<String, String> applied = new ConcurrentHashMap<>();
+    /** What was last said about a file that did not come, so the same trouble is logged once, not every round. */
+    private final Map<String, String> trouble = new ConcurrentHashMap<>();
 
     /**
      * @param serving  every link on which this server answers for its files
@@ -74,7 +76,12 @@ public final class FileSync {
         return followed.request(TOPIC, Map.of("path", relative), Duration.ofSeconds(4)).thenApply(answer -> {
             String content = answer.get("content");
             String sha = answer.get("sha");
-            if (answer.containsKey(MISSING) || content == null || sha == null || sha.equals(applied.get(relative))) {
+            if (answer.containsKey(MISSING) || content == null || sha == null) {
+                note(relative, answer.isEmpty() ? "the other server has nothing registered for it (empty answer)" : "the other server does not have it registered or readable");
+                return false;
+            }
+            trouble.remove(relative);
+            if (sha.equals(applied.get(relative))) {
                 return false;
             }
             try {
@@ -88,9 +95,19 @@ public final class FileSync {
                 log.warn("The synced file {} could not be written: {}", relative, unwritable.getMessage());
                 return false;
             }
+            log.info("Synced {} from the other server.", relative);
             registered.get(relative).run();
             return true;
-        }).exceptionally(unreachable -> false);
+        }).exceptionally(failure -> {
+            note(relative, "no answer (" + (failure.getCause() == null ? failure : failure.getCause()).getClass().getSimpleName() + ")");
+            return false;
+        });
+    }
+
+    private void note(String relative, String why) {
+        if (!why.equals(trouble.put(relative, why))) {
+            log.warn("Synced file {}: {}.", relative, why);
+        }
     }
 
     private Map<String, String> serve(Map<String, String> data) {

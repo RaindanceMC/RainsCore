@@ -53,6 +53,7 @@ public final class LinkHost extends AbstractLink {
     private final String instance = UUID.randomUUID().toString();
     private final Deque<LinkMessage> outbox = new ConcurrentLinkedDeque<>();
     private final Object arrived = new Object();
+    private final Object order = new Object();
     private final java.util.concurrent.Semaphore polls = new java.util.concurrent.Semaphore(MOST_POLLS);
     private final Map<String, Long> nonces = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile long lastPoll;
@@ -99,15 +100,21 @@ public final class LinkHost extends AbstractLink {
 
     @Override
     public void send(String topic, Map<String, String> data) {
-        queue(new LinkMessage(nextId(), topic, data, 0, false));
+        synchronized (order) {
+            queue(new LinkMessage(nextId(), topic, data, 0, false));
+        }
     }
 
     @Override
     public CompletableFuture<Map<String, String>> request(String topic, Map<String, String> data, Duration timeout) {
-        long id = nextId();
-        CompletableFuture<Map<String, String>> answer = expect(id, timeout);
-        queue(new LinkMessage(id, topic, data, 0, true));
-        return answer;
+        // Numbered and queued as one step: the guest takes a message only if its number is past the last it saw, so one
+        // queued out of order by another thread would be skipped for good — and counted as received.
+        synchronized (order) {
+            long id = nextId();
+            CompletableFuture<Map<String, String>> answer = expect(id, timeout);
+            queue(new LinkMessage(id, topic, data, 0, true));
+            return answer;
+        }
     }
 
     private void queue(LinkMessage message) {

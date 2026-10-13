@@ -429,4 +429,34 @@ class ServerLinkTest {
         assertThat(guest.isConnected()).isTrue();
         assertThat(host.isConnected()).isTrue();
     }
+
+    @Test
+    @DisplayName("requests asked from many threads at once are all answered: a message is queued in the order of its number")
+    void concurrentRequestsAreAllAnswered() throws Exception {
+        LinkHost host = host(SECRET);
+        LinkGuest guest = guest(host, SECRET);
+        guest.on("echo", data -> Map.of("n", data.get("n")));
+        List<java.util.concurrent.CompletableFuture<Map<String, String>>> answers = new CopyOnWriteArrayList<>();
+        java.util.concurrent.ExecutorService threads = java.util.concurrent.Executors.newFixedThreadPool(16);
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        for (int n = 0; n < 300; n++) {
+            String number = String.valueOf(n);
+            threads.submit(() -> {
+                go.await();
+                answers.add(host.request("echo", Map.of("n", number), Duration.ofSeconds(8)));
+                return null;
+            });
+        }
+        go.countDown();
+        threads.shutdown();
+        threads.awaitTermination(10, TimeUnit.SECONDS);
+
+        int answered = 0;
+        for (java.util.concurrent.CompletableFuture<Map<String, String>> each : answers) {
+            Map<String, String> answer = each.get(10, TimeUnit.SECONDS);
+            assertThat(answer).containsKey("n");
+            answered++;
+        }
+        assertThat(answered).isEqualTo(300);
+    }
 }
