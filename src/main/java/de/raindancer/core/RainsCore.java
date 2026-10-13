@@ -614,6 +614,14 @@ public interface RainsCore {
         return de.raindancer.core.ui.text.ServerName.resolve("", "", org.bukkit.Bukkit.motd());
     }
 
+    /**
+     * Every link of this server, the peers of link.yml included — to talk to one server of the network by name, or to
+     * whichever one a player is on right now. {@link #link()} is the main one; this has it under the key {@code ""}.
+     */
+    default de.raindancer.core.platform.link.LinkDirectory links() {
+        return de.raindancer.core.platform.link.LinkDirectory.NONE;
+    }
+
     /** {@link #playersElsewhere} by the server they are on, under the name it gives itself (server-name in link.yml). */
     default java.util.Map<String, java.util.Set<String>> playersByServer() {
         return java.util.Map.of();

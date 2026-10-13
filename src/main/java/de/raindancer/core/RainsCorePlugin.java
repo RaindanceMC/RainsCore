@@ -326,6 +326,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private final java.util.List<de.raindancer.core.platform.link.LinkProfiles> allProfiles =
             new java.util.concurrent.CopyOnWriteArrayList<>();
     private boolean linkFollows;
+    private volatile de.raindancer.core.platform.link.LinkDirectory linkDirectory =
+            de.raindancer.core.platform.link.LinkDirectory.NONE;
     private volatile de.raindancer.core.social.economy.LinkedEconomy linkedEconomy;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask profileTimer;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask rosterTimer;
@@ -795,10 +797,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         java.util.function.Supplier<java.util.List<String>> seen = () -> getServer().getOnlinePlayers().stream()
                 .filter(online -> !vanish.isVanished(online.getUniqueId()))
                 .map(org.bukkit.entity.Player::getName).toList();
+        de.raindancer.core.platform.link.LinkDirectory directory = new de.raindancer.core.platform.link.LinkDirectory();
         allLinks.forEach((peerName, end) -> {
             de.raindancer.core.platform.link.LinkRoster each =
                     new de.raindancer.core.platform.link.LinkRoster(end, this::linkName, seen, System::currentTimeMillis);
             rosters.put(peerName, each);
+            directory.add(peerName, end, each);
             de.raindancer.core.platform.link.LinkProfiles parts = new de.raindancer.core.platform.link.LinkProfiles(end);
             parts.provide("identity", identities::export);
             parts.provide("punishments", punishments::export);
@@ -812,6 +816,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                         de.raindancer.core.social.economy.Economies::current);
             }
         });
+        linkDirectory = allLinks.isEmpty() ? de.raindancer.core.platform.link.LinkDirectory.NONE : directory;
         if (!allLinks.isEmpty()) {
             // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
             rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
@@ -1150,6 +1155,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         rosters.values().forEach(de.raindancer.core.platform.link.LinkRoster::stop);
         rosters.clear();
+        linkDirectory = de.raindancer.core.platform.link.LinkDirectory.NONE;
         roster = null;
         if (profileTimer != null) {
             profileTimer.cancel();
@@ -1562,6 +1568,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public java.util.Optional<de.raindancer.core.platform.link.ServerLink> link() {
         return java.util.Optional.ofNullable(link);
+    }
+
+    @Override
+    public de.raindancer.core.platform.link.LinkDirectory links() {
+        return linkDirectory;
     }
 
     @Override
