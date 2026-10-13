@@ -23,7 +23,7 @@ public final class LockedWorlds {
 
     public static final String BUILD_PERMISSION = "rainscore.lockedworlds.build";
 
-    private record Lock(Plugin owner, Predicate<Player> builder) {
+    private record Lock(Plugin owner, Predicate<Player> builder, Predicate<org.bukkit.Location> open) {
     }
 
     private static final Map<String, Lock> locks = new ConcurrentHashMap<>();
@@ -38,8 +38,30 @@ public final class LockedWorlds {
 
     /** Locks a world with the owner's own idea of who is building there. */
     public static void lock(Plugin owner, String world, Predicate<Player> builder) {
+        lock(owner, world, builder, null);
+    }
+
+    /**
+     * Locks a world that is open in places for a while — a fight that may blow up its own pit. {@code open} says whether
+     * the world's blocks may change at a location right now, for what has no player behind it: explosions, fire,
+     * falling blocks, things an item places. The plugin that opens a place is the one that puts it back.
+     */
+    public static void lock(Plugin owner, String world, Predicate<Player> builder, Predicate<org.bukkit.Location> open) {
         if (world != null && !world.isBlank()) {
-            locks.put(key(world), new Lock(owner, builder == null ? LockedWorlds::defaultBuilder : builder));
+            locks.put(key(world), new Lock(owner, builder == null ? LockedWorlds::defaultBuilder : builder, open));
+        }
+    }
+
+    /** Whether the blocks of a locked world may change at this location right now — see the four-argument lock. */
+    public static boolean isOpen(org.bukkit.Location where) {
+        Lock lock = where == null || where.getWorld() == null ? null : locks.get(key(where.getWorld().getName()));
+        if (lock == null || lock.open() == null) {
+            return false;
+        }
+        try {
+            return lock.open().test(where);
+        } catch (RuntimeException broken) {
+            return false;
         }
     }
 

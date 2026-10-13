@@ -637,6 +637,29 @@ public interface RainsCore {
     }
 
     /**
+     * Keeps a plugin's own per-player data in step over every link: this server answers {@code provide} to whoever
+     * asks about a player (on every link, peers included), and a server that follows its link applies what the other
+     * side kept with {@code adopt}. Where nothing is linked, or this server does not follow, only the providing
+     * half is live and nothing is adopted. Part names are the plugin's own — use something like {@code "chat:style"}.
+     */
+    default void shareProfile(String part,
+                              java.util.function.Function<java.util.UUID, java.util.Map<String, String>> provide,
+                              java.util.function.BiConsumer<java.util.UUID, java.util.Map<String, String>> adopt) {
+    }
+
+    /**
+     * Keeps a file in step with the other server of the link: this server serves it, and a server that follows its link
+     * copies the other's version here and then runs {@code changed} (on the global thread) so the plugin reads it again.
+     * The path is relative to the plugins folder, e.g. {@code "RainsChat/config.yml"}. Without a link, nothing happens.
+     */
+    default void syncFile(String relativePath, Runnable changed) {
+    }
+
+    /** Stops what {@link #shareProfile} started. */
+    default void unshareProfile(String part) {
+    }
+
+    /**
      * Shares what a plugin keeps on its players under one namespace of their persistent data — cosmetics chosen on
      * survival worn in the arena. The server that keeps it answers from the player's saved data; a following server
      * replaces that namespace on a player with it when they arrive (and every half minute while they stay).

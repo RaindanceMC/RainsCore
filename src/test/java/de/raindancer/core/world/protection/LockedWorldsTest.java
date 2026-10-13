@@ -82,4 +82,27 @@ class LockedWorldsTest {
         assertThat(LockedWorlds.forgetFrom(hub.getClass().getClassLoader())).isEqualTo(1);
         assertThat(LockedWorlds.locked()).isEqualTo(List.of());
     }
+
+    @Test
+    @DisplayName("a locked world is open only where its owner says so, and a throwing owner opens nothing")
+    void openPlaces() {
+        Plugin arena = mock(Plugin.class);
+        org.bukkit.World world = mock(org.bukkit.World.class);
+        when(world.getName()).thenReturn("Arena");
+        org.bukkit.Location inside = new org.bukkit.Location(world, 5, 64, 5);
+        org.bukkit.Location outside = new org.bukkit.Location(world, 500, 64, 500);
+
+        LockedWorlds.lock(arena, "arena", null, where -> where.getX() < 100);
+        assertThat(LockedWorlds.isOpen(inside)).isTrue();
+        assertThat(LockedWorlds.isOpen(outside)).isFalse();
+
+        LockedWorlds.lock(arena, "arena", null, where -> {
+            throw new IllegalStateException("broken");
+        });
+        assertThat(LockedWorlds.isOpen(inside)).isFalse();
+
+        LockedWorlds.lock(arena, "arena");
+        assertThat(LockedWorlds.isOpen(inside)).as("a plain lock has no open places").isFalse();
+        assertThat(LockedWorlds.isOpen(null)).isFalse();
+    }
 }

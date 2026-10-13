@@ -331,6 +331,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.social.economy.LinkedEconomy linkedEconomy;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask profileTimer;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask rosterTimer;
+    private io.papermc.paper.threadedregions.scheduler.ScheduledTask fileSyncTimer;
+    private volatile de.raindancer.core.platform.link.FileSync fileSync;
 
     static RainsCorePlugin instance() {
         return instance;
@@ -840,6 +842,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     task -> rosters.values().forEach(each -> each.exchange().exceptionally(unreachable -> null)));
             tablists.elsewhere(this::playersByServer);
         }
+        if (!allLinks.isEmpty()) {
+            fileSync = new de.raindancer.core.platform.link.FileSync(getDataFolder().toPath().getParent(),
+                    allLinks.values(), linkFollows ? link : null);
+            fileSync.register("RainsCore/prefix.yml", () -> de.raindancer.core.platform.util.Scheduling.global(this,
+                    prefixes::reload));
+            if (linkFollows) {
+                fileSyncTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 10, 30,
+                        task -> fileSync.pullAll());
+            }
+        }
         if (linkFollows) {
             profiles.follow("identity", identities::adopt);
             profiles.follow("punishments", (player, exported) -> {
@@ -1165,6 +1177,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             if (released > 0) {
                 log.info("Let go of {} chunk(s) that were being kept loaded.", released);
             }
+        }
+        if (fileSyncTimer != null) {
+            fileSyncTimer.cancel();
+            fileSyncTimer = null;
         }
         if (rosterTimer != null) {
             rosterTimer.cancel();
@@ -1643,6 +1659,39 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                                     namespace, exported));
                 }
             });
+        }
+    }
+
+    @Override
+    public void shareProfile(String part,
+                             java.util.function.Function<java.util.UUID, java.util.Map<String, String>> provide,
+                             java.util.function.BiConsumer<java.util.UUID, java.util.Map<String, String>> adopt) {
+        if (allProfiles.isEmpty() || part == null || part.isBlank()) {
+            return;
+        }
+        allProfiles.forEach(parts -> parts.provide(part, provide));
+        de.raindancer.core.platform.link.LinkProfiles current = profiles;
+        if (linkFollows && current != null) {
+            current.follow(part, adopt);
+        }
+    }
+
+    @Override
+    public void unshareProfile(String part) {
+        if (part != null) {
+            allProfiles.forEach(parts -> parts.forget(part));
+        }
+    }
+
+    @Override
+    public void syncFile(String relativePath, Runnable changed) {
+        de.raindancer.core.platform.link.FileSync sync = fileSync;
+        if (sync == null || relativePath == null) {
+            return;
+        }
+        sync.register(relativePath, () -> de.raindancer.core.platform.util.Scheduling.global(this, changed));
+        if (linkFollows) {
+            de.raindancer.core.platform.util.Scheduling.async(this, () -> sync.pull(relativePath));
         }
     }
 

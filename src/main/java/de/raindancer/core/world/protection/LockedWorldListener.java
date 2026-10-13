@@ -85,6 +85,13 @@ public final class LockedWorldListener implements Listener {
         }
     }
 
+    /** Like {@link #cancelIn}, except where a plugin has opened the world for a while. */
+    private static void cancelUnlessOpen(Block block, Cancellable event) {
+        if (locked(block.getWorld()) && !LockedWorlds.isOpen(block.getLocation())) {
+            event.setCancelled(true);
+        }
+    }
+
     private static void cancelIn(World world, Cancellable event) {
         if (locked(world)) {
             event.setCancelled(true);
@@ -270,14 +277,14 @@ public final class LockedWorldListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onExplode(EntityExplodeEvent event) {
-        if (locked(event.getLocation().getWorld())) {
+        if (locked(event.getLocation().getWorld()) && !LockedWorlds.isOpen(event.getLocation())) {
             event.blockList().clear();
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onBlockExplode(BlockExplodeEvent event) {
-        if (locked(event.getBlock().getWorld())) {
+        if (locked(event.getBlock().getWorld()) && !LockedWorlds.isOpen(event.getBlock().getLocation())) {
             event.blockList().clear();
         }
     }
@@ -286,6 +293,9 @@ public final class LockedWorldListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onEntityChangeBlock(EntityChangeBlockEvent event) {
         if (!locked(event.getBlock().getWorld())) {
+            return;
+        }
+        if (LockedWorlds.isOpen(event.getBlock().getLocation())) {
             return;
         }
         if (!(event.getEntity() instanceof Player player) || !building(player)) {
@@ -302,19 +312,20 @@ public final class LockedWorldListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onIgnite(BlockIgniteEvent event) {
-        if (locked(event.getBlock().getWorld()) && !(event.getPlayer() != null && building(event.getPlayer()))) {
+        if (locked(event.getBlock().getWorld()) && !(event.getPlayer() != null && building(event.getPlayer()))
+                && !LockedWorlds.isOpen(event.getBlock().getLocation())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onBurn(BlockBurnEvent event) {
-        cancelIn(event.getBlock().getWorld(), event);
+        cancelUnlessOpen(event.getBlock(), event);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onSpread(BlockSpreadEvent event) {
-        cancelIn(event.getBlock().getWorld(), event);
+        cancelUnlessOpen(event.getBlock(), event);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
