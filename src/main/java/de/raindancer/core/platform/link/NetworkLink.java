@@ -56,6 +56,15 @@ public final class NetworkLink {
             #     secret: ""
             """;
 
+    /**
+     * The role as written, lower case. YAML reads an unquoted {@code off} (and {@code no}) as false — the default file
+     * itself says {@code role: off} — so false is off too.
+     */
+    static String role(org.bukkit.configuration.ConfigurationSection yaml) {
+        String role = yaml.getString("role", "off").trim().toLowerCase(Locale.ROOT);
+        return role.equals("false") || role.equals("no") ? "off" : role;
+    }
+
     private NetworkLink() {
     }
 
@@ -125,7 +134,7 @@ public final class NetworkLink {
 
     private static Optional<ServerLink> startEnd(org.bukkit.configuration.ConfigurationSection yaml, String label,
                                                  LogChannel log) {
-        String role = yaml.getString("role", "off").trim().toLowerCase(Locale.ROOT);
+        String role = role(yaml);
         if (role.equals("off")) {
             return Optional.empty();
         }

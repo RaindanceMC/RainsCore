@@ -10,6 +10,7 @@ import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -100,5 +101,18 @@ class NetworkLinkTest {
             hubEnd.ifPresent(ServerLink::close);
             smpPeers.values().forEach(ServerLink::close);
         }
+    }
+
+    @Test
+    @DisplayName("role: off is off — YAML reads an unquoted off as false, and that is no error")
+    void offReadAsFalse() {
+        org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
+        assertThat(NetworkLink.role(yaml)).isEqualTo("off");
+        for (String written : List.of("role: off", "role: false", "role: 'off'", "role: OFF", "role: no")) {
+            yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.StringReader(written));
+            assertThat(NetworkLink.role(yaml)).as(written).isEqualTo("off");
+        }
+        yaml = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.StringReader("role: Guest"));
+        assertThat(NetworkLink.role(yaml)).isEqualTo("guest");
     }
 }
