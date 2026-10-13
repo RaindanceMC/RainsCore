@@ -818,6 +818,23 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         });
         linkDirectory = allLinks.isEmpty() ? de.raindancer.core.platform.link.LinkDirectory.NONE : directory;
         if (!allLinks.isEmpty()) {
+            directory.serve(new de.raindancer.core.platform.link.LinkDirectory.Here() {
+                @Override
+                public java.util.Optional<de.raindancer.core.platform.link.LinkDirectory.Found> find(String name) {
+                    return seenHere(name).map(online -> new de.raindancer.core.platform.link.LinkDirectory.Found(
+                            online.getUniqueId(), online.getName(), linkName()));
+                }
+
+                @Override
+                public boolean tell(String name, String key, java.util.List<String> values) {
+                    java.util.Optional<org.bukkit.entity.Player> online = seenHere(name);
+                    online.ifPresent(player -> de.raindancer.core.platform.util.Scheduling.entity(RainsCorePlugin.this,
+                            player, () -> messages.send(player, key, values.toArray())));
+                    return online.isPresent();
+                }
+            });
+        }
+        if (!allLinks.isEmpty()) {
             // Both sides call: the guest's call keeps the host fresh too, but either alone must be enough.
             rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
                     task -> rosters.values().forEach(each -> each.exchange().exceptionally(unreachable -> null)));
@@ -1155,6 +1172,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         rosters.values().forEach(de.raindancer.core.platform.link.LinkRoster::stop);
         rosters.clear();
+        linkDirectory.stopServing();
         linkDirectory = de.raindancer.core.platform.link.LinkDirectory.NONE;
         roster = null;
         if (profileTimer != null) {
@@ -1568,6 +1586,17 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public java.util.Optional<de.raindancer.core.platform.link.ServerLink> link() {
         return java.util.Optional.ofNullable(link);
+    }
+
+    /** Online under that name, case aside, and not vanished — whom another server may know is here. */
+    private java.util.Optional<org.bukkit.entity.Player> seenHere(String name) {
+        org.bukkit.entity.Player online = name == null || name.isBlank() ? null : getServer().getPlayerExact(name);
+        if (online == null) {
+            online = getServer().getOnlinePlayers().stream().filter(each -> each.getName().equalsIgnoreCase(name))
+                    .findFirst().orElse(null);
+        }
+        return online == null || vanish.isVanished(online.getUniqueId()) ? java.util.Optional.empty()
+                : java.util.Optional.of(online);
     }
 
     @Override

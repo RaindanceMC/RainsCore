@@ -78,4 +78,37 @@ class LinkDirectoryTest {
         assertThat(LinkDirectory.NONE.named("")).isEmpty();
         assertThat(LinkDirectory.NONE.reaching("Ada")).isEmpty();
     }
+
+    @Test
+    @DisplayName("a line for somebody on another server goes to the server they are on, said there with its values")
+    void tellOverThere() throws Exception {
+        LinkRoster[] hub = pair("Hub", List.of("Hydr0Drag0n"), List.of());
+        LinkDirectory smp = new LinkDirectory();
+        smp.add("hub", open.get(1), hub[0]);
+        LinkDirectory hubSide = new LinkDirectory();
+        hubSide.add("", open.get(0), hub[1]);
+        java.util.List<String> said = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.UUID id = java.util.UUID.randomUUID();
+        hubSide.serve(new LinkDirectory.Here() {
+            @Override
+            public java.util.Optional<LinkDirectory.Found> find(String name) {
+                return name.equalsIgnoreCase("hydr0drag0n")
+                        ? java.util.Optional.of(new LinkDirectory.Found(id, "Hydr0Drag0n", "Hub"))
+                        : java.util.Optional.empty();
+            }
+
+            @Override
+            public boolean tell(String name, String key, List<String> values) {
+                said.add(name + " " + key + " " + values);
+                return name.equalsIgnoreCase("hydr0drag0n");
+            }
+        });
+
+        assertThat(smp.tell("Hydr0Drag0n", "oneblock.invited", "player", "Raindancer118").get()).isTrue();
+        assertThat(said).containsExactly("Hydr0Drag0n oneblock.invited [player, Raindancer118]");
+        assertThat(smp.tell("Nobody", "oneblock.invited").get()).as("on no server").isFalse();
+
+        assertThat(smp.whois("HYDR0DRAG0N").get()).contains(new LinkDirectory.Found(id, "Hydr0Drag0n", "Hub"));
+        assertThat(smp.whois("Nobody").get()).isEmpty();
+    }
 }
