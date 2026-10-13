@@ -536,6 +536,14 @@ public interface RainsCore {
      */
     CommandDirectory commands();
 
+    /**
+     * What players type to open the features panel, as hints name it — {@code hub} unless the server says otherwise
+     * (a network whose proxy takes /hub to send people to a hub server sets {@code smp}).
+     */
+    default String hubCommand() {
+        return "hub";
+    }
+
     /** The doors of {@code /hub}; a module declares itself here as it enables. */
     de.raindancer.core.ui.hub.Hub hub();
 

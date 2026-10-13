@@ -373,7 +373,12 @@ public record CoreConfig(
         @In("appearance/tablist") @Title("Server performance")
         @Describe("A line under the list with the ticks per second, how long a tick takes and the memory in "
                 + "use — green while all is well, yellow when it strains, red when it lags.")
-        boolean tablistShowPerformance
+        boolean tablistShowPerformance,
+
+        @In("config/chat") @Title("Command for the panel")
+        @Describe("What players type to open the features panel, as hints name it. The panel answers to /hub and /smp; "
+                + "on a network whose proxy takes /hub to send people to a hub server, set smp.")
+        String hubCommand
 
 ) {
 
@@ -419,5 +424,6 @@ public record CoreConfig(
             true, 365,
             false,
             "",
-            true);
+            true,
+            "hub");
 }

@@ -2147,6 +2147,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
     }
 
+    @Override
+    public String hubCommand() {
+        CoreConfig config = settings == null ? null : settings.current();
+        String name = config == null || config.hubCommand() == null ? "" : config.hubCommand().strip();
+        return name.isEmpty() ? "hub" : name;
+    }
+
     /** server-name in link.yml, read once at start; empty without one. */
     private volatile String linkServerName = "";
 

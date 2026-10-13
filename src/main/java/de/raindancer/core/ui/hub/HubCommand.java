@@ -39,8 +39,7 @@ public final class HubCommand implements BasicCommand {
         Optional<HubEntry> wanted = Hub.find(visible, typed);
 
         if (!typed.isEmpty() && wanted.isEmpty()) {
-            sender.sendMessage(MINI.deserialize("<gray>No feature here is called <white>" + Text.literal(typed)
-                    + "</white>. Try <white>/hub</white> to see them all."));
+            sender.sendMessage(MINI.deserialize(notFound(typed, core.hubCommand())));
             return;
         }
         if (sender instanceof Player player) {
@@ -54,6 +53,16 @@ public final class HubCommand implements BasicCommand {
             return;
         }
         printTo(sender, wanted.map(List::of).orElse(visible), core);
+    }
+
+    /** "No feature called X — try /<command>", naming the command the server says opens this panel. */
+    static String notFound(String typed, String command) {
+        String name = command == null || command.isBlank() ? "hub" : command.strip();
+        if (name.startsWith("/")) {
+            name = name.substring(1);
+        }
+        return "<gray>No feature here is called <white>" + Text.literal(typed) + "</white>. Try <white>/"
+                + Text.literal(name) + "</white> to see them all.";
     }
 
     private static void printTo(CommandSender sender, List<HubEntry> entries, RainsCore core) {
