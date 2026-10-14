@@ -92,6 +92,56 @@ public final class Secrets {
         return kept;
     }
 
+    /**
+     * A secret somebody gave — a login, a bot token — rather than one made here: empty when there is none (or the
+     * database cannot be reached). Never in a document, so {@code /documents} cannot show or export it.
+     */
+    public Optional<String> text(String name) {
+        if (database == null || !database.isUsable()) {
+            return Optional.empty();
+        }
+        return database.read(connection -> {
+            try (PreparedStatement select = connection.prepareStatement("SELECT value FROM secret WHERE name = ?")) {
+                select.setString(1, name);
+                try (ResultSet rows = select.executeQuery()) {
+                    return rows.next() ? new String(Base64.getDecoder().decode(rows.getString(1)),
+                            java.nio.charset.StandardCharsets.UTF_8) : null;
+                }
+            }
+        });
+    }
+
+    /** Stores (or replaces) a secret somebody gave. @return whether it was written */
+    public boolean putText(String name, String value) {
+        if (database == null || !database.isUsable() || value == null) {
+            return false;
+        }
+        String encoded = Base64.getEncoder().encodeToString(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return database.write(connection -> {
+            try (PreparedStatement upsert = connection.prepareStatement("""
+                    INSERT INTO secret (name, value, created_at) VALUES (?, ?, ?)
+                    ON CONFLICT(name) DO UPDATE SET value = excluded.value, created_at = excluded.created_at""")) {
+                upsert.setString(1, name);
+                upsert.setString(2, encoded);
+                upsert.setLong(3, clock.getAsLong());
+                upsert.executeUpdate();
+            }
+        });
+    }
+
+    /** Forgets a secret somebody gave. @return whether the database could be written */
+    public boolean remove(String name) {
+        if (database == null || !database.isUsable()) {
+            return false;
+        }
+        return database.write(connection -> {
+            try (PreparedStatement delete = connection.prepareStatement("DELETE FROM secret WHERE name = ?")) {
+                delete.setString(1, name);
+                delete.executeUpdate();
+            }
+        });
+    }
+
     private static Optional<byte[]> fromFile(Path file, int length, java.util.function.Function<byte[], byte[]> decode) {
         if (file == null || !Files.isRegularFile(file)) {
             return Optional.empty();

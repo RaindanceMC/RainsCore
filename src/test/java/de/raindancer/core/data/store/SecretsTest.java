@@ -113,4 +113,26 @@ class SecretsTest {
         assertThat(server().bytes("cash", 32, file, Secrets.BASE64)).hasValueSatisfying(got -> assertThat(got).hasSize(32));
         assertThat(file.resolveSibling("cash.key.imported-2.0.0")).exists();
     }
+
+    @Test
+    @DisplayName("a secret an owner gives (a login, a bot token): stored, found by every server, replaced, removed")
+    void givenByTheOwner() {
+        Secrets smp = server();
+        Secrets arena = server();
+        assertThat(smp.text("twitch-login")).isEmpty();
+        assertThat(smp.putText("twitch-login", "id:secret")).isTrue();
+        assertThat(arena.text("twitch-login")).contains("id:secret");
+        assertThat(arena.putText("twitch-login", "id:other")).isTrue();
+        assertThat(smp.text("twitch-login")).contains("id:other");
+        assertThat(smp.remove("twitch-login")).isTrue();
+        assertThat(arena.text("twitch-login")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an unreachable database finds nothing and stores nothing")
+    void givenUnreachable() {
+        Secrets nowhere = new Secrets(null, System::currentTimeMillis);
+        assertThat(nowhere.text("x")).isEmpty();
+        assertThat(nowhere.putText("x", "y")).isFalse();
+    }
 }
