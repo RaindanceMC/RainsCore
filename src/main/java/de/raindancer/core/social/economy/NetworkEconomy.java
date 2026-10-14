@@ -27,6 +27,12 @@ public final class NetworkEconomy implements Economy {
 
     private static final Duration WAIT = Duration.ofSeconds(3);
 
+    /** How often a money movement is asked again, with the same request id, before it counts as unanswered. */
+    static final int TRIES = 3;
+
+    /** How long the bank remembers a movement's answer by its request id, so a repeat is never applied twice. */
+    static final long REMEMBERED_MILLIS = 10 * 60_000L;
+
     private final NetworkCalls calls;
     private final NetworkRoles roles;
     private volatile Currency currency = Currency.DEFAULT;
@@ -82,6 +88,9 @@ public final class NetworkEconomy implements Economy {
 
     private EconomyResult move(String kind, UUID player, UUID to, Money amount, String reason) {
         Map<String, String> data = new HashMap<>();
+        // One id for every try: the bank applies a movement once and answers a repeat with what it answered.
+        // Without it a lost answer and a retry pay or charge twice.
+        data.put("request", UUID.randomUUID().toString());
         data.put("kind", kind);
         data.put("player", player.toString());
         data.put("amount", String.valueOf(amount.minor()));
@@ -89,7 +98,11 @@ public final class NetworkEconomy implements Economy {
         if (to != null) {
             data.put("to", to.toString());
         }
-        return ask(LinkedEconomy.MOVE, data).map(answer -> {
+        Optional<Map<String, String>> answered = Optional.empty();
+        for (int attempt = 0; attempt < TRIES && answered.isEmpty(); attempt++) {
+            answered = ask(LinkedEconomy.MOVE, data);
+        }
+        return answered.map(answer -> {
             EconomyResult.Outcome outcome;
             try {
                 outcome = EconomyResult.Outcome.valueOf(answer.getOrDefault("outcome", "UNAVAILABLE"));
@@ -120,17 +133,37 @@ public final class NetworkEconomy implements Economy {
      * Only the server holding {@value #ROLE} is ever asked.
      */
     public static NetworkBus.Subscription serve(NetworkCalls calls, Supplier<Optional<Economy>> local) {
+        return serve(calls, local, () -> true, System::currentTimeMillis);
+    }
+
+    /**
+     * As {@link #serve(NetworkCalls, Supplier)}, answering only while {@code isBank} — a server that lost the role a
+     * moment ago must not keep moving money for callers that looked it up before.
+     */
+    public static NetworkBus.Subscription serve(NetworkCalls calls, Supplier<Optional<Economy>> local,
+                                                java.util.function.BooleanSupplier isBank, java.util.function.LongSupplier clock) {
+        Map<String, Remembered> answered = new java.util.concurrent.ConcurrentHashMap<>();
         NetworkBus.Subscription currency = calls.answer(LinkedEconomy.CURRENCY,
                 data -> local.get().map(money -> LinkedEconomy.encode(money.currency())).orElse(Map.of()));
-        NetworkBus.Subscription balance = calls.answer(LinkedEconomy.BALANCE, data -> local.get().map(money -> {
+        NetworkBus.Subscription balance = calls.answer(LinkedEconomy.BALANCE, data -> local.get()
+                .filter(money -> isBank.getAsBoolean()).map(money -> {
             UUID player = UUID.fromString(data.get("player"));
             return Map.of("balance", String.valueOf(money.balance(player).minor()),
                     "account", String.valueOf(money.hasAccount(player)));
         }).orElse(Map.of()));
         NetworkBus.Subscription move = calls.answer(LinkedEconomy.MOVE, data -> {
             Optional<Economy> found = local.get();
-            if (found.isEmpty()) {
+            if (found.isEmpty() || !isBank.getAsBoolean()) {
                 return Map.of("outcome", EconomyResult.Outcome.UNAVAILABLE.name());
+            }
+            String request = data.getOrDefault("request", "");
+            long now = clock.getAsLong();
+            answered.values().removeIf(old -> now - old.at() > REMEMBERED_MILLIS);
+            if (!request.isEmpty()) {
+                Remembered before = answered.get(request);
+                if (before != null) {
+                    return before.answer();
+                }
             }
             Economy money = found.get();
             try {
@@ -143,7 +176,12 @@ public final class NetworkEconomy implements Economy {
                     case "transfer" -> money.transfer(player, UUID.fromString(data.get("to")), amount, reason);
                     default -> EconomyResult.failed(EconomyResult.Outcome.REFUSED, amount, Money.ZERO);
                 };
-                return Map.of("outcome", result.outcome().name(), "balance", String.valueOf(result.balance().minor()));
+                Map<String, String> answer = Map.of("outcome", result.outcome().name(),
+                        "balance", String.valueOf(result.balance().minor()));
+                if (!request.isEmpty()) {
+                    answered.put(request, new Remembered(answer, now));
+                }
+                return answer;
             } catch (RuntimeException garbled) {
                 return Map.of("outcome", EconomyResult.Outcome.REFUSED.name());
             }
@@ -153,5 +191,9 @@ public final class NetworkEconomy implements Economy {
             balance.close();
             move.close();
         };
+    }
+
+    /** A movement's answer, kept by its request id. */
+    private record Remembered(Map<String, String> answer, long at) {
     }
 }

@@ -57,6 +57,33 @@ public final class Economies {
     }
 
     /** Stops providing it. Harmless for one that was never provided. */
+    /**
+     * Makes an already provided economy the one in use, ahead of any provided after it — on a network, the
+     * bank's over a local economy that is not the bank, so the server never keeps a second set of balances.
+     */
+    public static void prefer(Economy economy) {
+        synchronized (providers) {
+            for (int at = 0; at < providers.size(); at++) {
+                if (providers.get(at).economy() == economy) {
+                    providers.add(providers.remove(at));
+                    return;
+                }
+            }
+        }
+    }
+
+    /** The most recently provided economy that {@code matching} accepts, whichever is in use. */
+    public static Optional<Economy> latest(java.util.function.Predicate<Economy> matching) {
+        synchronized (providers) {
+            for (int at = providers.size() - 1; at >= 0; at--) {
+                if (matching.test(providers.get(at).economy())) {
+                    return Optional.of(providers.get(at).economy());
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     public static void retract(Economy economy) {
         boolean removed;
         synchronized (providers) {

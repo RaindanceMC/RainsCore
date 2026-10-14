@@ -130,4 +130,37 @@ class NetworkEconomyTest {
         assertThat(arena.deposit(ALEX, Money.of(5), "x").outcome()).isEqualTo(EconomyResult.Outcome.UNAVAILABLE);
         assertThat(arena.withdraw(ALEX, Money.of(5), "x").outcome()).isEqualTo(EconomyResult.Outcome.UNAVAILABLE);
     }
+
+    @Test
+    @DisplayName("an answer lost on the way: the retry with the same request id is not applied a second time")
+    void retryIsNotAppliedTwice() {
+        Bank bank = new Bank();
+        bank.balances.put(ALEX, 1_000L);
+        NetworkRoles smpRoles = roles("smp");
+        smpRoles.claim(NetworkEconomy.ROLE);
+        NetworkCalls bankCalls = calls("smp");
+        java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger();
+        NetworkEconomy.serve(bankCalls, () -> Optional.of(bank), () -> true, System::currentTimeMillis);
+        // The same request asked twice — what a retry after a lost answer is.
+        Map<String, String> request = Map.of("request", "r-1", "kind", "withdraw", "player", ALEX.toString(),
+                "amount", "300", "reason", "fee");
+        NetworkCalls caller = calls("arena");
+        Optional<Map<String, String>> first = caller.ask("smp", LinkedEconomy.MOVE, request, java.time.Duration.ofSeconds(5)).join();
+        Optional<Map<String, String>> second = caller.ask("smp", LinkedEconomy.MOVE, request, java.time.Duration.ofSeconds(5)).join();
+        assertThat(first).isEqualTo(second);
+        assertThat(bank.balances).containsEntry(ALEX, 700L);
+    }
+
+    @Test
+    @DisplayName("a server that is not the bank (any more) moves nothing, whoever asks it")
+    void notTheBankAnswersUnavailable() {
+        Bank bank = new Bank();
+        bank.balances.put(ALEX, 1_000L);
+        NetworkEconomy.serve(calls("smp"), () -> Optional.of(bank), () -> false, System::currentTimeMillis);
+        Optional<Map<String, String>> answer = calls("arena").ask("smp", LinkedEconomy.MOVE,
+                Map.of("request", "r-2", "kind", "deposit", "player", ALEX.toString(), "amount", "5", "reason", ""),
+                java.time.Duration.ofSeconds(5)).join();
+        assertThat(answer).get().extracting(found -> found.get("outcome")).isEqualTo("UNAVAILABLE");
+        assertThat(bank.balances).containsEntry(ALEX, 1_000L);
+    }
 }
