@@ -4,94 +4,158 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 /**
  * Where each player was before they were moved — what {@code /back} goes to.
  *
- * <h2>Why this is Core's</h2>
- * Because "the last place I was" is asked by more than one thing. A warp, a home, a teleport request
- * and a death all move somebody, and all four want to be undoable. It lived in the teleport-request
- * plugin because that is where {@code /back} was typed, not because that is where it belongs — and
- * the consequence was exactly what you would expect: a home teleport recorded nothing, so
- * {@code /back} after {@code /home} took you to wherever the last teleport <em>request</em> had.
+ * <h2>Why this is Core's, and one</h2>
+ * "The last place I was" is asked by more than one thing: a warp, a home, a teleport request and a death all move
+ * somebody, and all want to be undoable. RainsCore installs one ({@link #installed()}) that every {@link Travel}
+ * records into, whichever plugin made it — so {@code /back} after {@code /home} goes where they were before the
+ * home, not to the last teleport request.
  *
- * <p>With it here, anything that moves somebody can record it in one line, and there is one answer to
- * where they came from.
- *
- * <h2>Deliberately not saved to disk</h2>
- * A waypoint from before a restart is a lie: the world has been running without it, the reason they
- * were moved is long over, and "go back to where you were three days ago" is not what anybody means.
- * So this is memory only, and a player who logs out is forgotten.
+ * <h2>On a network it follows the player</h2>
+ * Kept in the network's database with the server it is on ({@link ReturnsStore}): a player who leaves a server —
+ * a hop, {@code /hub}, the proxy moving them — can go back to where they stood there, from any server. A player
+ * off the network for a couple of minutes is forgotten, so it still means "where I just was". On a server of its
+ * own it is memory only, as it always was: a place from before a restart is not where anybody means.
  *
  * <h2>Thread safety</h2>
- * Safe from any thread. On Folia a teleport, a death and a command can each reach a different region
- * thread for the same player.
+ * Safe from any thread. {@link #arrived} reads the database: call it off the server's threads.
  */
 public final class Returns {
 
-    private final Map<UUID, Waypoint> places = new ConcurrentHashMap<>();
+    /** A place to go back to, and the server it is on ({@code ""} on a server of its own). */
+    public record Elsewhere(String server, Waypoint where) {
+    }
+
+    private static volatile Returns installed;
+
+    private final Map<UUID, Elsewhere> places = new ConcurrentHashMap<>();
+    private final ReturnsStore store;
+    private final String self;
+    private final Executor writer;
+
+    /** Memory only — a server of its own. */
+    public Returns() {
+        this(null, "", Runnable::run);
+    }
 
     /**
-     * Remembers where somebody was.
+     * @param store  where it is kept on a network
+     * @param self   this server's network id
+     * @param writer runs the database writes — off the server's threads
+     */
+    public Returns(ReturnsStore store, String self, Executor writer) {
+        this.store = store;
+        this.self = self == null ? "" : self;
+        this.writer = writer;
+    }
+
+    /** RainsCore's, for every {@link Travel} of every plugin. Set once by Core. */
+    public static void install(Returns returns) {
+        installed = returns;
+    }
+
+    public static Optional<Returns> installed() {
+        return Optional.ofNullable(installed);
+    }
+
+    /**
+     * Remembers where somebody was, on this server.
      *
-     * <p><b>A teleport cannot overwrite a death.</b> Somebody who died and was then moved by a plugin
-     * still wants {@code /back} to mean their body — that is the case where it matters most, since
-     * their things are on the floor there. Only using it, or dying again, releases that hold.
+     * <p><b>A teleport cannot overwrite a death.</b> Somebody who died and was then moved still wants {@code /back}
+     * to mean their body. Only using it, or dying again, releases that hold — on a network, also when the death
+     * was on another server.
      *
-     * @return whether it was remembered, so a caller can tell "recorded" from "you already have
-     *         somewhere better to go back to" rather than guessing
+     * @return whether it was remembered
      */
     public boolean remember(UUID player, Waypoint where) {
         if (player == null || where == null || !where.isUsable()) {
             return false;
         }
-        // compute, not get-then-put: on Folia a death and a teleport for the same player really can
-        // arrive on two threads, and the two-step version lets the teleport win the race it must lose.
         boolean[] kept = new boolean[1];
+        Elsewhere here = new Elsewhere(self, where);
         places.compute(player, (ignored, held) -> {
-            if (held != null && held.cause() == Waypoint.Cause.DEATH
+            if (held != null && held.where().cause() == Waypoint.Cause.DEATH
                     && where.cause() != Waypoint.Cause.DEATH) {
                 return held;
             }
             kept[0] = true;
-            return where;
+            return here;
         });
+        if (kept[0] && store != null) {
+            writer.execute(() -> store.save(player, self, where));
+        }
         return kept[0];
     }
 
-    /**
-     * Where they would go back to, without using it up.
-     *
-     * <p>What a menu asks to grey a button, and what a command asks before it looks at a cooldown.
-     */
+    /** Where they would go back to on this server, without using it up. */
     public Optional<Waypoint> of(UUID player) {
+        return anywhere(player).filter(place -> place.server().equals(self)).map(Elsewhere::where);
+    }
+
+    /** Where they would go back to on this server, used up; nothing when it is on another server. */
+    public Optional<Waypoint> take(UUID player) {
+        return of(player).isPresent() ? takeAnywhere(player).map(Elsewhere::where) : Optional.empty();
+    }
+
+    /** Where they would go back to, on whichever server, without using it up. */
+    public Optional<Elsewhere> anywhere(UUID player) {
         return player == null ? Optional.empty() : Optional.ofNullable(places.get(player));
     }
 
     /**
-     * Where they would go back to, and forgets it.
-     *
-     * <p>Consumed on purpose: kept, {@code /back} twice in a row would be a way to hop between two
-     * places for ever, which is a teleport with no cost at all.
+     * Where they would go back to, on whichever server, used up — kept, {@code /back} twice would hop between two
+     * places for ever.
      */
-    public Optional<Waypoint> take(UUID player) {
-        return player == null ? Optional.empty() : Optional.ofNullable(places.remove(player));
+    public Optional<Elsewhere> takeAnywhere(UUID player) {
+        Optional<Elsewhere> taken = player == null ? Optional.empty() : Optional.ofNullable(places.remove(player));
+        if (taken.isPresent() && store != null) {
+            writer.execute(() -> store.delete(player));
+        }
+        return taken;
     }
 
-    /** Forgets a player. Called when they log out. */
+    /** A player arrived on this server: what they had on the network is read in. Off the server's threads. */
+    public Returns arrived(UUID player) {
+        if (store != null && player != null) {
+            store.load(player).ifPresentOrElse(found -> places.put(player, found), () -> places.remove(player));
+        }
+        return this;
+    }
+
+    /**
+     * A player left this server standing at {@code where}: on a network that is where {@code /back} takes them from
+     * the next server (a death still outranks it). Forgotten here either way.
+     */
+    public void left(UUID player, Waypoint where) {
+        if (store != null) {
+            remember(player, where);
+        }
+        forget(player);
+    }
+
+    /** Forgets a player here — they left. On a network it is kept for wherever they go next. */
     public void forget(UUID player) {
         if (player != null) {
             places.remove(player);
         }
     }
 
-    /** Forgets everybody. For a plugin being disabled. */
+    /** Forgets everybody here. For a plugin being disabled. */
     public void clear() {
         places.clear();
     }
 
-    /** How many are remembered, for a diagnostic and for the tests. */
+    /** How many are remembered here, for a diagnostic and for the tests. */
     public int tracked() {
         return places.size();
+    }
+
+    /** Whether this one is kept on the network. */
+    public boolean onTheNetwork() {
+        return store != null;
     }
 }

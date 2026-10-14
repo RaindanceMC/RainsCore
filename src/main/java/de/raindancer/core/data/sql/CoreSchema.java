@@ -323,7 +323,21 @@ public final class CoreSchema {
                 balance INTEGER,
                 at      INTEGER NOT NULL
             )""",
-            "CREATE INDEX economy_request_by_age ON economy_request (at)");
+            "CREATE INDEX economy_request_by_age ON economy_request (at)",
+            // Where /back takes each player, on whichever server that was: it follows them across the network.
+            """
+            CREATE TABLE network_return (
+                player TEXT    PRIMARY KEY,
+                server TEXT    NOT NULL,
+                world  TEXT    NOT NULL,
+                x      REAL    NOT NULL,
+                y      REAL    NOT NULL,
+                z      REAL    NOT NULL,
+                yaw    REAL    NOT NULL,
+                pitch  REAL    NOT NULL,
+                cause  TEXT    NOT NULL,
+                at     INTEGER NOT NULL
+            )""");
 
     /**
      * What was done.

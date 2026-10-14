@@ -107,7 +107,7 @@ public final class Travel {
      * entry per player who has travelled, and a plugin that never offers the way back simply never
      * asks.
      */
-    private final Returns returns = new Returns();
+    private final Returns returns = Returns.installed().orElseGet(Returns::new);
 
     /**
      * @param safety where a safe arrival is worked out; null means every trip goes to its exact

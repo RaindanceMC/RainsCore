@@ -1046,6 +1046,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     databases.core(), network.serverId(), System::currentTimeMillis));
             Scheduling.asyncTimer(this, 1, 5, task -> chores.tick());
         }
+        // One /back for every plugin's trips; on a network it follows the player from server to server.
+        if (network.isNetwork()) {
+            de.raindancer.core.world.teleport.ReturnsStore returnsStore = new de.raindancer.core.world.teleport.ReturnsStore(
+                    databases.core(), System::currentTimeMillis);
+            de.raindancer.core.world.teleport.Returns.install(new de.raindancer.core.world.teleport.Returns(
+                    returnsStore, network.serverId(), task -> Scheduling.async(this, task)));
+            Scheduling.asyncTimer(this, 60, 60, task -> chores.ifMine(returnsStore::prune));
+        } else {
+            de.raindancer.core.world.teleport.Returns.install(new de.raindancer.core.world.teleport.Returns());
+        }
         // The network's event log only has to reach servers that are up; an hour covers any restart.
         if (bus instanceof de.raindancer.core.platform.network.PostgresBus central) {
             Scheduling.asyncTimer(this, 600, 600, task -> chores.ifMine(() -> central.prune(java.time.Duration.ofHours(1))));
@@ -1431,6 +1441,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             inventoryCapture.saveEveryoneNow();
         }
         chores.release();
+        de.raindancer.core.world.teleport.Returns.install(null);
         if (networkRoles != null) {
             // The bank's role goes at once, so another server running an economy takes it without waiting.
             networkRoles.release(de.raindancer.core.social.economy.NetworkEconomy.ROLE);
@@ -2467,6 +2478,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             boolean hidden = vanish.isVanished(id);
             String name = event.getPlayer().getName();
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
+            de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> Scheduling.async(this,
+                    () -> returns.arrived(id)));
             if (!sharedNamespaces.isEmpty()) {
                 sharedArriving.add(id);
                 Scheduling.async(this, () -> applySharedData(id, java.util.List.copyOf(sharedNamespaces)));
@@ -2578,6 +2591,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             sharedArriving.remove(event.getPlayer().getUniqueId());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
+            // Where they stood is where /back takes them from the next server.
+            de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> returns.left(leaving,
+                    de.raindancer.core.world.teleport.Waypoint.of(event.getPlayer().getLocation(),
+                            de.raindancer.core.world.teleport.Waypoint.Cause.TELEPORT, System.currentTimeMillis())));
         }
         if (mentionCompletions != null) {
             mentionCompletions.forget(event.getPlayer().getUniqueId());
