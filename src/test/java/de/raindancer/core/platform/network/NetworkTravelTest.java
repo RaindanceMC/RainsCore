@@ -77,4 +77,30 @@ class NetworkTravelTest {
         assertThat(moved).isCompletedWithValue(false);
         assertThat(check.get()).as("no hop").isNull();
     }
+
+    @Test
+    @DisplayName("still here with a place to land at: the place is taken back, so a late move cannot land them there")
+    void placeTakenBack() {
+        when(player.isOnline()).thenReturn(true);
+        when(arrivals.expect(any(), eq("arena"), any(), anyLong())).thenReturn(true);
+        when(arrivals.withdraw(any(), eq("arena"))).thenReturn(true);
+        CompletableFuture<Boolean> moved = travel.travel(player, "arena",
+                Optional.of(new Arrivals.Destination("world", 0, 64, 0, 0, 0)));
+        check.get().accept(null);
+        assertThat(moved).isCompletedWithValue(false);
+        assertThat(said).containsExactly("travel.failed");
+    }
+
+    @Test
+    @DisplayName("still here, but the place was already taken on the other server: they arrived, nothing to give back")
+    void arrivedWhileStillListedHere() {
+        when(player.isOnline()).thenReturn(true);
+        when(arrivals.expect(any(), eq("arena"), any(), anyLong())).thenReturn(true);
+        when(arrivals.withdraw(any(), eq("arena"))).thenReturn(false);
+        CompletableFuture<Boolean> moved = travel.travel(player, "arena",
+                Optional.of(new Arrivals.Destination("world", 0, 64, 0, 0, 0)));
+        check.get().accept(null);
+        assertThat(moved).isCompletedWithValue(true);
+        assertThat(said).isEmpty();
+    }
 }

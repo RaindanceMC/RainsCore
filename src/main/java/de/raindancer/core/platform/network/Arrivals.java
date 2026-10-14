@@ -74,6 +74,25 @@ public final class Arrivals {
         return ran && found[0] ? Optional.of(destination[0]) : Optional.empty();
     }
 
+    /**
+     * Takes back where {@code player} was to land on {@code server}, for a hop that seems not to have happened.
+     *
+     * @return true when it was still there (they have not arrived: now they never land there); false when it was
+     *         already taken — they did arrive — or could not be removed
+     */
+    public boolean withdraw(UUID player, String server) {
+        int[] removed = new int[1];
+        boolean ran = database.write(connection -> {
+            try (PreparedStatement delete = connection.prepareStatement(
+                    "DELETE FROM network_arrival WHERE player = ? AND server = ?")) {
+                delete.setString(1, player.toString());
+                delete.setString(2, server);
+                removed[0] = delete.executeUpdate();
+            }
+        });
+        return ran && removed[0] > 0;
+    }
+
     /** Forgets arrivals that ran out — anybody may run it, any number of times. */
     public void prune(long now) {
         database.write(connection -> {

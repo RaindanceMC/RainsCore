@@ -65,7 +65,8 @@ public final class NetworkTravel implements Listener {
 
     /**
      * As {@link #send}, saying how it went: true once they left this server (or were teleported here), false when
-     * they were not moved — so whatever was charged for the trip can be given back.
+     * they were not moved — so whatever was charged for the trip can be given back. A hop to a place reported as
+     * not moved never lands there, even if the proxy moves them late: the place is taken back first.
      */
     public java.util.concurrent.CompletableFuture<Boolean> travel(Player player, String server,
                                                                  Optional<Arrivals.Destination> destination) {
@@ -84,11 +85,22 @@ public final class NetworkTravel implements Listener {
             ProxyTransfer.send(plugin, player, server);
             // Retired = they left this server before the check, which is what being moved looks like from here.
             Object check = player.getScheduler().runDelayed(plugin, ignored -> {
-                if (player.isOnline()) {
+                if (!player.isOnline()) {
+                    moved.complete(true);
+                } else if (destination.isEmpty()) {
                     say.say(player, "travel.failed", server);
                     moved.complete(false);
                 } else {
-                    moved.complete(true);
+                    // Still here, but the proxy may be moving them right now. Whether the place they were to land at
+                    // is still waiting decides it: taken back, they never land there, so "not moved" holds even if
+                    // the proxy moves them later; already taken, they arrived.
+                    Scheduling.async(plugin, () -> {
+                        boolean notMoved = arrivals.withdraw(player.getUniqueId(), server);
+                        if (notMoved) {
+                            Scheduling.entity(plugin, player, () -> say.say(player, "travel.failed", server));
+                        }
+                        moved.complete(!notMoved);
+                    });
                 }
             }, () -> moved.complete(true), NOT_MOVED_TICKS);
             if (check == null) {

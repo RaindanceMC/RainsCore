@@ -71,4 +71,18 @@ class ArrivalsTest {
         arrivals.prune(999);
         assertThat(arrivals.take(ALEX, "arena", 500)).contains(WARP);
     }
+
+    @Test
+    @DisplayName("taking back a place: true while it waits, false once the player arrived and took it")
+    void withdraw() {
+        UUID who = ALEX;
+        Arrivals.Destination place = WARP;
+        arrivals.expect(who, "arena", place, Long.MAX_VALUE);
+        assertThat(arrivals.withdraw(who, "arena")).isTrue();
+        assertThat(arrivals.take(who, "arena", 0)).isEmpty();
+
+        arrivals.expect(who, "arena", place, Long.MAX_VALUE);
+        assertThat(arrivals.take(who, "arena", 0)).contains(place);
+        assertThat(arrivals.withdraw(who, "arena")).isFalse();
+    }
 }
