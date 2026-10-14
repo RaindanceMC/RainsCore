@@ -8,8 +8,9 @@ import java.util.Locale;
 
 /**
  * A player's own on/off for one thing — "show me the particle trail", "no sounds for me". Kept in the
- * player's own data, so it survives restarts and needs no file of its own; {@code owner} namespaces it
- * so two plugins' switches of the same name never collide.
+ * player's own data, so it survives restarts and needs no file of its own; {@code owner} prefixes it so two
+ * plugins' switches of the same name never collide. Every switch lives in Core's one namespace
+ * ({@value #NAMESPACE}), which on a network follows the player from server to server.
  *
  * <p>The server-wide setting, where there is one, stays the owner's to check first: a switch is a
  * player opting out of something the server offers, not a way round the server turning it off.
@@ -24,17 +25,31 @@ public record PlayerSwitch(String owner, String name, boolean defaultOn) {
         }
     }
 
+    /** Where every switch is kept — shared across the network by Core. */
+    public static final String NAMESPACE = "rainsswitches";
+
     public NamespacedKey key() {
+        return new NamespacedKey(NAMESPACE, owner + "." + name);
+    }
+
+    /** Where it was kept before 2.0: under the owner's namespace, which does not follow the player. */
+    private NamespacedKey legacyKey() {
         return new NamespacedKey(owner, "switch-" + name);
     }
 
     public boolean isOn(Player player) {
-        Boolean stored = player.getPersistentDataContainer().get(key(), PersistentDataType.BOOLEAN);
+        var data = player.getPersistentDataContainer();
+        Boolean stored = data.get(key(), PersistentDataType.BOOLEAN);
+        if (stored == null) {
+            stored = data.get(legacyKey(), PersistentDataType.BOOLEAN);
+        }
         return stored == null ? defaultOn : stored;
     }
 
     public void set(Player player, boolean on) {
-        player.getPersistentDataContainer().set(key(), PersistentDataType.BOOLEAN, on);
+        var data = player.getPersistentDataContainer();
+        data.set(key(), PersistentDataType.BOOLEAN, on);
+        data.remove(legacyKey());
     }
 
     /** Flips it. @return what it is now */

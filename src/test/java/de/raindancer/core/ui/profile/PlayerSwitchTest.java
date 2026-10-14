@@ -32,6 +32,8 @@ class PlayerSwitchTest {
                 .thenAnswer(call -> stored.get(call.getArgument(0, NamespacedKey.class)));
         doAnswer(call -> stored.put(call.getArgument(0), call.getArgument(2)))
                 .when(data).set(any(NamespacedKey.class), eq(PersistentDataType.BOOLEAN), any(Boolean.class));
+        doAnswer(call -> stored.remove(call.getArgument(0, NamespacedKey.class)))
+                .when(data).remove(any(NamespacedKey.class));
         return player;
     }
 
@@ -58,10 +60,23 @@ class PlayerSwitchTest {
     }
 
     @Test
-    @DisplayName("stored under the owner's own namespace, so two plugins' switches never collide")
+    @DisplayName("stored with every other switch in Core's one namespace, which follows the player across the network")
     void namespaced() {
         assertThat(new PlayerSwitch("manhunt", "trail", true).key())
-                .isEqualTo(new NamespacedKey("manhunt", "switch-trail"));
+                .isEqualTo(new NamespacedKey(PlayerSwitch.NAMESPACE, "manhunt.trail"));
+    }
+
+    @Test
+    @DisplayName("what a player chose before 2.0 (under the owner's namespace) still counts, and moves on the next change")
+    void oldChoiceKept() {
+        Player player = player();
+        stored.put(new NamespacedKey("manhunt", "switch-trail"), false);
+        PlayerSwitch trail = new PlayerSwitch("manhunt", "trail", true);
+
+        assertThat(trail.isOn(player)).isFalse();
+        trail.set(player, true);
+        assertThat(stored).doesNotContainKey(new NamespacedKey("manhunt", "switch-trail"))
+                .containsEntry(trail.key(), true);
     }
 
     @Test

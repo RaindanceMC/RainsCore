@@ -713,6 +713,16 @@ public interface RainsCore {
     }
 
     /**
+     * Told once a player's shared data ({@link #sharePlayerData}) is put on them on this server — after they
+     * joined, a moment later, or when another server changed it. With the namespaces that came. On the player's
+     * thread. A cache of anything kept in that data is refreshed here.
+     */
+    default de.raindancer.core.platform.network.NetworkBus.Subscription onSharedDataApplied(
+            java.util.function.BiConsumer<org.bukkit.entity.Player, java.util.Set<String>> listener) {
+        return () -> { };
+    }
+
+    /**
      * Shares what a plugin keeps on its players under one namespace of their persistent data — cosmetics chosen on
      * survival worn in the arena. The server that keeps it answers from the player's saved data; a following server
      * replaces that namespace on a player with it when they arrive (and every half minute while they stay).

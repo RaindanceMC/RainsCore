@@ -1918,6 +1918,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<java.util.function.BiConsumer<Player, java.util.Set<String>>> sharedDataApplied =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    @Override
+    public de.raindancer.core.platform.network.NetworkBus.Subscription onSharedDataApplied(
+            java.util.function.BiConsumer<Player, java.util.Set<String>> listener) {
+        sharedDataApplied.add(listener);
+        return () -> sharedDataApplied.remove(listener);
+    }
     /**
      * Players whose kept data has not been put on them yet. Saving them before it is would write what this server
      * had before they arrived, stamped newer, over what they brought — so they are not saved until it is.
@@ -1966,6 +1975,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     online.getPersistentDataContainer(), namespace,
                     java.util.Map.of("bytes", java.util.Base64.getEncoder().encodeToString(data))));
             sharedArriving.remove(id);
+            if (!found.isEmpty()) {
+                sharedDataApplied.forEach(listener -> {
+                    try {
+                        listener.accept(online, java.util.Set.copyOf(found.keySet()));
+                    } catch (RuntimeException failed) {
+                        log.error(failed, "A plugin failed while {}'s shared data was put on them.", online.getName());
+                    }
+                });
+            }
         }, () -> sharedArriving.remove(id));
     }
 
@@ -1981,6 +1999,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 network.group(), System::currentTimeMillis);
         presence = new de.raindancer.core.platform.network.Presence(databases.core(), networkServers, System::currentTimeMillis);
         presence.connect(bus);
+        // Every player's own switches follow them, whichever plugin they belong to.
+        sharedNamespaces.add(de.raindancer.core.ui.profile.PlayerSwitch.NAMESPACE);
         networkPlayers = new de.raindancer.core.platform.network.NetworkPlayers(presence, networkServers, bus,
                 (player, key, values) -> {
                     Player online = getServer().getPlayer(player);
