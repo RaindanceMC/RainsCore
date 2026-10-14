@@ -336,6 +336,17 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     private de.raindancer.core.platform.network.NetworkConfig network;
 
+    /** The network's name on its database: one network per database, so one fixed channel. */
+    private static final String BUS_CHANNEL = "rains";
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /** How the servers of this network tell each other what changed. Silent on a server of its own. */
+    @Override
+    public de.raindancer.core.platform.network.NetworkBus bus() {
+        return bus;
+    }
+
     /**
      * SQLite files beside the plugin on a server of its own; namespaces in the network's central
      * PostgreSQL when network.yml says so. A central database that cannot be reached is said once,
@@ -409,6 +420,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // supplier that always answers false would have disabled it for the whole run — a safety net
         // that never fires, which is worse than none because it reads as proof.
         databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread());
+        // On a network: which server this is, for places and seeds kept per server; and the bus the
+        // servers tell each other what changed on. A server on its own keeps both blank and silent.
+        if (network.isNetwork()) {
+            de.raindancer.core.platform.network.ThisServer.set(network.serverId());
+            bus = de.raindancer.core.platform.network.PostgresBus.start(databases.pool(), network.serverId(),
+                    BUS_CHANNEL, java.time.Duration.ofSeconds(1));
+        } else {
+            de.raindancer.core.platform.network.ThisServer.set("");
+            bus = de.raindancer.core.platform.network.LocalBus.alone(network.serverId());
+        }
         audit = new Audit(databases.audit(), System::currentTimeMillis);
 
         // Before anything that says anything. The file is written out on the first start, and on every
@@ -444,6 +465,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
         places = new PoiStore(databases.core());
         places.load();
+        places.connect(bus);
         places.writeSoon(write -> Scheduling.async(this, write));
 
         seedHistory = new SeedHistory(databases.core(),
@@ -456,11 +478,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
         identities = new Identities(databases.core());
         identities.load();
+        identities.connect(bus);
         prefixes = new de.raindancer.core.ui.chat.PrefixService(
                 new de.raindancer.core.ui.chat.PrefixFile(getDataFolder().toPath().resolve("prefix.yml")));
         prefixes.reload();
         nicknames = new de.raindancer.core.ui.identity.Nicknames(databases.core());
         nicknames.load();
+        nicknames.connect(bus);
         de.raindancer.core.platform.command.PlayerTargets.useNicknames(nicknames);
 
         // Permissions this server has granted individuals. Not a permissions plugin — see Grants —
@@ -519,6 +543,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         punishments = new Punishments(databases.core(),
                 System::currentTimeMillis);
         punishments.load();
+        punishments.connect(bus);
         punishments.writeSoon(write -> Scheduling.async(this, write));
         punishmentGuard = new PunishmentGuard(punishments, System::currentTimeMillis);
         punishmentGuard.messages(messages);
@@ -547,6 +572,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 databases.core(),
                 System::currentTimeMillis);
         achievements.load();
+        achievements.connect(bus);
 
         tablists = new Tablists(new TablistModel(identities), serverName());
         tablists.load(this::serverLoad);
@@ -953,6 +979,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new de.raindancer.core.moderation.chatlog.ChatLogListener(chatLog, messages,
                         () -> settings.current().chatLogRetention()), this);
         Scheduling.asyncTimer(this, AUDIT_FLUSH_PERIOD_SECONDS, AUDIT_FLUSH_PERIOD_SECONDS, task -> chatLog.flush());
+        // The network's event log only has to reach servers that are up; an hour covers any restart.
+        if (bus instanceof de.raindancer.core.platform.network.PostgresBus central) {
+            Scheduling.asyncTimer(this, 600, 600, task -> central.prune(java.time.Duration.ofHours(1)));
+        }
         Scheduling.asyncTimer(this, AUDIT_PRUNE_PERIOD_SECONDS, AUDIT_PRUNE_PERIOD_SECONDS,
                 task -> chatLog.forgetOlderThan(Duration.ofDays(settings.current().chatLogRetention())));
         auditFlushTask = Scheduling.asyncTimer(this, AUDIT_FLUSH_PERIOD_SECONDS,
@@ -1329,6 +1359,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (settings != null) {
             settings.save();
+        }
+        if (bus != null) {
+            // After the last flush has announced itself, before the pool it publishes through is closed.
+            bus.close();
         }
         if (databases != null) {
             // After every flush above and before the logfile: closing a database folds its
@@ -1864,6 +1898,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         String key = game == null || game.isBlank() ? "default" : game.trim().toLowerCase(Locale.ROOT);
         return histories.computeIfAbsent(key, name -> {
             RunHistory history = new RunHistory(databases.core(), name);
+            history.connect(bus);
             history.writeSoon(write -> Scheduling.async(this, write));
             Scheduling.async(this, history::load);
             return history;

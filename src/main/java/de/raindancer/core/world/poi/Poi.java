@@ -34,7 +34,8 @@ import java.util.UUID;
  */
 public record Poi(String id, String name, String kind, UUID owner, String world,
                   double x, double y, double z, float yaw, float pitch,
-                  Material icon, String label, boolean shared, Map<String, String> tags) {
+                  Material icon, String label, boolean shared, Map<String, String> tags,
+                  String server) {
 
     public Poi {
         if (name == null || name.isBlank()) {
@@ -46,6 +47,14 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
         id = id == null || id.isBlank() ? UUID.randomUUID().toString() : id;
         kind = kind == null || kind.isBlank() ? "place" : kind;
         tags = tags == null ? Map.of() : Map.copyOf(tags);
+        server = server == null ? "" : server.strip();
+    }
+
+    /** A place on no particular server — on this one, as every place was before 2.0.0. */
+    public Poi(String id, String name, String kind, UUID owner, String world,
+               double x, double y, double z, float yaw, float pitch,
+               Material icon, String label, boolean shared, Map<String, String> tags) {
+        this(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared, tags, "");
     }
 
     public static Builder builder(String name, String world, double x, double y, double z) {
@@ -65,6 +74,10 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
 
     /** The place itself, or empty when its world is not loaded right now. */
     public Optional<Location> location() {
+        if (!isHere()) {
+            // A world of the same name on this server is not that world.
+            return Optional.empty();
+        }
         World loaded = Bukkit.getWorld(world);
         return loaded == null ? Optional.empty()
                 : Optional.of(new Location(loaded, x, y, z, yaw, pitch));
@@ -72,7 +85,17 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
 
     /** Whether the world this is in exists on the server right now. */
     public boolean isReachable() {
-        return Bukkit.getWorld(world) != null;
+        return isHere() && Bukkit.getWorld(world) != null;
+    }
+
+    /** Whether this place is on this server, rather than on another server of the network. */
+    public boolean isHere() {
+        return de.raindancer.core.platform.network.ThisServer.is(server);
+    }
+
+    /** The same place, kept for {@code newServer}. */
+    public Poi onServer(String newServer) {
+        return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared, tags, newServer);
     }
 
     /** "x, y, z", rounded — the useful part of a place, for a lore line. */
@@ -87,18 +110,18 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
     /** The same place under another name. Keeps its id, so anything pointing at it still does. */
     public Poi renamedTo(String newName) {
         return new Poi(id, newName, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared,
-                tags);
+                tags, server);
     }
 
     /** The same place, somewhere else. */
     public Poi movedTo(String newWorld, double newX, double newY, double newZ) {
         return new Poi(id, name, kind, owner, newWorld, newX, newY, newZ, yaw, pitch, icon, label,
-                shared, tags);
+                shared, tags, server);
     }
 
     public Poi withIcon(Material newIcon) {
         return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, newIcon, label, shared,
-                tags);
+                tags, server);
     }
 
     /**
@@ -110,24 +133,24 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
      */
     public Poi withLabel(String newLabel) {
         return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, newLabel, shared,
-                tags);
+                tags, server);
     }
 
     /** The same place, looked at from a different angle — nothing else about it changes. */
     public Poi withFacing(float newYaw, float newPitch) {
         return new Poi(id, name, kind, owner, world, x, y, z, newYaw, newPitch, icon, label, shared,
-                tags);
+                tags, server);
     }
 
     /** The same place, belonging to somebody else — a warp staff hand to a player, say. */
     public Poi withOwner(UUID newOwner) {
         return new Poi(id, name, kind, newOwner, world, x, y, z, yaw, pitch, icon, label, shared,
-                tags);
+                tags, server);
     }
 
     public Poi withShared(boolean nowShared) {
         return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, nowShared,
-                tags);
+                tags, server);
     }
 
     public Poi withTag(String key, String value) {
@@ -138,7 +161,7 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
             updated.put(key, value);
         }
         return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared,
-                updated);
+                updated, server);
     }
 
     /** Builds one. Only the name, world and position are required. */
@@ -156,6 +179,7 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
         private Material icon;
         private String label;
         private boolean shared;
+        private String server = "";
         private final Map<String, String> tags = new LinkedHashMap<>();
 
         private Builder(String name, String world, double x, double y, double z) {
@@ -198,6 +222,12 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
             return this;
         }
 
+        /** Which server of the network it is on; blank is this one. */
+        public Builder server(String value) {
+            this.server = value;
+            return this;
+        }
+
         public Builder shared(boolean value) {
             this.shared = value;
             return this;
@@ -220,7 +250,7 @@ public record Poi(String id, String name, String kind, UUID owner, String world,
 
         public Poi build() {
             return new Poi(id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared,
-                    tags);
+                    tags, server);
         }
     }
 }

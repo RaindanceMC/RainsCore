@@ -158,7 +158,7 @@ public final class RunHistory {
                     + "are kept and written once it is.", game);
             return;
         }
-        Optional<List<Run>> read = database.read(this::readAll);
+        Optional<List<Run>> read = database.read(connection -> readAll(connection, null));
         if (read.isEmpty()) {
             log.warn("The run history of {} could not be read; it was left exactly as it is.", game);
             return;
@@ -172,11 +172,16 @@ public final class RunHistory {
         loaded = true;
     }
 
-    private List<Run> readAll(Connection connection) throws SQLException {
+    /** Every run of this game, or the one with {@code onlyId}. */
+    private List<Run> readAll(Connection connection, String onlyId) throws SQLException {
+        String one = onlyId == null ? "" : " AND r.id = ?";
         Map<String, Map<UUID, String>> players = new HashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT p.run, p.player, p.name FROM run_player p JOIN run r ON r.id = p.run WHERE r.game = ?")) {
+                "SELECT p.run, p.player, p.name FROM run_player p JOIN run r ON r.id = p.run WHERE r.game = ?" + one)) {
             statement.setString(1, game);
+            if (onlyId != null) {
+                statement.setString(2, onlyId);
+            }
             try (ResultSet rows = statement.executeQuery()) {
                 while (rows.next()) {
                     try {
@@ -191,8 +196,11 @@ public final class RunHistory {
         Map<String, Map<String, Long>> splits = new HashMap<>();
         Map<String, Map<String, String>> fields = new HashMap<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT v.run, v.kind, v.name, v.value FROM run_value v JOIN run r ON r.id = v.run WHERE r.game = ?")) {
+                "SELECT v.run, v.kind, v.name, v.value FROM run_value v JOIN run r ON r.id = v.run WHERE r.game = ?" + one)) {
             statement.setString(1, game);
+            if (onlyId != null) {
+                statement.setString(2, onlyId);
+            }
             try (ResultSet rows = statement.executeQuery()) {
                 while (rows.next()) {
                     String run = rows.getString(1);
@@ -212,8 +220,11 @@ public final class RunHistory {
         }
         List<Run> read = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT id, category, started_at, score, lower_wins, ranked FROM run WHERE game = ?")) {
+                "SELECT id, category, started_at, score, lower_wins, ranked FROM run r WHERE game = ?" + one)) {
             statement.setString(1, game);
+            if (onlyId != null) {
+                statement.setString(2, onlyId);
+            }
             try (ResultSet rows = statement.executeQuery()) {
                 while (rows.next()) {
                     String id = rows.getString("id");
@@ -408,54 +419,108 @@ public final class RunHistory {
                 return false;
             }
             Set<String> writing = Marks.drain(unwritten);
-            List<Run> rows = runs.stream().filter(run -> writing.contains(run.id())).toList();
-            boolean written = database.write(connection -> {
-                try (PreparedStatement upsert = connection.prepareStatement("""
-                        INSERT INTO run (id, game, category, started_at, score, lower_wins, ranked)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(id) DO UPDATE SET category = excluded.category,
-                            started_at = excluded.started_at, score = excluded.score,
-                            lower_wins = excluded.lower_wins, ranked = excluded.ranked""");
-                     PreparedStatement clearPlayers = connection.prepareStatement("DELETE FROM run_player WHERE run = ?");
-                     PreparedStatement clearValues = connection.prepareStatement("DELETE FROM run_value WHERE run = ?");
-                     PreparedStatement player = connection.prepareStatement(
-                             "INSERT INTO run_player (run, player, name) VALUES (?, ?, ?)");
-                     PreparedStatement value = connection.prepareStatement(
-                             "INSERT INTO run_value (run, kind, name, value) VALUES (?, ?, ?, ?)")) {
-                    for (Run run : rows) {
-                        upsert.setString(1, run.id());
-                        upsert.setString(2, game);
-                        upsert.setString(3, run.category());
-                        upsert.setLong(4, run.startedAt().toEpochMilli());
-                        upsert.setLong(5, run.score());
-                        upsert.setInt(6, run.lowerWins() ? 1 : 0);
-                        upsert.setInt(7, run.ranked() ? 1 : 0);
-                        upsert.executeUpdate();
-                        clearPlayers.setString(1, run.id());
-                        clearPlayers.executeUpdate();
-                        clearValues.setString(1, run.id());
-                        clearValues.executeUpdate();
-                        for (Map.Entry<UUID, String> who : run.players().entrySet()) {
-                            player.setString(1, run.id());
-                            player.setString(2, who.getKey().toString());
-                            player.setString(3, who.getValue());
-                            player.executeUpdate();
-                        }
-                        for (Map.Entry<String, Long> split : run.splits().entrySet()) {
-                            insertValue(value, run.id(), "split", split.getKey(), String.valueOf(split.getValue()));
-                        }
-                        for (Map.Entry<String, String> field : run.fields().entrySet()) {
-                            insertValue(value, run.id(), "field", field.getKey(), field.getValue());
-                        }
+            inFlight.addAll(writing);
+            try {
+                return writeAndAnnounce(writing);
+            } finally {
+                inFlight.removeAll(writing);
+            }
+        }
+    }
+
+    /** Runs being written right now: a refresh in that moment keeps them, as it keeps unwritten ones. */
+    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
+
+    private boolean writeAndAnnounce(Set<String> writing) {
+        List<Run> rows = runs.stream().filter(run -> writing.contains(run.id())).toList();
+        boolean written = database.write(connection -> {
+            try (PreparedStatement upsert = connection.prepareStatement("""
+                    INSERT INTO run (id, game, category, started_at, score, lower_wins, ranked)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET category = excluded.category,
+                        started_at = excluded.started_at, score = excluded.score,
+                        lower_wins = excluded.lower_wins, ranked = excluded.ranked""");
+                 PreparedStatement clearPlayers = connection.prepareStatement("DELETE FROM run_player WHERE run = ?");
+                 PreparedStatement clearValues = connection.prepareStatement("DELETE FROM run_value WHERE run = ?");
+                 PreparedStatement player = connection.prepareStatement(
+                         "INSERT INTO run_player (run, player, name) VALUES (?, ?, ?)");
+                 PreparedStatement value = connection.prepareStatement(
+                         "INSERT INTO run_value (run, kind, name, value) VALUES (?, ?, ?, ?)")) {
+                for (Run run : rows) {
+                    upsert.setString(1, run.id());
+                    upsert.setString(2, game);
+                    upsert.setString(3, run.category());
+                    upsert.setLong(4, run.startedAt().toEpochMilli());
+                    upsert.setLong(5, run.score());
+                    upsert.setInt(6, run.lowerWins() ? 1 : 0);
+                    upsert.setInt(7, run.ranked() ? 1 : 0);
+                    upsert.executeUpdate();
+                    clearPlayers.setString(1, run.id());
+                    clearPlayers.executeUpdate();
+                    clearValues.setString(1, run.id());
+                    clearValues.executeUpdate();
+                    for (Map.Entry<UUID, String> who : run.players().entrySet()) {
+                        player.setString(1, run.id());
+                        player.setString(2, who.getKey().toString());
+                        player.setString(3, who.getValue());
+                        player.executeUpdate();
+                    }
+                    for (Map.Entry<String, Long> split : run.splits().entrySet()) {
+                        insertValue(value, run.id(), "split", split.getKey(), String.valueOf(split.getValue()));
+                    }
+                    for (Map.Entry<String, String> field : run.fields().entrySet()) {
+                        insertValue(value, run.id(), "field", field.getKey(), field.getValue());
                     }
                 }
-            });
-            if (!written) {
-                Marks.restore(unwritten, writing);
-                log.warn("{} run(s) of {} could not be written yet; they will be tried again.",
-                        writing.size(), game);
             }
-            return written;
+        });
+        if (!written) {
+            Marks.restore(unwritten, writing);
+            log.warn("{} run(s) of {} could not be written yet; they will be tried again.",
+                    writing.size(), game);
+            return false;
+        }
+        de.raindancer.core.platform.network.NetworkBus network = bus;
+        if (network != null) {
+            writing.forEach(id -> network.publish(topic(), id));
+        }
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------- the network
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /** The topic other servers are told on — one per game — keyed by the run's id. */
+    public String topic() {
+        return "runs:" + game;
+    }
+
+    /** Joins the network: a run finished on one server is on the leaderboard of every server. */
+    public void connect(de.raindancer.core.platform.network.NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(topic(), event -> refresh(event.key()));
+        }
+    }
+
+    /**
+     * Reads one run again. An unwritten change of this server's wins; an unreadable database leaves what
+     * is known; a run gone from the database is gone here. Off the server's threads.
+     */
+    public void refresh(String id) {
+        if (id == null || id.isBlank() || database == null || !database.isUsable()) {
+            return;
+        }
+        Optional<List<Run>> read = database.read(connection -> readAll(connection, id));
+        if (read.isEmpty() || unwritten.contains(id) || inFlight.contains(id)) {
+            return;
+        }
+        synchronized (runs) {
+            if (!unwritten.contains(id) && !inFlight.contains(id)) {
+                runs.removeIf(run -> run.id().equals(id));
+                runs.addAll(read.get());
+            }
         }
     }
 

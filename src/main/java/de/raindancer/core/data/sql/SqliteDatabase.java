@@ -231,6 +231,11 @@ public final class SqliteDatabase implements Database {
         } catch (SQLException unreadable) {
             log.error(unreadable, "Could not read the schema version of {}.", file);
             return 0;
+        } finally {
+            // The read opened a transaction on the writer. Left open, it pins a snapshot from now, and
+            // SQLite refuses the first write after any other connection commits (SQLITE_BUSY_SNAPSHOT) —
+            // invisible with one connection per file, certain with two.
+            rollbackQuietly();
         }
     }
 

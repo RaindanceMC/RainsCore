@@ -611,6 +611,15 @@ public interface RainsCore {
      * else the MOTD's first line. Plain text, never empty.
      */
     /**
+     * How the servers of this network tell each other that something changed: a store writes, then
+     * publishes {@code (topic, key)}, and every other server reads that key again. A module whose data
+     * lives in the central database uses it the same way. On a server of its own it is silent.
+     */
+    default de.raindancer.core.platform.network.NetworkBus bus() {
+        return de.raindancer.core.platform.network.NetworkBus.NONE;
+    }
+
+    /**
      * Who this server is on its network — its id, its group — and whether the network keeps its data in
      * one central database. A server on its own is a network of one: its id, group "default", SQLite.
      */

@@ -171,29 +171,95 @@ public final class Nicknames {
                 return;
             }
             Set<UUID> writing = Marks.drain(changed);
-            boolean written = database.write(connection -> {
-                try (PreparedStatement upsert = connection.prepareStatement("""
-                        INSERT INTO nickname (player, plain, typed) VALUES (?, ?, ?)
-                        ON CONFLICT(player) DO UPDATE SET plain = excluded.plain, typed = excluded.typed""");
-                     PreparedStatement remove =
-                             connection.prepareStatement("DELETE FROM nickname WHERE player = ?")) {
-                    for (UUID player : writing) {
-                        Entry entry = entries.get(player);
-                        if (entry == null) {
-                            remove.setString(1, player.toString());
-                            remove.executeUpdate();
-                            continue;
-                        }
-                        upsert.setString(1, player.toString());
-                        upsert.setString(2, entry.plain());
-                        upsert.setString(3, entry.typed());
-                        upsert.executeUpdate();
-                    }
-                }
-            });
-            if (!written) {
-                Marks.restore(changed, writing);
+            inFlight.addAll(writing);
+            try {
+                writeAndAnnounce(writing);
+            } finally {
+                inFlight.removeAll(writing);
             }
         }
+    }
+
+    /** Players being written right now: a refresh in that moment keeps them, as it keeps unwritten ones. */
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
+
+    private void writeAndAnnounce(Set<UUID> writing) {
+        boolean written = database.write(connection -> {
+            try (PreparedStatement upsert = connection.prepareStatement("""
+                    INSERT INTO nickname (player, plain, typed) VALUES (?, ?, ?)
+                    ON CONFLICT(player) DO UPDATE SET plain = excluded.plain, typed = excluded.typed""");
+                 PreparedStatement remove =
+                         connection.prepareStatement("DELETE FROM nickname WHERE player = ?")) {
+                for (UUID player : writing) {
+                    Entry entry = entries.get(player);
+                    if (entry == null) {
+                        remove.setString(1, player.toString());
+                        remove.executeUpdate();
+                        continue;
+                    }
+                    upsert.setString(1, player.toString());
+                    upsert.setString(2, entry.plain());
+                    upsert.setString(3, entry.typed());
+                    upsert.executeUpdate();
+                }
+            }
+        });
+        if (!written) {
+            Marks.restore(changed, writing);
+            return;
+        }
+        de.raindancer.core.platform.network.NetworkBus network = bus;
+        if (network != null) {
+            inFlight.removeAll(writing);
+            writing.forEach(this::refresh);
+            writing.forEach(player -> network.publish(TOPIC, player.toString()));
+        }
+    }
+
+    // ------------------------------------------------------------------ the network
+
+    /** The topic other servers are told on, keyed by the player. */
+    public static final String TOPIC = "nickname";
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /** Joins the network: a nickname taken on one server is found by name on all of them. */
+    public void connect(de.raindancer.core.platform.network.NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(TOPIC, event -> {
+                try {
+                    refresh(UUID.fromString(event.key()));
+                } catch (IllegalArgumentException notAPlayer) {
+                    log.warn("A nickname event named no player: '{}'", event.key());
+                }
+            });
+        }
+    }
+
+    /**
+     * Reads one player's nickname from the database again; an unwritten change of this server's wins,
+     * and an unreadable database leaves what is known. Off the server's threads.
+     */
+    public void refresh(UUID player) {
+        if (player == null || !database.isUsable()) {
+            return;
+        }
+        Optional<Optional<Entry>> stored = database.read(connection -> {
+            try (PreparedStatement statement =
+                         connection.prepareStatement("SELECT plain, typed FROM nickname WHERE player = ?")) {
+                statement.setString(1, player.toString());
+                try (ResultSet rows = statement.executeQuery()) {
+                    return rows.next()
+                            ? Optional.of(new Entry(rows.getString("plain"), rows.getString("typed")))
+                            : Optional.<Entry>empty();
+                }
+            }
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        entries.compute(player, (key, current) -> changed.contains(player) || inFlight.contains(player)
+                ? current : stored.get().orElse(null));
     }
 }

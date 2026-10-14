@@ -208,7 +208,14 @@ public final class CoreSchema {
                 plain  TEXT NOT NULL,
                 typed  TEXT NOT NULL
             )""",
-            "CREATE INDEX nickname_by_typed ON nickname (typed)");
+            "CREATE INDEX nickname_by_typed ON nickname (typed)",
+            // 2.0.0: which server of the network a place is on. Blank is "this server", which is what
+            // every row a 1.x server wrote means; the importer stamps them when a server joins a network.
+            "ALTER TABLE place ADD COLUMN server TEXT NOT NULL DEFAULT ''",
+            "CREATE INDEX place_by_server ON place (server)",
+            // 2.0.0: a world's seeds are the seeds of that server's world; another server's "world" is another world.
+            "ALTER TABLE world_seed ADD COLUMN server TEXT NOT NULL DEFAULT ''",
+            "CREATE INDEX world_seed_by_server ON world_seed (server, world)");
 
     /**
      * What was done.

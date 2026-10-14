@@ -50,6 +50,7 @@ public final class PunishmentListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+        guard.readFromDatabase(event.getUniqueId());
         guard.stopping(event.getUniqueId(), PunishmentKind.BAN).ifPresent(ban -> {
             guard.joinRefusal(event.getUniqueId()).ifPresent(screen ->
                     event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_BANNED, screen));

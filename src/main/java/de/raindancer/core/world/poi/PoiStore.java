@@ -68,6 +68,11 @@ public final class PoiStore {
         if (place == null) {
             return;
         }
+        // A new place on a network belongs to the server it was set on. Never re-stamped: a place
+        // another server made and this one edits stays that server's.
+        if (place.server().isBlank() && !de.raindancer.core.platform.network.ThisServer.id().isBlank()) {
+            place = place.onServer(de.raindancer.core.platform.network.ThisServer.id());
+        }
         places.put(place.id(), place);
         changed.add(place.id());
         deleted.remove(place.id());
@@ -231,7 +236,7 @@ public final class PoiStore {
         boolean read = database.read(connection -> {
             Map<String, Map<String, String>> tags = readTags(connection);
             try (PreparedStatement statement = connection.prepareStatement("""
-                    SELECT id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared
+                    SELECT id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared, server
                     FROM place""");
                  ResultSet rows = statement.executeQuery()) {
                 while (rows.next()) {
@@ -286,7 +291,8 @@ public final class PoiStore {
                 .kind(rows.getString("kind"))
                 .facing(rows.getFloat("yaw"), rows.getFloat("pitch"))
                 .label(rows.getString("label"))
-                .shared(rows.getBoolean("shared"));
+                .shared(rows.getBoolean("shared"))
+                .server(rows.getString("server"));
         String owner = rows.getString("owner");
         if (owner != null && !owner.isBlank()) {
             built.owner(UUID.fromString(owner));
@@ -354,6 +360,20 @@ public final class PoiStore {
         // nothing.
         Set<String> writing = Marks.drain(changed);
         Set<String> removing = Marks.drain(deleted);
+        inFlight.addAll(writing);
+        inFlight.addAll(removing);
+        try {
+            return writeAndAnnounce(writing, removing);
+        } finally {
+            inFlight.removeAll(writing);
+            inFlight.removeAll(removing);
+        }
+    }
+
+    /** Places being written right now: a refresh in that moment keeps them, as it keeps unwritten ones. */
+    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
+
+    private boolean writeAndAnnounce(Set<String> writing, Set<String> removing) {
         List<Poi> rows = writing.stream().map(places::get)
                 .filter(Objects::nonNull)
                 .toList();
@@ -368,13 +388,13 @@ public final class PoiStore {
             }
             try (PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO place (id, name, kind, owner, world, x, y, z, yaw, pitch,
-                                       icon, label, shared)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       icon, label, shared, server)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name = excluded.name, kind = excluded.kind, owner = excluded.owner,
                         world = excluded.world, x = excluded.x, y = excluded.y, z = excluded.z,
                         yaw = excluded.yaw, pitch = excluded.pitch, icon = excluded.icon,
-                        label = excluded.label, shared = excluded.shared""");
+                        label = excluded.label, shared = excluded.shared, server = excluded.server""");
                  PreparedStatement clearTags =
                          connection.prepareStatement("DELETE FROM place_tag WHERE place = ?");
                  PreparedStatement addTag = connection.prepareStatement(
@@ -398,6 +418,7 @@ public final class PoiStore {
                     statement.setString(12,
                             place.label().equals(place.name()) ? null : place.label());
                     statement.setInt(13, place.isShared() ? 1 : 0);
+                    statement.setString(14, place.server());
                     statement.executeUpdate();
 
                     // Replaced wholesale rather than merged: a tag the caller removed has to
@@ -419,7 +440,75 @@ public final class PoiStore {
             // places: nothing else would ever write them.
             Marks.restore(changed, writing);
             Marks.restore(deleted, removing);
+            return false;
         }
-        return written;
+        de.raindancer.core.platform.network.NetworkBus network = bus;
+        if (network != null) {
+            inFlight.removeAll(writing);
+            inFlight.removeAll(removing);
+            writing.forEach(this::refresh);
+            removing.forEach(this::refresh);
+            writing.forEach(id -> network.publish(TOPIC, id));
+            removing.forEach(id -> network.publish(TOPIC, id));
+        }
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------- the network
+
+    /** The topic other servers are told on, keyed by the place's id. */
+    public static final String TOPIC = "place";
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /** Joins the network: a warp set on one server is listed on all of them, a deleted home is gone everywhere. */
+    public void connect(de.raindancer.core.platform.network.NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(TOPIC, event -> refresh(event.key()));
+        }
+    }
+
+    /**
+     * Reads one place from the database again: changed, added, or gone. A change of this server's that is
+     * not written yet wins, and an unreadable database leaves what is known. Off the server's threads.
+     */
+    public void refresh(String id) {
+        if (id == null || id.isBlank() || !database.isUsable()) {
+            return;
+        }
+        Optional<Optional<Poi>> stored = database.read(connection -> {
+            Map<String, String> tags = new LinkedHashMap<>();
+            try (PreparedStatement statement =
+                         connection.prepareStatement("SELECT name, value FROM place_tag WHERE place = ?")) {
+                statement.setString(1, id);
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        tags.put(rows.getString("name"), rows.getString("value"));
+                    }
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared, server
+                    FROM place WHERE id = ?""")) {
+                statement.setString(1, id);
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) {
+                        return Optional.<Poi>empty();
+                    }
+                    try {
+                        return Optional.of(readOne(rows, tags));
+                    } catch (RuntimeException broken) {
+                        note("'" + id + "' could not be read and was skipped (" + broken.getMessage() + ")");
+                        return Optional.<Poi>empty();
+                    }
+                }
+            }
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        places.compute(id, (key, current) -> changed.contains(id) || deleted.contains(id) || inFlight.contains(id)
+                ? current : stored.get().orElse(null));
     }
 }

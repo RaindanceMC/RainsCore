@@ -88,9 +88,15 @@ public final class SeedHistory {
         }
         List<Entry> rows = database.read(connection -> {
             List<Entry> read = new ArrayList<>();
-            try (PreparedStatement statement = connection.prepareStatement(
-                    "SELECT world, seed, at, cause FROM world_seed ORDER BY at, id");
-                 ResultSet result = statement.executeQuery()) {
+            // This server's seeds, and the unstamped rows a 1.x server wrote — which were this server's too.
+            String here = de.raindancer.core.platform.network.ThisServer.id();
+            try (PreparedStatement statement = connection.prepareStatement(here.isBlank()
+                    ? "SELECT world, seed, at, cause FROM world_seed ORDER BY at, id"
+                    : "SELECT world, seed, at, cause FROM world_seed WHERE server IN (?, '') ORDER BY at, id")) {
+                if (!here.isBlank()) {
+                    statement.setString(1, here);
+                }
+                try (ResultSet result = statement.executeQuery()) {
                 while (result.next()) {
                     Cause cause;
                     try {
@@ -101,6 +107,7 @@ public final class SeedHistory {
                     }
                     read.add(new Entry(result.getString("world"), result.getLong("seed"),
                             result.getLong("at"), cause));
+                }
                 }
             }
             return read;
@@ -219,12 +226,13 @@ public final class SeedHistory {
         }
         boolean written = database.write(connection -> {
             try (PreparedStatement insert = connection.prepareStatement(
-                    "INSERT INTO world_seed (world, seed, at, cause) VALUES (?, ?, ?, ?)")) {
+                    "INSERT INTO world_seed (world, seed, at, cause, server) VALUES (?, ?, ?, ?, ?)")) {
                 for (Entry entry : writing) {
                     insert.setString(1, entry.world());
                     insert.setLong(2, entry.seed());
                     insert.setLong(3, entry.at());
                     insert.setString(4, entry.cause().name());
+                    insert.setString(5, de.raindancer.core.platform.network.ThisServer.id());
                     insert.executeUpdate();
                 }
             }

@@ -4,6 +4,7 @@ import de.raindancer.core.platform.log.Log;
 import de.raindancer.core.platform.log.LogChannel;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.platform.util.Marks;
+import de.raindancer.core.platform.network.NetworkBus;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -41,9 +42,16 @@ import java.util.Map;
  * answerable, and it is the difference between this and a set of flags.
  *
  * <h2>Thread safety</h2>
- * Safe from any thread. Each player's record is a {@link CopyOnWriteArrayList} — punishments are
- * read constantly (every join, every chat message) and written rarely, which is exactly what that
- * list is for.
+ * Safe from any thread. Each player's record is an immutable list, swapped whole under the map's
+ * per-key lock — punishments are read constantly (every join, every chat message) and written rarely.
+ * A swap rather than an edit in place is what lets a {@link #refresh} replace a player's records
+ * without a moment in which a check finds nothing and lets a banned player in.
+ *
+ * <h2>On a network (2.0.0)</h2>
+ * Every server keeps this cache of the one central table. A server that wrote a change tells the
+ * others over the {@link NetworkBus} ({@value #TOPIC}, keyed by the player), and they read that
+ * player again. A join reads the player from the database itself, so a ban is enforced even if the
+ * event never arrived.
  */
 public final class Punishments {
 
@@ -51,8 +59,12 @@ public final class Punishments {
 
     private final Database database;
     private final LongSupplier clock;
-    private final Map<UUID, CopyOnWriteArrayList<Punishment>> byPlayer =
-            new ConcurrentHashMap<>();
+    /** The topic other servers are told on, keyed by the punished player's id. */
+    public static final String TOPIC = "punishments";
+
+    private final Map<UUID, List<Punishment>> byPlayer = new ConcurrentHashMap<>();
+
+    private volatile NetworkBus bus;
 
     /**
      * Which punishments have changed and need writing.
@@ -97,14 +109,24 @@ public final class Punishments {
     public Punishment punish(UUID target, PunishmentKind kind, UUID moderator, String reason,
                              Duration length) {
         Instant now = now();
-        // The old one is lifted rather than dropped, so the history still shows both. A moderator
-        // extending a mute has done two things and the record should say so.
-        active(target, kind).ifPresent(existing ->
-                replace(target, existing, existing.lifted(moderator, "replaced", now)));
-
         Punishment given = Punishment.given(target, kind, moderator, reason, now, length);
-        recordsOf(target).add(given);
-        mark(given);
+        byPlayer.compute(target, (player, old) -> {
+            List<Punishment> next = new ArrayList<>(old == null ? List.of() : old);
+            // The old one is lifted rather than dropped, so the history still shows both. A moderator
+            // extending a mute has done two things and the record should say so.
+            for (int at = 0; at < next.size(); at++) {
+                Punishment each = next.get(at);
+                if (each.kind() == kind && each.isActiveAt(now)) {
+                    Punishment lifted = each.lifted(moderator, "replaced", now);
+                    next.set(at, lifted);
+                    changed.add(lifted.id());
+                }
+            }
+            next.add(given);
+            changed.add(given.id());
+            return List.copyOf(next);
+        });
+        writeSoon();
         log.info("{} was {} by {} for '{}' ({})", target, kind.past(), moderator, given.reason(),
                 given.length());
         return given;
@@ -181,30 +203,34 @@ public final class Punishments {
      * @return whether there was one to end
      */
     public boolean lift(UUID target, PunishmentKind kind, UUID moderator, String reason) {
-        Optional<Punishment> existing = active(target, kind);
-        if (existing.isEmpty()) {
+        if (target == null || kind == null) {
             return false;
         }
-        replace(target, existing.get(), existing.get().lifted(moderator, reason, now()));
+        Instant now = now();
+        boolean[] lifted = new boolean[1];
+        byPlayer.computeIfPresent(target, (player, old) -> {
+            List<Punishment> next = new ArrayList<>(old);
+            for (int at = 0; at < next.size(); at++) {
+                Punishment each = next.get(at);
+                if (each.kind() == kind && each.isActiveAt(now)) {
+                    Punishment updated = each.lifted(moderator, reason, now);
+                    next.set(at, updated);
+                    // Marked inside the swap: one way of changing a punishment forgetting to mark it is a lift
+                    // that applies until the next restart and then quietly comes back.
+                    changed.add(updated.id());
+                    lifted[0] = true;
+                    break;
+                }
+            }
+            return List.copyOf(next);
+        });
+        if (!lifted[0]) {
+            return false;
+        }
+        writeSoon();
         log.info("{}'s {} was lifted by {} ('{}')", target, kind.name().toLowerCase(Locale.ROOT),
                 moderator, reason);
         return true;
-    }
-
-    /**
-     * Swaps one record for an updated one, and marks it as needing writing.
-     *
-     * <p>The marking happens here rather than at each call site: every way a punishment changes goes
-     * through this method, and one caller forgetting to mark is a lift that applies until the next
-     * restart and then quietly comes back.
-     */
-    private void replace(UUID target, Punishment old, Punishment updated) {
-        CopyOnWriteArrayList<Punishment> records = recordsOf(target);
-        int at = records.indexOf(old);
-        if (at >= 0) {
-            records.set(at, updated);
-            mark(updated);
-        }
     }
 
     // ---------------------------------------------------------------------------- asking
@@ -255,8 +281,8 @@ public final class Punishments {
         return allActive().stream().filter(punishment -> punishment.kind() == kind).toList();
     }
 
-    private CopyOnWriteArrayList<Punishment> recordsOf(UUID player) {
-        return byPlayer.computeIfAbsent(player, key -> new CopyOnWriteArrayList<>());
+    private List<Punishment> recordsOf(UUID player) {
+        return byPlayer.getOrDefault(player, List.of());
     }
 
     // ---------------------------------------------------------------------------- the file
@@ -286,6 +312,7 @@ public final class Punishments {
                     + "session until this is fixed.");
             return;
         }
+        Map<UUID, List<Punishment>> loaded = new java.util.HashMap<>();
         int read = database.read(connection -> {
             int found = 0;
             try (PreparedStatement statement = connection.prepareStatement("""
@@ -296,7 +323,7 @@ public final class Punishments {
                 while (rows.next()) {
                     try {
                         Punishment punishment = readOne(rows);
-                        recordsOf(punishment.target()).add(punishment);
+                        loaded.computeIfAbsent(punishment.target(), key -> new ArrayList<>()).add(punishment);
                         found++;
                     } catch (RuntimeException broken) {
                         // One unreadable row — a kind this version no longer has, a UUID somebody
@@ -311,6 +338,71 @@ public final class Punishments {
         if (read < 0) {
             log.fatal("The punishments could not be read. Nobody is banned or muted this session "
                     + "until this is fixed.");
+        }
+        loaded.forEach((player, records) -> byPlayer.put(player, List.copyOf(records)));
+    }
+
+    /**
+     * Reads one player's punishments from the database again — because another server said they
+     * changed, or because they are joining and the answer must be the database's, not this cache's.
+     *
+     * <p>What this server changed and has not written yet is kept over what the database says: it is
+     * newer, and dropping it would be a lift that never happened. When the database cannot be read, the
+     * cache stays as it is — forgetting every ban because the network blinked is the worst answer.
+     *
+     * <p>Must be called off the server's threads.
+     */
+    public void refresh(UUID player) {
+        if (player == null || !database.isUsable()) {
+            return;
+        }
+        Optional<List<Punishment>> stored = database.read(connection -> {
+            List<Punishment> found = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, target, kind, moderator, reason, given_at, ends_at,
+                           lifter, lifter_reason, lifted_at
+                    FROM punishment WHERE target = ?""")) {
+                statement.setString(1, player.toString());
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        try {
+                            found.add(readOne(rows));
+                        } catch (RuntimeException broken) {
+                            log.warn("A punishment row could not be read and was skipped ({})", broken.getMessage());
+                        }
+                    }
+                }
+            }
+            return found;
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        byPlayer.compute(player, (key, old) -> {
+            Map<String, Punishment> merged = new java.util.LinkedHashMap<>();
+            stored.get().forEach(each -> merged.put(each.id(), each));
+            if (old != null) {
+                old.stream().filter(each -> changed.contains(each.id()) || inFlight.contains(each.id()))
+                        .forEach(each -> merged.put(each.id(), each));
+            }
+            return merged.isEmpty() ? null : List.copyOf(merged.values());
+        });
+    }
+
+    /**
+     * Joins the network: what this server writes is announced to the others, and what they announce
+     * is read again here.
+     */
+    public void connect(NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(TOPIC, event -> {
+                try {
+                    refresh(UUID.fromString(event.key()));
+                } catch (IllegalArgumentException notAPlayer) {
+                    log.warn("A punishment event named no player: '{}'", event.key());
+                }
+            });
         }
     }
 
@@ -366,6 +458,18 @@ public final class Punishments {
         // Drained rather than snapshotted — see Marks. Copying the marks and clearing them
         // afterwards loses any change that arrives while the write is running.
         Set<String> writing = Marks.drain(changed);
+        inFlight.addAll(writing);
+        try {
+            writeAndAnnounce(writing);
+        } finally {
+            inFlight.removeAll(writing);
+        }
+    }
+
+    /** Ids being written right now: a refresh in that moment keeps them, as it keeps unwritten ones. */
+    private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
+
+    private void writeAndAnnounce(Set<String> writing) {
         List<Punishment> rows = byPlayer.values().stream()
                 .flatMap(List::stream)
                 .filter(punishment -> writing.contains(punishment.id()))
@@ -400,17 +504,25 @@ public final class Punishments {
             // Put back, so the next flush tries again. A dropped mark here is a ban nothing will
             // ever write.
             Marks.restore(changed, writing);
+            return;
+        }
+        // After the commit, never before: a server that hears it too early reads the old rows and keeps them.
+        NetworkBus network = bus;
+        if (network != null) {
+            List<UUID> targets = rows.stream().map(Punishment::target).distinct().toList();
+            inFlight.removeAll(writing);
+            // Read back: anything another server wrote while this write held these rows was skipped by
+            // the refresh it caused, and is picked up now.
+            targets.forEach(this::refresh);
+            targets.forEach(target -> network.publish(TOPIC, target.toString()));
         }
     }
 
-    /** Says a punishment needs writing. */
-    private void mark(Punishment punishment) {
-        if (punishment != null) {
-            changed.add(punishment.id());
-            Consumer<Runnable> soon = writeSoon;
-            if (soon != null) {
-                soon.accept(this::flush);
-            }
+    /** Hands a write over the moment something changed; the changes themselves are already marked. */
+    private void writeSoon() {
+        Consumer<Runnable> soon = writeSoon;
+        if (soon != null) {
+            soon.accept(this::flush);
         }
     }
 

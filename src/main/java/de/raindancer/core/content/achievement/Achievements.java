@@ -4,7 +4,6 @@ import de.raindancer.core.platform.util.PluginCode;
 import de.raindancer.core.platform.log.Log;
 import de.raindancer.core.platform.log.LogChannel;
 import de.raindancer.core.data.sql.Database;
-import de.raindancer.core.platform.util.Marks;
 import de.raindancer.core.data.store.YamlStore;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
@@ -74,8 +73,27 @@ public final class Achievements {
     private final Database database;
     /** Set when a definition changed and the file needs rewriting. */
     private final AtomicBoolean dirty = new AtomicBoolean();
-    /** Which players' rows need writing — the database half. */
-    private final Set<UUID> changedPlayers = ConcurrentHashMap.newKeySet();
+    /**
+     * What this server changed for each player and has not written yet — as operations, not results.
+     *
+     * <p>On a network a player's progress is changed by whichever server they are on, and two servers
+     * may both hold unwritten progress for them for a moment around a server switch. Writing results
+     * ("sofar is 12") would let the later write undo the earlier one; writing operations ("add 3",
+     * "earned at t", "revoked") lets both land. The database applies them; a {@link #refresh} reads
+     * the result and lays whatever is still pending here on top.
+     */
+    private final Map<UUID, PlayerChanges> pending = new ConcurrentHashMap<>();
+
+    /** One lock per player: their cached rows and their pending operations change together. */
+    private final Map<UUID, Object> locks = new ConcurrentHashMap<>();
+
+    private Object lockOf(UUID player) {
+        return locks.computeIfAbsent(player, key -> new Object());
+    }
+
+    private PlayerChanges changesOf(UUID player) {
+        return pending.computeIfAbsent(player, key -> new PlayerChanges());
+    }
 
     /**
      * @param clock milliseconds; injected so "when was this earned" can be tested
@@ -165,23 +183,30 @@ public final class Achievements {
             return false;
         }
         // One atomic step. Checking and then writing is where "announced twice" comes from.
-        Instant already = earnedMap(player).putIfAbsent(achievement.key(),
-                Instant.ofEpochMilli(clock.getAsLong()));
-        if (already != null) {
-            return false;
+        Instant at = Instant.ofEpochMilli(clock.getAsLong());
+        synchronized (lockOf(player)) {
+            Instant already = earnedMap(player).putIfAbsent(achievement.key(), at);
+            if (already != null) {
+                return false;
+            }
+            changesOf(player).earn(achievement.key(), at);
         }
-        changedPlayers.add(player);
         announce(player, achievement);
         return true;
     }
 
     /** Takes one back, for a mistake. */
     public boolean revoke(UUID player, String key) {
-        Map<String, Instant> theirs = player == null ? null : earned.get(player);
-        if (theirs == null || key == null || theirs.remove(normalise(key)) == null) {
+        if (player == null || key == null) {
             return false;
         }
-        changedPlayers.add(player);
+        synchronized (lockOf(player)) {
+            Map<String, Instant> theirs = earned.get(player);
+            if (theirs == null || theirs.remove(normalise(key)) == null) {
+                return false;
+            }
+            changesOf(player).revoke(normalise(key));
+        }
         return true;
     }
 
@@ -235,8 +260,12 @@ public final class Achievements {
             return;
         }
         String normalised = normalise(key);
-        int updated = progressOf(player).merge(normalised, Math.max(0, by), Integer::sum);
-        changedPlayers.add(player);
+        int added = Math.max(0, by);
+        int updated;
+        synchronized (lockOf(player)) {
+            updated = progressOf(player).merge(normalised, added, Integer::sum);
+            changesOf(player).add(normalised, added);
+        }
         checkGoal(player, normalised, updated);
     }
 
@@ -246,8 +275,10 @@ public final class Achievements {
             return;
         }
         String normalised = normalise(key);
-        progressOf(player).put(normalised, Math.max(0, to));
-        changedPlayers.add(player);
+        synchronized (lockOf(player)) {
+            progressOf(player).put(normalised, Math.max(0, to));
+            changesOf(player).set(normalised, Math.max(0, to));
+        }
         checkGoal(player, normalised, Math.max(0, to));
     }
 
@@ -321,7 +352,7 @@ public final class Achievements {
 
     /** Whether either half is waiting to be written. */
     public boolean isDirty() {
-        return dirty.get() || !changedPlayers.isEmpty();
+        return dirty.get() || !pending.isEmpty();
     }
 
     public void load() {
@@ -359,7 +390,7 @@ public final class Achievements {
     private void loadPlayers() {
         earned.clear();
         progress.clear();
-        changedPlayers.clear();
+        pending.clear();
         if (!database.isUsable()) {
             log.error("The achievement tables are not available; nobody's achievements are known "
                     + "this session.");
@@ -513,45 +544,212 @@ public final class Achievements {
      * player has. All inside one transaction, so nobody is ever seen mid-rewrite.
      */
     private void flushPlayers() {
-        if (changedPlayers.isEmpty() || !database.isUsable()) {
+        if (pending.isEmpty() || !database.isUsable()) {
             return;
         }
-        // Drained rather than snapshotted — see Marks. Copying the marks and clearing them
-        // afterwards loses any change that arrives while the write is running.
-        Set<UUID> writing = Marks.drain(changedPlayers);
+        // Taken off, not copied: an operation arriving while the write runs lands in a fresh entry and
+        // is written next time, rather than being cleared away with the ones written now.
+        Map<UUID, PlayerChanges> writing = new java.util.HashMap<>();
+        for (UUID player : List.copyOf(pending.keySet())) {
+            synchronized (lockOf(player)) {
+                PlayerChanges taken = pending.remove(player);
+                if (taken != null && !taken.isEmpty()) {
+                    writing.put(player, taken);
+                }
+            }
+        }
+        if (writing.isEmpty()) {
+            return;
+        }
         boolean written = database.write(connection -> {
-            try (PreparedStatement clearEarned = connection.prepareStatement(
-                         "DELETE FROM achievement_earned WHERE player = ?");
-                 PreparedStatement clearProgress = connection.prepareStatement(
-                         "DELETE FROM achievement_progress WHERE player = ?");
-                 PreparedStatement addEarned = connection.prepareStatement(
-                         "INSERT INTO achievement_earned (player, achievement, earned_at) "
-                                 + "VALUES (?, ?, ?)");
-                 PreparedStatement addProgress = connection.prepareStatement(
-                         "INSERT INTO achievement_progress (player, achievement, sofar) "
-                                 + "VALUES (?, ?, ?)")) {
-                for (UUID player : writing) {
-                    clearEarned.setString(1, player.toString());
-                    clearEarned.executeUpdate();
-                    clearProgress.setString(1, player.toString());
-                    clearProgress.executeUpdate();
-                    for (Map.Entry<String, Instant> got : earnedBy(player).entrySet()) {
-                        addEarned.setString(1, player.toString());
-                        addEarned.setString(2, got.getKey());
-                        addEarned.setLong(3, got.getValue().toEpochMilli());
-                        addEarned.executeUpdate();
+            try (PreparedStatement earn = connection.prepareStatement(
+                         "INSERT INTO achievement_earned (player, achievement, earned_at) VALUES (?, ?, ?) "
+                                 + "ON CONFLICT(player, achievement) DO NOTHING");
+                 PreparedStatement revoke = connection.prepareStatement(
+                         "DELETE FROM achievement_earned WHERE player = ? AND achievement = ?");
+                 PreparedStatement set = connection.prepareStatement(
+                         "INSERT INTO achievement_progress (player, achievement, sofar) VALUES (?, ?, ?) "
+                                 + "ON CONFLICT(player, achievement) DO UPDATE SET sofar = excluded.sofar");
+                 PreparedStatement add = connection.prepareStatement(
+                         "INSERT INTO achievement_progress (player, achievement, sofar) VALUES (?, ?, ?) "
+                                 + "ON CONFLICT(player, achievement) DO UPDATE "
+                                 + "SET sofar = achievement_progress.sofar + excluded.sofar")) {
+                for (Map.Entry<UUID, PlayerChanges> each : writing.entrySet()) {
+                    String player = each.getKey().toString();
+                    PlayerChanges changes = each.getValue();
+                    for (String key : changes.revoked) {
+                        revoke.setString(1, player);
+                        revoke.setString(2, key);
+                        revoke.executeUpdate();
                     }
-                    for (Map.Entry<String, Integer> towards : progressOf(player).entrySet()) {
-                        addProgress.setString(1, player.toString());
-                        addProgress.setString(2, towards.getKey());
-                        addProgress.setInt(3, towards.getValue());
-                        addProgress.executeUpdate();
+                    for (Map.Entry<String, Instant> got : changes.earned.entrySet()) {
+                        earn.setString(1, player);
+                        earn.setString(2, got.getKey());
+                        earn.setLong(3, got.getValue().toEpochMilli());
+                        earn.executeUpdate();
+                    }
+                    for (Map.Entry<String, PlayerChanges.Progress> towards : changes.progress.entrySet()) {
+                        PreparedStatement statement = towards.getValue().absolute() ? set : add;
+                        statement.setString(1, player);
+                        statement.setString(2, towards.getKey());
+                        statement.setInt(3, towards.getValue().value());
+                        statement.executeUpdate();
                     }
                 }
             }
         });
         if (!written) {
-            Marks.restore(changedPlayers, writing);
+            // Put back in front of whatever arrived since, so the next flush applies them in order.
+            writing.forEach((player, taken) -> {
+                synchronized (lockOf(player)) {
+                    pending.merge(player, taken, (newer, older) -> older.then(newer));
+                }
+            });
+            return;
+        }
+        de.raindancer.core.platform.network.NetworkBus network = bus;
+        if (network != null) {
+            // Read back: a refresh another server caused while these were being written saw neither the
+            // database with them nor them pending, and showed too little until now.
+            writing.keySet().forEach(this::refresh);
+            writing.keySet().forEach(player -> network.publish(TOPIC, player.toString()));
+        }
+    }
+
+    // ---------------------------------------------------------------------------- the network
+
+    /** The topic other servers are told on, keyed by the player. */
+    public static final String TOPIC = "achievements";
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /** Joins the network: what a player earns on one server is theirs on all of them. */
+    public void connect(de.raindancer.core.platform.network.NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(TOPIC, event -> {
+                try {
+                    refresh(UUID.fromString(event.key()));
+                } catch (IllegalArgumentException notAPlayer) {
+                    log.warn("An achievement event named no player: '{}'", event.key());
+                }
+            });
+        }
+    }
+
+    /**
+     * Reads one player's achievements and progress from the database again, with this server's unwritten
+     * operations laid on top — nothing earned here is lost to what another server wrote, and nothing
+     * written elsewhere is hidden by an old copy. Never announces: the server where it was earned did.
+     * An unreadable database leaves what is known. Off the server's threads.
+     */
+    public void refresh(UUID player) {
+        if (player == null || !database.isUsable()) {
+            return;
+        }
+        Optional<Map.Entry<Map<String, Instant>, Map<String, Integer>>> stored = database.read(connection -> {
+            Map<String, Instant> got = new java.util.HashMap<>();
+            Map<String, Integer> towards = new java.util.HashMap<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT achievement, earned_at FROM achievement_earned WHERE player = ?")) {
+                statement.setString(1, player.toString());
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        got.put(rows.getString("achievement"), Instant.ofEpochMilli(rows.getLong("earned_at")));
+                    }
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT achievement, sofar FROM achievement_progress WHERE player = ?")) {
+                statement.setString(1, player.toString());
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        towards.put(rows.getString("achievement"), rows.getInt("sofar"));
+                    }
+                }
+            }
+            return Map.entry(got, towards);
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        synchronized (lockOf(player)) {
+            Map<String, Instant> got = new ConcurrentHashMap<>(stored.get().getKey());
+            Map<String, Integer> towards = new ConcurrentHashMap<>(stored.get().getValue());
+            PlayerChanges mine = pending.get(player);
+            if (mine != null) {
+                mine.applyTo(got, towards);
+            }
+            if (got.isEmpty()) {
+                earned.remove(player);
+            } else {
+                earned.put(player, got);
+            }
+            if (towards.isEmpty()) {
+                progress.remove(player);
+            } else {
+                progress.put(player, towards);
+            }
+        }
+    }
+
+    /** What one player's achievements went through on this server since the last write. Guarded by their lock. */
+    private static final class PlayerChanges {
+
+        record Progress(boolean absolute, int value) {
+        }
+
+        final Map<String, Instant> earned = new java.util.HashMap<>();
+        final Set<String> revoked = new java.util.HashSet<>();
+        final Map<String, Progress> progress = new java.util.HashMap<>();
+
+        void earn(String key, Instant at) {
+            revoked.remove(key);
+            earned.putIfAbsent(key, at);
+        }
+
+        void revoke(String key) {
+            earned.remove(key);
+            revoked.add(key);
+        }
+
+        void add(String key, int by) {
+            progress.merge(key, new Progress(false, by),
+                    (was, now) -> new Progress(was.absolute(), was.value() + now.value()));
+        }
+
+        void set(String key, int to) {
+            progress.put(key, new Progress(true, to));
+        }
+
+        boolean isEmpty() {
+            return earned.isEmpty() && revoked.isEmpty() && progress.isEmpty();
+        }
+
+        /** These, then {@code later} on top — for putting a failed write back in front of what came since. */
+        PlayerChanges then(PlayerChanges later) {
+            PlayerChanges combined = new PlayerChanges();
+            combined.earned.putAll(earned);
+            combined.revoked.addAll(revoked);
+            combined.progress.putAll(progress);
+            later.revoked.forEach(combined::revoke);
+            later.earned.forEach(combined::earn);
+            later.progress.forEach((key, step) -> {
+                if (step.absolute()) {
+                    combined.set(key, step.value());
+                } else {
+                    combined.add(key, step.value());
+                }
+            });
+            return combined;
+        }
+
+        /** Lays these on top of what the database holds. */
+        void applyTo(Map<String, Instant> got, Map<String, Integer> towards) {
+            revoked.forEach(got::remove);
+            earned.forEach(got::putIfAbsent);
+            progress.forEach((key, step) -> towards.put(key,
+                    step.absolute() ? step.value() : towards.getOrDefault(key, 0) + step.value()));
         }
     }
 }

@@ -702,4 +702,24 @@ class DatabaseTest {
             })).as("the half that succeeded must not stand on its own").contains(0);
         }
     }
+
+    @Test
+    @DisplayName("a database whose schema was already up to date can write after another connection wrote")
+    void upToDateSchemaLeavesNoSnapshotOpen() {
+        Schema schema = Schema.of("CREATE TABLE t (n INTEGER)");
+        try (Database first = open(schema); Database second = open(schema)) {
+            assertThat(first.write(connection -> {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO t VALUES (1)");
+                }
+            })).isTrue();
+            // The second found the schema current and only read its version. That read must not have left a
+            // snapshot open on its writer: SQLite refuses a write from a snapshot older than the last commit.
+            assertThat(second.write(connection -> {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO t VALUES (2)");
+                }
+            })).isTrue();
+        }
+    }
 }

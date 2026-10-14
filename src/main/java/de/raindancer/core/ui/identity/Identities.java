@@ -443,6 +443,65 @@ public final class Identities {
         }
     }
 
+    /** The topic other servers are told on, keyed by the player. */
+    public static final String TOPIC = "identity";
+
+    private volatile de.raindancer.core.platform.network.NetworkBus bus;
+
+    /**
+     * Joins the network: identities this server writes are announced, and those another server
+     * announces are read again here. A prefix set on the SMP is the prefix in the arena.
+     */
+    public void connect(de.raindancer.core.platform.network.NetworkBus network) {
+        this.bus = network;
+        if (network != null) {
+            network.subscribe(TOPIC, event -> {
+                try {
+                    refresh(UUID.fromString(event.key()));
+                } catch (IllegalArgumentException notAPlayer) {
+                    log.warn("An identity event named no player: '{}'", event.key());
+                }
+            });
+        }
+    }
+
+    /**
+     * Reads one player's identity from the database again. What this server changed and has not
+     * written yet wins — it is newer. When the database cannot be read, what is known is kept.
+     *
+     * <p>Must be called off the server's threads.
+     */
+    public void refresh(UUID player) {
+        if (player == null || !database.isUsable()) {
+            return;
+        }
+        java.util.Optional<java.util.Optional<Identity>> stored = database.read(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT prefix, suffix, nametag_prefix, colour, subtitle
+                    FROM identity WHERE player = ?""")) {
+                statement.setString(1, player.toString());
+                try (ResultSet rows = statement.executeQuery()) {
+                    if (!rows.next()) {
+                        return java.util.Optional.<Identity>empty();
+                    }
+                    return java.util.Optional.of(new Identity(orEmpty(rows.getString("prefix")),
+                            orEmpty(rows.getString("suffix")), orEmpty(rows.getString("nametag_prefix")),
+                            orEmpty(rows.getString("colour")), orEmpty(rows.getString("subtitle"))));
+                }
+            }
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        identities.compute(player, (key, current) -> {
+            if (changed.contains(player) || inFlight.contains(player)) {
+                return current;
+            }
+            Identity found = stored.get().orElse(null);
+            return found == null || found.isBlank() ? null : found;
+        });
+    }
+
     private static String orEmpty(String value) {
         return value == null ? "" : value;
     }
@@ -475,6 +534,18 @@ public final class Identities {
         // Drained rather than snapshotted — see Marks. Copying the marks and clearing them
         // afterwards loses any change that arrives while the write is running.
         Set<UUID> writing = Marks.drain(changed);
+        inFlight.addAll(writing);
+        try {
+            writeAndAnnounce(writing);
+        } finally {
+            inFlight.removeAll(writing);
+        }
+    }
+
+    /** Players being written right now: a refresh in that moment keeps them, as it keeps unwritten ones. */
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
+
+    private void writeAndAnnounce(Set<UUID> writing) {
         boolean written = database.write(connection -> {
             try (PreparedStatement upsert = connection.prepareStatement("""
                     INSERT INTO identity (player, prefix, suffix, nametag_prefix, colour, subtitle)
@@ -504,6 +575,13 @@ public final class Identities {
         });
         if (!written) {
             Marks.restore(changed, writing);
+            return;
+        }
+        de.raindancer.core.platform.network.NetworkBus network = bus;
+        if (network != null) {
+            inFlight.removeAll(writing);
+            writing.forEach(this::refresh);
+            writing.forEach(player -> network.publish(TOPIC, player.toString()));
         }
     }
 

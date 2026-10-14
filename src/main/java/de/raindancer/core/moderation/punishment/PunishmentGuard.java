@@ -144,6 +144,15 @@ public final class PunishmentGuard {
                         punishment));
     }
 
+    /**
+     * Reads the player's record from the database rather than trusting this server's copy — for a join,
+     * where the answer must be the network's even if the event about a ban given elsewhere never came.
+     * Off the server's threads (the pre-login event already is).
+     */
+    public void readFromDatabase(UUID player) {
+        punishments.refresh(player);
+    }
+
     /** The punishment stopping this player, if one is and it is being enforced. */
     public Optional<Punishment> stopping(UUID player, PunishmentKind kind) {
         if (player == null || !isEnforced(kind)) {
