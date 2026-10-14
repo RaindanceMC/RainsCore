@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.tablist;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.ui.identity.Identities;
@@ -16,6 +18,7 @@ import static net.kyori.adventure.text.serializer.plain.PlainTextComponentSerial
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Who is on the other servers of the network, under the footer — everybody is somewhere on the list. */
+@org.junit.jupiter.api.Tag("database")
 class TablistElsewhereTest {
 
     @TempDir
@@ -24,7 +27,7 @@ class TablistElsewhereTest {
     @Test
     @DisplayName("one line per server with somebody on it: its name, how many, who — sorted; nobody elsewhere adds nothing")
     void lines() {
-        TablistModel model = new TablistModel(new Identities(Database.open(directory.resolve("core.db"), CoreSchema.CORE,
+        TablistModel model = new TablistModel(new Identities(TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE,
                 () -> false)));
         Map<String, Set<String>> elsewhere = new LinkedHashMap<>();
         elsewhere.put("Arena", Set.of("Engine_963", "Bo"));

@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.chatlog;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("database")
 class ChatLogTest {
 
     @TempDir
@@ -28,7 +31,7 @@ class ChatLogTest {
 
     @BeforeEach
     void open() {
-        database = Database.open(folder.resolve("chatlog.db"), ChatLog.SCHEMA, () -> false);
+        database = TestDatabases.open(folder.resolve("chatlog.db"), ChatLog.SCHEMA, () -> false);
         log = new ChatLog(database, clock::get);
     }
 
@@ -180,12 +183,12 @@ class ChatLogTest {
         java.nio.file.Path old = folder.resolve("old.db");
         de.raindancer.core.data.sql.Schema before = new de.raindancer.core.data.sql.Schema(
                 ChatLog.SCHEMA.steps().subList(0, 3));
-        Database first = Database.open(old, before, () -> false);
+        Database first = TestDatabases.open(old, before, () -> false);
         ChatLog writer = new ChatLog(first, clock::get);
         writer.record(bo, "Bo", ChatLog.PUBLIC, "kept too");
         writer.flush();
         first.close();
-        database = Database.open(old, ChatLog.SCHEMA, () -> false);
+        database = TestDatabases.open(old, ChatLog.SCHEMA, () -> false);
         log = new ChatLog(database, clock::get);
         assertThat(database.version()).isEqualTo(ChatLog.SCHEMA.size());
         assertThat(log.playersNamed("bo")).containsExactly(bo);

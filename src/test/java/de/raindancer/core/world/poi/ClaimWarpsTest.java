@@ -1,5 +1,7 @@
 package de.raindancer.core.world.poi;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * A claim's warp point and a player's main home: written by the claims plugin, read by the warps plugin,
  * kept in Core's place store so neither has to know the other is installed.
  */
+@org.junit.jupiter.api.Tag("database")
 class ClaimWarpsTest {
 
     private static final UUID LILLY = UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -31,7 +34,7 @@ class ClaimWarpsTest {
 
     @BeforeEach
     void setUp() {
-        database = Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
         places = new PoiStore(database);
         warps = new ClaimWarps(places);
     }

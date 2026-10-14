@@ -1,5 +1,7 @@
 package de.raindancer.core.platform.command;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.ui.identity.Nicknames;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.when;
 /**
  * Pointing a command at somebody by their nickname — online or not — and being offered it while typing.
  */
+@org.junit.jupiter.api.Tag("database")
 class PlayerTargetsNicknameTest {
 
     @TempDir
@@ -44,7 +47,7 @@ class PlayerTargetsNicknameTest {
 
     @BeforeEach
     void setUp() {
-        database = Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
         nicknames = new Nicknames(database);
         PlayerTargets.useNicknames(nicknames);
         lilly = online("lillyyxoxo");

@@ -428,8 +428,8 @@ public final class RunHistory {
                         upsert.setString(3, run.category());
                         upsert.setLong(4, run.startedAt().toEpochMilli());
                         upsert.setLong(5, run.score());
-                        upsert.setBoolean(6, run.lowerWins());
-                        upsert.setBoolean(7, run.ranked());
+                        upsert.setInt(6, run.lowerWins() ? 1 : 0);
+                        upsert.setInt(7, run.ranked() ? 1 : 0);
                         upsert.executeUpdate();
                         clearPlayers.setString(1, run.id());
                         clearPlayers.executeUpdate();

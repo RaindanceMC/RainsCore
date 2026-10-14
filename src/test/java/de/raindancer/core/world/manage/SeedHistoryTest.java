@@ -1,5 +1,7 @@
 package de.raindancer.core.world.manage;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -16,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Every seed a world has had, kept in the real {@code core.db} schema rather than a stand-in, so the
  * table these tests read is the table a server gets.
  */
+@org.junit.jupiter.api.Tag("database")
 class SeedHistoryTest {
 
     @TempDir
@@ -28,7 +31,7 @@ class SeedHistoryTest {
         if (database != null) {
             database.close();
         }
-        database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         SeedHistory history = new SeedHistory(database, clock::get);
         history.load();
         return history;
@@ -112,7 +115,7 @@ class SeedHistoryTest {
     @DisplayName("a recorded seed asks to be written soon, rather than waiting for the timer or the shutdown")
     void flushesSoon() {
         java.util.List<Runnable> asked = new java.util.ArrayList<>();
-        database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         SeedHistory history = new SeedHistory(database, clock::get, asked::add);
         history.load();
 
@@ -129,7 +132,7 @@ class SeedHistoryTest {
     @DisplayName("flushNow answers once what was recorded is on disk, on the writer it was handed")
     void flushNowWaits() {
         java.util.List<Runnable> asked = new java.util.ArrayList<>();
-        database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         SeedHistory history = new SeedHistory(database, clock::get, asked::add);
         history.load();
         history.record("farm", 3L, SeedHistory.Cause.REPLACED);
@@ -162,11 +165,8 @@ class SeedHistoryTest {
 
         // Somebody else holds the write lock, so the first flush takes the seed off the queue and
         // then has to wait for its turn.
-        try (java.sql.Connection other = java.sql.DriverManager.getConnection(
-                "jdbc:sqlite:" + folder.resolve("core.db"))) {
-            try (java.sql.Statement lock = other.createStatement()) {
-                lock.execute("BEGIN EXCLUSIVE");
-            }
+        AutoCloseable held = TestDatabases.holdWrites(folder.resolve("core.db"), "world_seed");
+        {
             java.util.concurrent.CompletableFuture<Boolean> first =
                     java.util.concurrent.CompletableFuture.supplyAsync(history::flush);
             long until = System.currentTimeMillis() + 5_000;
@@ -183,9 +183,7 @@ class SeedHistoryTest {
                             + "disk anywhere")
                     .isNotDone();
 
-            try (java.sql.Statement unlock = other.createStatement()) {
-                unlock.execute("ROLLBACK");
-            }
+            held.close();
             assertThat(first.get(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             assertThat(second.get(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
         }

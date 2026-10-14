@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.punishment;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * lifting a ban <em>adds</em> the lifting, so the history still says what happened. That is the
  * difference between a moderation system and a set of flags.
  */
+@org.junit.jupiter.api.Tag("database")
 class PunishmentsTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -52,7 +55,7 @@ class PunishmentsTest {
     private Database database;
 
     private Database openDatabase() {
-        return Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        return TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
     }
 
     @BeforeEach
@@ -326,7 +329,7 @@ class PunishmentsTest {
         @Test
         @DisplayName("a missing file is a clean server")
         void survivesAMissingFile() {
-            Database empty = Database.open(directory.resolve("never-used.db"), CoreSchema.CORE,
+            Database empty = TestDatabases.open(directory.resolve("never-used.db"), CoreSchema.CORE,
                     () -> false);
             Punishments fresh = new Punishments(empty, clock::get);
             assertThatCode(fresh::load).doesNotThrowAnyException();

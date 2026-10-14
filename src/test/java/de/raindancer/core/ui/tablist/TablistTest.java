@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.tablist;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.ui.identity.Identities;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * footer say. Each of those is a decision somebody will want to change, and none of them should
  * need a server to get right.
  */
+@org.junit.jupiter.api.Tag("database")
 class TablistTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -38,7 +41,7 @@ class TablistTest {
     /** One database per test, opened on first use so the temporary directory already exists. */
     private Database database() {
         if (openedDatabase == null || !openedDatabase.isUsable()) {
-            openedDatabase = Database.open(directory.resolve("core.db"), CoreSchema.CORE,
+            openedDatabase = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE,
                     () -> false);
         }
         return openedDatabase;

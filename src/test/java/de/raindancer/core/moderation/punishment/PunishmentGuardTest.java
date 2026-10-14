@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.punishment;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * not what do they see" is a pure question about a punishment and a clock; the Bukkit event handler
  * that asks it is three lines and needs a server. Everything worth getting right is on this side.
  */
+@org.junit.jupiter.api.Tag("database")
 class PunishmentGuardTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -50,7 +53,7 @@ class PunishmentGuardTest {
     private Database database;
 
     private Database openDatabase() {
-        return Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        return TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
     }
     private PunishmentGuard guard;
 

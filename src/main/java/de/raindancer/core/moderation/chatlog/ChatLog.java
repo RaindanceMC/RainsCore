@@ -43,7 +43,9 @@ public final class ChatLog {
             "CREATE INDEX chat_line_player ON chat_line (player, id)",
             "CREATE INDEX chat_line_at ON chat_line (at)",
             // Who used a name, for finding somebody by a name they have since changed.
-            "CREATE INDEX chat_line_name ON chat_line (name COLLATE NOCASE)");
+            "CREATE INDEX chat_line_name ON chat_line (name COLLATE NOCASE)",
+            // 2.0.0: the same question on Postgres, which has no NOCASE, is asked as lower(name).
+            "CREATE INDEX chat_line_name_lower ON chat_line (lower(name))");
 
     /** One line, as it was said. */
     public record Line(long at, UUID player, String name, String channel, String text) {
@@ -194,7 +196,7 @@ public final class ChatLog {
     /** What matches, newest first. Off the server's threads. */
     public List<Line> search(Search what, int limit, int offset) {
         flush();
-        Where where = where(what);
+        Where where = where(what, database.dialect());
         String sql = "SELECT at, player, name, channel, text FROM chat_line" + where.sql
                 + " ORDER BY id DESC LIMIT ? OFFSET ?";
         return database.read(connection -> {
@@ -217,7 +219,7 @@ public final class ChatLog {
     /** How many lines match. Off the server's threads. */
     public long count(Search what) {
         flush();
-        Where where = where(what);
+        Where where = where(what, database.dialect());
         return database.read(connection -> {
             try (PreparedStatement select = connection.prepareStatement("SELECT COUNT(*) FROM chat_line" + where.sql)) {
                 where.bind(select);
@@ -237,7 +239,9 @@ public final class ChatLog {
         return database.read(connection -> {
             Set<UUID> found = new LinkedHashSet<>();
             try (PreparedStatement select = connection.prepareStatement(
-                    "SELECT DISTINCT player FROM chat_line WHERE name = ? COLLATE NOCASE")) {
+                    database.dialect() == de.raindancer.core.data.sql.Dialect.POSTGRESQL
+                            ? "SELECT DISTINCT player FROM chat_line WHERE lower(name) = lower(?)"
+                            : "SELECT DISTINCT player FROM chat_line WHERE name = ? COLLATE NOCASE")) {
                 select.setString(1, name.strip());
                 try (ResultSet rows = select.executeQuery()) {
                     while (rows.next()) {
@@ -280,7 +284,7 @@ public final class ChatLog {
         }
     }
 
-    private static Where where(Search what) {
+    private static Where where(Search what, de.raindancer.core.data.sql.Dialect dialect) {
         Search search = what == null ? Search.everything() : what;
         List<String> parts = new ArrayList<>();
         List<Object> values = new ArrayList<>();
@@ -305,7 +309,8 @@ public final class ChatLog {
                 spellings.add(lower.toUpperCase(Locale.ROOT));
                 spellings.add(lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1));
             }
-            parts.add("(" + String.join(" OR ", java.util.Collections.nCopies(spellings.size(), "text LIKE ? ESCAPE '\\'")) + ")");
+            parts.add("(" + String.join(" OR ", java.util.Collections.nCopies(spellings.size(),
+                    "text " + dialect.likeIgnoringCase() + " ? ESCAPE '\\'")) + ")");
             spellings.forEach(spelling -> values.add("%" + escaped(spelling) + "%"));
         }
         return new Where(parts.isEmpty() ? "" : " WHERE " + String.join(" AND ", parts), values);

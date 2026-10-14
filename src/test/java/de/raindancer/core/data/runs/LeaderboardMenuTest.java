@@ -1,5 +1,7 @@
 package de.raindancer.core.data.runs;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.testkit.TestPlayers;
@@ -22,6 +24,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** The leaderboard screen's icons, built server-free with the testkit. */
+@org.junit.jupiter.api.Tag("database")
 class LeaderboardMenuTest {
 
     @TempDir
@@ -33,7 +36,7 @@ class LeaderboardMenuTest {
 
     @BeforeEach
     void setUp() {
-        database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         history = new RunHistory(database, "speedrun");
         history.add(Run.timed("speedrun/solo", Duration.ofMinutes(20)).player(alex.getUniqueId(), "Alex")
                 .startedAt(Instant.ofEpochSecond(10)).split("nether", Duration.ofMinutes(5)).build());

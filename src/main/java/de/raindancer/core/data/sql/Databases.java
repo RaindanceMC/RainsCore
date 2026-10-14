@@ -29,9 +29,11 @@ import java.util.function.BooleanSupplier;
  * <p>They are also thrown away differently, which is the deciding argument: an audit journal has a
  * retention period and the rest does not. One file cannot have two retention policies.
  *
- * <h2>Names are files</h2>
- * A name becomes {@code <name>.db} in the plugin's folder, so what is on disk matches what the code
- * calls it. Anybody looking at a data folder can tell what each file is without reading any code.
+ * <h2>Names are files, or namespaces</h2>
+ * On a server of its own a name becomes {@code <name>.db} in the plugin's folder, so what is on disk
+ * matches what the code calls it. On a network (2.0.0) the same name is a namespace — a Postgres
+ * schema — in the one central database every server of the network shares, reached through this
+ * server's single connection pool. Callers ask for a name either way and do not know which it is.
  */
 public final class Databases implements AutoCloseable {
 
@@ -44,16 +46,49 @@ public final class Databases implements AutoCloseable {
     public static final String AUDIT = "audit";
 
     private final Path folder;
+    private final PostgresPool pool;
+    private final String serverId;
     private final BooleanSupplier onServerThread;
     private final Map<String, Database> open = new ConcurrentHashMap<>();
 
     /**
+     * SQLite files, for a server on its own.
+     *
      * @param folder         where the files live, usually the plugin's data folder
      * @param onServerThread how to tell whether the caller is on a thread running the world
      */
     public Databases(Path folder, BooleanSupplier onServerThread) {
+        this(folder, null, "", onServerThread);
+    }
+
+    private Databases(Path folder, PostgresPool pool, String serverId, BooleanSupplier onServerThread) {
         this.folder = folder;
+        this.pool = pool;
+        this.serverId = serverId;
         this.onServerThread = onServerThread;
+    }
+
+    /**
+     * Namespaces in a network's central PostgreSQL. The pool is this server's and is closed with these.
+     *
+     * @param serverId this server's id on the network, recorded beside every schema step it applies
+     */
+    public static Databases central(PostgresPool pool, String serverId, BooleanSupplier onServerThread) {
+        return new Databases(null, pool, serverId, onServerThread);
+    }
+
+    /** Whether these live in the network's central database rather than in files of this server's. */
+    public boolean isCentral() {
+        return pool != null;
+    }
+
+    public Dialect dialect() {
+        return isCentral() ? Dialect.POSTGRESQL : Dialect.SQLITE;
+    }
+
+    /** The central database's pool, or null on a server of its own. */
+    public PostgresPool pool() {
+        return pool;
     }
 
     /**
@@ -67,8 +102,9 @@ public final class Databases implements AutoCloseable {
      * first schema wins, because it is the one the tables were built from.
      */
     public Database of(String name, Schema schema) {
-        return open.computeIfAbsent(name, key ->
-                Database.open(folder.resolve(key + ".db"), schema, onServerThread));
+        return open.computeIfAbsent(name, key -> isCentral()
+                ? PostgresDatabase.open(pool, key, schema, onServerThread, serverId)
+                : Database.open(folder.resolve(key + ".db"), schema, onServerThread));
     }
 
     /**
@@ -121,9 +157,12 @@ public final class Databases implements AutoCloseable {
             try {
                 database.close();
             } catch (RuntimeException failed) {
-                log.error(failed, "Could not close {} cleanly.", database.file());
+                log.error(failed, "Could not close {} cleanly.", database.describe());
             }
         });
         open.clear();
+        if (pool != null) {
+            pool.close();
+        }
     }
 }

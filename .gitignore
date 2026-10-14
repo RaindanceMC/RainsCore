@@ -3,3 +3,4 @@ target/
 .idea/
 .serena/
 build/
+dependency-reduced-pom.xml

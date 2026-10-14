@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.punishment;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.moderation.audit.Audit;
@@ -23,6 +25,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("database")
 class BlockedAttemptsTest {
 
     @TempDir
@@ -42,7 +45,7 @@ class BlockedAttemptsTest {
 
     @BeforeEach
     void open() {
-        database = Database.open(folder.resolve("audit.db"), CoreSchema.AUDIT, () -> false);
+        database = TestDatabases.open(folder.resolve("audit.db"), CoreSchema.AUDIT, () -> false);
         audit = new Audit(database, clock::get);
         attempts = new BlockedAttempts(audit, clock::get);
     }

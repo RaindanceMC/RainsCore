@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.tablist;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.ui.identity.Identities;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * thing anybody actually wants from it: staff at the top, then whoever else, rather than the admin
  * being wherever the alphabet put them.
  */
+@org.junit.jupiter.api.Tag("database")
 @DisplayName("tablist ranking")
 class TablistRankingTest {
 
@@ -33,7 +36,7 @@ class TablistRankingTest {
     Path folder;
 
     private TablistModel model() {
-        return new TablistModel(new Identities(Database.open(
+        return new TablistModel(new Identities(TestDatabases.open(
                 folder.resolve("identities.db"), CoreSchema.CORE, () -> false)));
     }
 

@@ -1,5 +1,7 @@
 package de.raindancer.core.content.achievement;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import org.bukkit.Material;
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
@@ -39,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * earned "your first claim" again, and a listener firing twice must not announce it twice — which
  * is the bug every hand-rolled version of this has.
  */
+@org.junit.jupiter.api.Tag("database")
 class AchievementsTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -49,7 +52,7 @@ class AchievementsTest {
     /** One database per test, opened on first use so the temporary directory already exists. */
     private Database database() {
         if (openedDatabase == null || !openedDatabase.isUsable()) {
-            openedDatabase = Database.open(directory.resolve("core.db"), CoreSchema.CORE,
+            openedDatabase = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE,
                     () -> false);
         }
         return openedDatabase;
@@ -389,7 +392,7 @@ class AchievementsTest {
         @DisplayName("a missing file is simply nothing earned yet")
         void survivesAMissingFile() {
             Achievements fresh = new Achievements(directory.resolve("nothing.yml"),
-                    Database.open(directory.resolve("never-used.db"), CoreSchema.CORE, () -> false),
+                    TestDatabases.open(directory.resolve("never-used.db"), CoreSchema.CORE, () -> false),
                     clock::get);
             assertThatCode(fresh::load).doesNotThrowAnyException();
             assertThat(fresh.all()).isEmpty();

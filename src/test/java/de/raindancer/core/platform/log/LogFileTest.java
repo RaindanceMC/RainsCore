@@ -182,7 +182,9 @@ class LogFileTest {
         // The backlog is still written, just not on this thread.
         long deadline = System.currentTimeMillis() + 10_000;
         while (System.currentTimeMillis() < deadline
-                && Files.readAllLines(todaysFile(directory)).size() < 2_000) {
+                // Not there at all yet is "not written yet" too: the background writer creates the file.
+                && (!Files.exists(todaysFile(directory))
+                    || Files.readAllLines(todaysFile(directory)).size() < 2_000)) {
             Thread.sleep(25);
         }
         assertThat(Files.readAllLines(todaysFile(directory))).hasSize(2_000);

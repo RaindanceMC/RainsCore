@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.identity;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.data.sql.CoreSchema;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +15,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** One server's idea of a player's name, carried to another as plain strings and taken over whole there. */
+@org.junit.jupiter.api.Tag("database")
 class IdentityTransferTest {
 
     @TempDir
@@ -22,13 +25,13 @@ class IdentityTransferTest {
     @DisplayName("exported on survival, adopted in the arena: prefix, colour, subtitle and nickname arrive; what is gone there goes")
     void roundTrip() {
         UUID ada = UUID.randomUUID();
-        Identities survival = new Identities(Database.open(directory.resolve("a.db"), CoreSchema.CORE, () -> false));
+        Identities survival = new Identities(TestDatabases.open(directory.resolve("a.db"), CoreSchema.CORE, () -> false));
         survival.setPrefix(ada, "<gold>[VIP] ");
         survival.setColour(ada, "#ff00aa");
         survival.setSubtitle(ada, "<gray>the brave");
         survival.setNickname(ada, "Addie");
 
-        Identities arena = new Identities(Database.open(directory.resolve("b.db"), CoreSchema.CORE, () -> false));
+        Identities arena = new Identities(TestDatabases.open(directory.resolve("b.db"), CoreSchema.CORE, () -> false));
         arena.setSuffix(ada, " <red>old");
         Map<String, String> carried = survival.export(ada);
         arena.adopt(ada, carried);

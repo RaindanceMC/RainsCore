@@ -334,6 +334,37 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask fileSyncTimer;
     private volatile de.raindancer.core.platform.link.FileSync fileSync;
 
+    private de.raindancer.core.platform.network.NetworkConfig network;
+
+    /**
+     * SQLite files beside the plugin on a server of its own; namespaces in the network's central
+     * PostgreSQL when network.yml says so. A central database that cannot be reached is said once,
+     * loudly: every store then answers "nothing" instead of the network's data, and an owner who reads
+     * no further than the first error must still learn why.
+     */
+    private Databases openDatabases(java.util.function.BooleanSupplier onServerThread) {
+        if (!network.isNetwork()) {
+            log.info("This server keeps its data in its own database files ({}).", network.serverId());
+            return new Databases(getDataFolder().toPath(), onServerThread);
+        }
+        de.raindancer.core.data.sql.PostgresPool pool = de.raindancer.core.data.sql.PostgresPool.open(network.postgres());
+        if (pool.isReachable()) {
+            log.info("This server is '{}' (group '{}') on a network; its data is in {}.",
+                    network.serverId(), network.group(), network.postgres().describe());
+        } else {
+            log.error("THE NETWORK DATABASE AT {} CANNOT BE REACHED. Nothing this server keeps — bans, homes, "
+                    + "balances, settings — can be read or saved until it can. Check network.yml and that the "
+                    + "database is running, then restart.", network.postgres().describe());
+        }
+        return Databases.central(pool, network.serverId(), onServerThread);
+    }
+
+    /** Who this server is on its network, and where the network's data is. */
+    @Override
+    public de.raindancer.core.platform.network.NetworkConfig network() {
+        return network;
+    }
+
     static RainsCorePlugin instance() {
         return instance;
     }
@@ -346,6 +377,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         long startedAt = System.nanoTime();
         instance = this;
         firstRun = !Files.exists(getDataFolder().toPath().resolve("config.yml"));
+
+        // Before everything: which server this is on its network, and where the network's data is.
+        network = de.raindancer.core.platform.network.NetworkConfig.load(getDataFolder().toPath(), System.getenv(),
+                () -> getServer().getPort() > 0 ? "server_" + getServer().getPort() : "server");
+        network.problems().forEach(problem -> log.warn("network.yml: {}", problem));
 
         // Settings first: everything after this reads them.
         settings = settingsFor(SettingsSchema.of(CoreConfig.class, CoreConfig.DEFAULTS),
@@ -372,8 +408,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // The guard is therefore armed at the end of onEnable rather than switched off. Passing a
         // supplier that always answers false would have disabled it for the whole run — a safety net
         // that never fires, which is worse than none because it reads as proof.
-        databases = new Databases(getDataFolder().toPath(),
-                () -> watchingThreads && getServer().isPrimaryThread());
+        databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread());
         audit = new Audit(databases.audit(), System::currentTimeMillis);
 
         // Before anything that says anything. The file is written out on the first start, and on every

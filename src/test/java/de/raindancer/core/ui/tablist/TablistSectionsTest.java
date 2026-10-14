@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.tablist;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.ui.identity.Identities;
@@ -16,13 +18,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** A section — the server's team — listed on its own, above every world. */
+@org.junit.jupiter.api.Tag("database")
 class TablistSectionsTest {
 
     @TempDir
     Path folder;
 
     private TablistModel model() {
-        return new TablistModel(new Identities(Database.open(
+        return new TablistModel(new Identities(TestDatabases.open(
                 folder.resolve("identities.db"), CoreSchema.CORE, () -> false)));
     }
 

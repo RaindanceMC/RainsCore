@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.identity;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * a decorative suffix in chat only, and a short tag above their head, and the two are set
  * independently.
  */
+@org.junit.jupiter.api.Tag("database")
 class IdentitiesTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -38,7 +41,7 @@ class IdentitiesTest {
     /** One database per test, opened on first use so the temporary directory already exists. */
     private Database database() {
         if (openedDatabase == null || !openedDatabase.isUsable()) {
-            openedDatabase = Database.open(directory.resolve("core.db"), CoreSchema.CORE,
+            openedDatabase = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE,
                     () -> false);
         }
         return openedDatabase;
@@ -313,7 +316,7 @@ class IdentitiesTest {
         @Test
         @DisplayName("a database with nothing in it is an empty set of identities, not a failure")
         void survivesAMissingFile() {
-            Identities fresh = new Identities(Database.open(
+            Identities fresh = new Identities(TestDatabases.open(
                     directory.resolve("never-used.db"), CoreSchema.CORE, () -> false));
             assertThatCode(fresh::load).doesNotThrowAnyException();
             assertThat(fresh.known()).isEmpty();

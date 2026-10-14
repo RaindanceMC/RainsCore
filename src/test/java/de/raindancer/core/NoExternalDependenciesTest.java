@@ -53,7 +53,8 @@ class NoExternalDependenciesTest {
     void everyDependencyIsProvidedOrTest() throws IOException {
         List<String> shipped = new ArrayList<>();
         Matcher dependencies = Pattern.compile("<dependency>(.*?)</dependency>", Pattern.DOTALL)
-                .matcher(Files.readString(POM));
+                // A build plugin's own dependencies (the shade plugin's ASM) are tools, never shipped.
+                .matcher(Files.readString(POM).replaceAll("(?s)<build>.*</build>", ""));
         while (dependencies.find()) {
             String block = dependencies.group(1);
             String scope = group(block, "<scope>([^<]+)</scope>");
@@ -62,11 +63,28 @@ class NoExternalDependenciesTest {
                         + " (scope " + (scope == null ? "compile" : scope) + ")");
             }
         }
+        shipped.removeAll(SHADED);
         assertThat(shipped)
-                .as("a compile-scoped dependency has to reach the server somehow: shaded, which "
-                        + "maven-shade cannot do for Java 25 class files, or fetched, which this "
-                        + "plugin does not do. Copy it in instead.")
+                .as("a compile-scoped dependency ships inside the jar. Only the PostgreSQL driver does "
+                        + "(NETWORK-PLAN.md N10); anything else is copied in, or not used.")
                 .isEmpty();
+    }
+
+    /** What ships inside the jar, shaded and relocated: the PostgreSQL driver and nothing else. */
+    private static final List<String> SHADED = List.of("postgresql (scope compile)");
+
+    @Test
+    @DisplayName("the shaded driver is relocated under core.internal and recorded with its licence")
+    void shadedDriverIsRelocatedAndRecorded() throws IOException {
+        String pom = Files.readString(POM);
+        assertThat(pom)
+                .as("relocated, so another plugin's own copy of the driver cannot collide with ours")
+                .contains("<pattern>org.postgresql</pattern>")
+                .contains("<shadedPattern>de.raindancer.core.internal.postgresql</shadedPattern>")
+                .contains("<include>org.postgresql:postgresql</include>");
+        assertThat(Files.readString(THIRD_PARTY).toLowerCase())
+                .contains("postgresql")
+                .contains("bsd-2-clause");
     }
 
     // ------------------------------------------------------------------ what was copied in

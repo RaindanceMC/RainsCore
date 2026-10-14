@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.punishment;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** A mute given on survival holds in the arena too, for as long as it has left, and ends there when it ends here. */
+@org.junit.jupiter.api.Tag("database")
 class PunishmentTransferTest {
 
     @TempDir
@@ -25,8 +28,8 @@ class PunishmentTransferTest {
         AtomicLong clock = new AtomicLong(1_000_000);
         UUID ada = UUID.randomUUID();
         UUID mod = UUID.randomUUID();
-        Punishments survival = new Punishments(Database.open(directory.resolve("a.db"), CoreSchema.CORE, () -> false), clock::get);
-        Punishments arena = new Punishments(Database.open(directory.resolve("b.db"), CoreSchema.CORE, () -> false), clock::get);
+        Punishments survival = new Punishments(TestDatabases.open(directory.resolve("a.db"), CoreSchema.CORE, () -> false), clock::get);
+        Punishments arena = new Punishments(TestDatabases.open(directory.resolve("b.db"), CoreSchema.CORE, () -> false), clock::get);
         survival.punish(ada, PunishmentKind.MUTE, mod, "spam", Duration.ofMinutes(10));
         clock.addAndGet(Duration.ofMinutes(4).toMillis());
 
@@ -50,8 +53,8 @@ class PunishmentTransferTest {
         AtomicLong clock = new AtomicLong(1_000_000);
         UUID ada = UUID.randomUUID();
         UUID mod = UUID.randomUUID();
-        Punishments survival = new Punishments(Database.open(directory.resolve("c.db"), CoreSchema.CORE, () -> false), clock::get);
-        Punishments arena = new Punishments(Database.open(directory.resolve("d.db"), CoreSchema.CORE, () -> false), clock::get);
+        Punishments survival = new Punishments(TestDatabases.open(directory.resolve("c.db"), CoreSchema.CORE, () -> false), clock::get);
+        Punishments arena = new Punishments(TestDatabases.open(directory.resolve("d.db"), CoreSchema.CORE, () -> false), clock::get);
         arena.punish(ada, PunishmentKind.MUTE, mod, "arena spam", Duration.ofHours(2));
 
         arena.adopt(ada, survival.export(ada));

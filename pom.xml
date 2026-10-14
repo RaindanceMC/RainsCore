@@ -6,7 +6,7 @@
 
     <groupId>de.raindancer</groupId>
     <artifactId>RainsCore</artifactId>
-    <version>1.137.1</version>
+    <version>2.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>RainsCore</name>
@@ -122,6 +122,25 @@
           Keep this version in step with Paper's. If they diverge, the tests pass against one engine
           and the server runs on another.
         -->
+        <!--
+          The PostgreSQL driver, the one dependency that ships inside the jar (2.0.0, decision N10 in
+          NETWORK-PLAN.md). A network keeps everything in one central Postgres, and Paper only carries
+          drivers for SQLite and MySQL. Shaded and relocated under de.raindancer.core.internal.postgresql
+          rather than fetched through paper-plugin.yml's libraries: — nothing is downloaded at startup,
+          an offline server still loads, and another plugin's copy of the driver cannot collide with it.
+          BSD-2-Clause, recorded in THIRD-PARTY.md. checker-qual is annotations only and not needed at runtime.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.8</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
@@ -215,6 +234,27 @@
                     -->
                     <argLine>-Dnet.bytebuddy.experimental=true</argLine>
                 </configuration>
+                <executions>
+                    <!--
+                      Every store test (tagged "database") once more against PostgreSQL, the database a
+                      network keeps everything in. TestDatabases hands them a Postgres namespace instead of a
+                      SQLite file; TestPostgres starts a throwaway server or uses CI's.
+                    -->
+                    <execution>
+                        <id>stores-on-postgres</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <groups>database</groups>
+                            <reportNameSuffix>postgres</reportNameSuffix>
+                            <systemPropertyVariables>
+                                <rains.test.dialect>postgresql</rains.test.dialect>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <!--
@@ -242,6 +282,61 @@
                                 <exclude>**/*Test.class</exclude>
                                 <exclude>**/*Test$*.class</exclude>
                             </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <!--
+                  Relocating rewrites every class in the jar, Core's own included, and the ASM shade ships
+                  with predates Java 25's class files (major 69). A newer ASM reads them.
+                -->
+                <dependencies>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm</artifactId>
+                        <version>9.10.1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.ow2.asm</groupId>
+                        <artifactId>asm-commons</artifactId>
+                        <version>9.10.1</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Modules compile against Core as provided; they must not inherit the driver. -->
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.postgresql:postgresql</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.postgresql</pattern>
+                                    <shadedPattern>de.raindancer.core.internal.postgresql</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>org.postgresql:postgresql</artifact>
+                                    <excludes>
+                                        <!-- Core asks the driver directly; it is not registered with DriverManager. -->
+                                        <exclude>META-INF/services/java.sql.Driver</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                        <exclude>META-INF/versions/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

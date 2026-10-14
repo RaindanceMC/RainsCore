@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.identity;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import net.kyori.adventure.text.Component;
@@ -17,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("database")
 class NameBadgesTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -30,7 +33,7 @@ class NameBadgesTest {
     @BeforeEach
     void setUp() {
         NameBadges.clear();
-        database = Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
         identities = new Identities(database);
     }
 

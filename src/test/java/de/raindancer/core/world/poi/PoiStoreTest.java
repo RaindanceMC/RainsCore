@@ -1,5 +1,7 @@
 package de.raindancer.core.world.poi;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import org.bukkit.Material;
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
@@ -38,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
  * have to be thrown away at load time rather than being unreachable until that world comes back. A
  * multiverse server that unloads a world for maintenance would silently lose every home in it.
  */
+@org.junit.jupiter.api.Tag("database")
 class PoiStoreTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -50,7 +53,7 @@ class PoiStoreTest {
     private Database database;
 
     private Database openDatabase() {
-        return Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        return TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
     }
 
     @AfterEach
@@ -251,7 +254,7 @@ class PoiStoreTest {
         @Test
         @DisplayName("a file that was never written loads as empty rather than failing")
         void survivesAMissingFile() {
-            Database empty = Database.open(directory.resolve("never-used.db"), CoreSchema.CORE,
+            Database empty = TestDatabases.open(directory.resolve("never-used.db"), CoreSchema.CORE,
                     () -> false);
             PoiStore fresh = new PoiStore(empty);
             assertThatCode(fresh::load).doesNotThrowAnyException();
@@ -612,10 +615,8 @@ class PoiStoreTest {
     void aFlushWaitsForTheOneAlreadyWriting() throws Exception {
         store.save(Poi.builder("base", "world", 0, 0, 0).owner(BOB).kind("home").build());
 
-        try (java.sql.Connection other = java.sql.DriverManager.getConnection(
-                "jdbc:sqlite:" + directory.resolve("core.db"));
-             java.sql.Statement lock = other.createStatement()) {
-            lock.execute("BEGIN EXCLUSIVE");
+        AutoCloseable held = TestDatabases.holdWrites(directory.resolve("core.db"), "place");
+        {
             java.util.concurrent.CompletableFuture<Boolean> first =
                     java.util.concurrent.CompletableFuture.supplyAsync(store::flush);
             long until = System.currentTimeMillis() + 5_000;
@@ -632,7 +633,7 @@ class PoiStoreTest {
                     .as("answering now lets the databases close under the write still running")
                     .isNotDone();
 
-            lock.execute("ROLLBACK");
+            held.close();
             assertThat(first.get(10, TimeUnit.SECONDS)).isTrue();
             assertThat(second.get(10, TimeUnit.SECONDS)).isTrue();
         }

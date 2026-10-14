@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.identity;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The nickname directory: who goes by what, kept across restarts, so a command can be pointed at
  * somebody by the name everybody actually knows them by.
  */
+@org.junit.jupiter.api.Tag("database")
 class NicknamesTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -30,7 +33,7 @@ class NicknamesTest {
 
     private Database database() {
         if (database == null || !database.isUsable()) {
-            database = Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+            database = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
         }
         return database;
     }

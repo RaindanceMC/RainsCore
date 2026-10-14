@@ -1,5 +1,7 @@
 package de.raindancer.core.data.runs;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@org.junit.jupiter.api.Tag("database")
 class RunHistoryTest {
 
     private static final UUID ALEX = UUID.randomUUID();
@@ -32,7 +35,7 @@ class RunHistoryTest {
 
     @BeforeEach
     void setUp() {
-        database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         history = new RunHistory(database, "speedrun");
     }
 
@@ -191,10 +194,7 @@ class RunHistoryTest {
         @Test
         @DisplayName("a database that cannot be read is never written over; runs wait in memory")
         void unreadableIsKept() throws Exception {
-            Path broken = folder.resolve("broken.db");
-            byte[] rubbish = "not a database".repeat(100).getBytes();
-            Files.write(broken, rubbish);
-            Database unusable = Database.open(broken, CoreSchema.CORE, () -> false);
+            Database unusable = TestDatabases.unusable(folder.resolve("broken.db"), CoreSchema.CORE);
             RunHistory kept = new RunHistory(unusable, "speedrun");
             kept.load();
 
@@ -205,7 +205,9 @@ class RunHistoryTest {
             assertThat(kept.waiting()).isEqualTo(1);
             assertThat(kept.record("speedrun/any%")).isPresent();
             unusable.close();
-            assertThat(Files.readAllBytes(broken)).isEqualTo(rubbish);
+            if (TestDatabases.dialect() == de.raindancer.core.data.sql.Dialect.SQLITE) {
+                assertThat(Files.readString(folder.resolve("broken.db"))).isEqualTo("not a database".repeat(100));
+            }
         }
     }
 }

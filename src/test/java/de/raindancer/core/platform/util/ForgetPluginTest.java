@@ -1,5 +1,7 @@
 package de.raindancer.core.platform.util;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.content.achievement.Achievements;
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * to anybody else. In a unit test every class has one loader, so "this plugin" is the test's loader and
  * "some other plugin" is a fresh, empty one.
  */
+@org.junit.jupiter.api.Tag("database")
 class ForgetPluginTest {
 
     private final ClassLoader thisPlugin = getClass().getClassLoader();
@@ -80,7 +83,7 @@ class ForgetPluginTest {
     @Test
     @DisplayName("an achievement listener goes with its plugin")
     void listeners() {
-        Database database = Database.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
+        Database database = TestDatabases.open(folder.resolve("core.db"), CoreSchema.CORE, () -> false);
         try {
             Achievements achievements = new Achievements(folder.resolve("a.yml"), database,
                     System::currentTimeMillis);

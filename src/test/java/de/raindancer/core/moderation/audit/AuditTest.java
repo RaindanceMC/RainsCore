@@ -1,5 +1,7 @@
 package de.raindancer.core.moderation.audit;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Against a real database, because the searching is SQL and a fake would only prove that the
  * queries agree with a fake.
  */
+@org.junit.jupiter.api.Tag("database")
 @DisplayName("the audit journal")
 class AuditTest {
 
@@ -48,7 +51,7 @@ class AuditTest {
 
     @BeforeEach
     void open() {
-        database = Database.open(folder.resolve("audit.db"), CoreSchema.AUDIT, () -> false);
+        database = TestDatabases.open(folder.resolve("audit.db"), CoreSchema.AUDIT, () -> false);
         audit = new Audit(database, now::get);
     }
 
@@ -346,7 +349,7 @@ class AuditTest {
         @Test
         @DisplayName("a database that will not open loses the entries and says so, rather than growing")
         void unusableDatabase() {
-            Database broken = Database.open(folder.resolve("broken.db"),
+            Database broken = TestDatabases.open(folder.resolve("broken.db"),
                     de.raindancer.core.data.sql.Schema.of("CREATE TABLE nope this is not sql"),
                     () -> false);
             Audit onBroken = new Audit(broken, now::get);
@@ -370,8 +373,9 @@ class AuditTest {
             // That is the shape of the real failure — a full disk, a corrupt file — and the one
             // where re-queueing would be a loop.
             database.write(connection -> {
-                try (var statement = connection.prepareStatement("DROP TABLE entry")) {
-                    statement.executeUpdate();
+                try (var statement = connection.createStatement()) {
+                    statement.executeUpdate("DROP TABLE entry_field");
+                    statement.executeUpdate("DROP TABLE entry");
                 }
             });
             audit.record(AuditEntry.of("invsee", "opened"));

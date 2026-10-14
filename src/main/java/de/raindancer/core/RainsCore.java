@@ -610,6 +610,14 @@ public interface RainsCore {
      * What this server is called, for anything that names it to a player — the owner's server-name setting,
      * else the MOTD's first line. Plain text, never empty.
      */
+    /**
+     * Who this server is on its network — its id, its group — and whether the network keeps its data in
+     * one central database. A server on its own is a network of one: its id, group "default", SQLite.
+     */
+    default de.raindancer.core.platform.network.NetworkConfig network() {
+        return de.raindancer.core.platform.network.NetworkConfig.STANDALONE;
+    }
+
     default String serverName() {
         return de.raindancer.core.ui.text.ServerName.resolve("", "", org.bukkit.Bukkit.motd());
     }

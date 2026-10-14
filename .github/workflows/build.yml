@@ -19,6 +19,26 @@ jobs:
     name: Build & test
     runs-on: ubuntu-latest
 
+    # A real PostgreSQL for the storage tests (2.0.0: a network keeps everything in one). TestPostgres
+    # fails rather than skips when CI is set, so a missing database is a red build, not a green one
+    # that tested nothing.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: rains
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      RAINS_TEST_POSTGRES: localhost:5432/postgres
+      RAINS_TEST_POSTGRES_USER: postgres
+      RAINS_TEST_POSTGRES_PASSWORD: rains
+
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -68,7 +88,9 @@ jobs:
         id: tagcheck
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.jar.outputs.version }}" \
+          # A -SNAPSHOT is work in progress on master: it gets the rolling builds, never a version.
+          if [[ "${{ steps.jar.outputs.version }}" == *-SNAPSHOT ]] || \
+              git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.jar.outputs.version }}" \
               >/dev/null 2>&1; then
             echo "new=false" >> "$GITHUB_OUTPUT"
           else

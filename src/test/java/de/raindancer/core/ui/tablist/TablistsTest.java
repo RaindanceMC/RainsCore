@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.tablist;
 
+import de.raindancer.core.testkit.TestDatabases;
+
 import de.raindancer.core.data.sql.CoreSchema;
 import de.raindancer.core.data.sql.Database;
 import de.raindancer.core.ui.identity.Identities;
@@ -44,6 +46,7 @@ import static org.mockito.Mockito.when;
  * themselves — while still sending every online player, vanished or not, a fresh header and footer
  * on every refresh. Being hidden should not also mean being forgotten.
  */
+@org.junit.jupiter.api.Tag("database")
 class TablistsTest {
 
     private static final UUID ALICE = UUID.nameUUIDFromBytes("alice".getBytes());
@@ -59,7 +62,7 @@ class TablistsTest {
 
     @BeforeEach
     void setUp() {
-        database = Database.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
+        database = TestDatabases.open(directory.resolve("core.db"), CoreSchema.CORE, () -> false);
         identities = new Identities(database);
         model = new TablistModel(identities);
         tablists = new Tablists(model, "Rain's SMP");

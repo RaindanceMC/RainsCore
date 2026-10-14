@@ -1,8 +1,25 @@
 # Third-party code in this repository
 
-Everything here is copied in rather than fetched at runtime: this project deliberately ships without
-external dependencies. Copies are kept unmodified apart from their package name, so that upgrading
-one is a copy rather than a merge.
+Nothing is fetched at runtime: everything RainsCore needs is inside its own jar. Copied source is kept
+unmodified apart from its package name, so that upgrading one is a copy rather than a merge. One library
+is shaded as a jar instead of copied as source, because it is far too large to keep by hand.
+
+## PostgreSQL JDBC driver (pgjdbc)
+
+- **Where** inside the plugin jar, relocated to `de.raindancer.core.internal.postgresql` by maven-shade
+  (`pom.xml`); not in the source tree
+- **Upstream** <https://github.com/pgjdbc/pgjdbc> — `org.postgresql:postgresql` 42.7.8
+- **License** BSD-2-Clause (Copyright (c) 1997, PostgreSQL Global Development Group); the licence text
+  travels inside the jar as `META-INF/LICENSE`
+- **Added** 2026-10-14, for RainsCore 2.0.0 — a network keeps all its data in one central PostgreSQL
+  (NETWORK-PLAN.md, decisions N1 and N10), and Paper ships drivers for SQLite and MySQL only
+- **How it fits our code** only `data.sql.PostgresPool` touches it, and it constructs the driver
+  directly rather than through `DriverManager` (which only sees drivers its caller's class loader
+  registered — the relocated one is not registered at all)
+- **Why shaded, not downloaded** Paper's `libraries:` would fetch it at startup: an offline server
+  would not load, and a repository outage would take the network down. Relocated so another plugin's
+  copy of the driver cannot collide with ours.
+- **Upgrading** raise the version in `pom.xml` and here; nothing else changes
 
 ## FastBoard
 

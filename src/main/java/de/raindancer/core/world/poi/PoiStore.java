@@ -397,7 +397,7 @@ public final class PoiStore {
                     // that went in, for ever, on the very first save.
                     statement.setString(12,
                             place.label().equals(place.name()) ? null : place.label());
-                    statement.setBoolean(13, place.isShared());
+                    statement.setInt(13, place.isShared() ? 1 : 0);
                     statement.executeUpdate();
 
                     // Replaced wholesale rather than merged: a tag the caller removed has to
