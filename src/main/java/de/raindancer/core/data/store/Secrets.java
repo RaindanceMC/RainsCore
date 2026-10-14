@@ -42,10 +42,26 @@ public final class Secrets {
      * @return empty when the database cannot be reached; the caller decides what to do without it
      */
     public Optional<byte[]> bytes(String name, int length, Path oldFile) {
+        return bytes(name, length, oldFile, RAW);
+    }
+
+    /** The file's bytes are the key — as most 1.x key files were. */
+    public static final java.util.function.Function<byte[], byte[]> RAW = file -> file;
+
+    /** The file holds the key as base64 text — as the economy's {@code cash.key} did. */
+    public static final java.util.function.Function<byte[], byte[]> BASE64 =
+            file -> Base64.getDecoder().decode(new String(file, java.nio.charset.StandardCharsets.US_ASCII).strip());
+
+    /**
+     * As {@link #bytes(String, int, Path)}, for an old file that keeps its key in some other form: {@code decode}
+     * turns what the file holds into the key. A file that does not decode is not imported.
+     */
+    public Optional<byte[]> bytes(String name, int length, Path oldFile,
+                                  java.util.function.Function<byte[], byte[]> decode) {
         if (database == null || !database.isUsable()) {
             return Optional.empty();
         }
-        byte[] offered = fromFile(oldFile, length).orElseGet(() -> {
+        byte[] offered = fromFile(oldFile, length, decode).orElseGet(() -> {
             byte[] fresh = new byte[length];
             RANDOM.nextBytes(fresh);
             return fresh;
@@ -76,14 +92,14 @@ public final class Secrets {
         return kept;
     }
 
-    private static Optional<byte[]> fromFile(Path file, int length) {
+    private static Optional<byte[]> fromFile(Path file, int length, java.util.function.Function<byte[], byte[]> decode) {
         if (file == null || !Files.isRegularFile(file)) {
             return Optional.empty();
         }
         try {
-            byte[] kept = Files.readAllBytes(file);
-            return kept.length >= Math.min(16, length) ? Optional.of(kept) : Optional.empty();
-        } catch (IOException unreadable) {
+            byte[] kept = decode.apply(Files.readAllBytes(file));
+            return kept != null && kept.length >= Math.min(16, length) ? Optional.of(kept) : Optional.empty();
+        } catch (IOException | RuntimeException unreadable) {
             log.warn("{} could not be read ({}); a new secret is made instead.", file, unreadable.getMessage());
             return Optional.empty();
         }

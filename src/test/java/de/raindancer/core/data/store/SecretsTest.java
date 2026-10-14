@@ -93,4 +93,24 @@ class SecretsTest {
         assertThat(new Secrets(broken, System::currentTimeMillis).bytes("x", 32, null)).isEmpty();
         broken.close();
     }
+
+    @Test
+    @DisplayName("an old key file holding text (base64) is decoded on import: the network's key is the same bytes")
+    void decodesATextFile() throws Exception {
+        byte[] key = new byte[32];
+        java.util.Arrays.fill(key, (byte) 7);
+        Path file = folder.resolve("cash.key");
+        java.nio.file.Files.writeString(file, java.util.Base64.getEncoder().encodeToString(key) + "\n");
+        assertThat(server().bytes("cash", 32, file, Secrets.BASE64)).hasValueSatisfying(got -> assertThat(got).isEqualTo(key));
+        assertThat(server().bytes("cash", 32, null)).hasValueSatisfying(got -> assertThat(got).isEqualTo(key));
+    }
+
+    @Test
+    @DisplayName("an old key file that does not decode is not imported: a fresh key, the file kept")
+    void undecodableFile() throws Exception {
+        Path file = folder.resolve("cash.key");
+        java.nio.file.Files.writeString(file, "not base64 at all !!!");
+        assertThat(server().bytes("cash", 32, file, Secrets.BASE64)).hasValueSatisfying(got -> assertThat(got).hasSize(32));
+        assertThat(file.resolveSibling("cash.key.imported-2.0.0")).exists();
+    }
 }
