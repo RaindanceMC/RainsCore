@@ -134,7 +134,15 @@ public final class Documents {
         }
         Path relative = root.relativize(absolute);
         String owner = relative.getName(0).toString();
-        String name = relative.subpath(1, relative.getNameCount()).toString().replace('\\', '/');
+        // Joined element by element: a '\\' inside one file's name stays part of that name, never a folder.
+        StringBuilder joined = new StringBuilder();
+        for (int at = 1; at < relative.getNameCount(); at++) {
+            if (!joined.isEmpty()) {
+                joined.append('/');
+            }
+            joined.append(relative.getName(at));
+        }
+        String name = joined.toString();
         return Optional.of(new Address(scope == Scope.NETWORK ? NETWORK_SCOPE : serverScope, owner, name));
     }
 

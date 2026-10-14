@@ -92,11 +92,17 @@ public final class DocumentFolder {
         return gone;
     }
 
+    /**
+     * One plain name, checked as a name rather than as a path: no separator of either kind (a document's name
+     * turns '\\' into '/', a file's does not — the two must never disagree about which entry is meant), no
+     * "." or "..", nothing unprintable.
+     */
     private Path inside(String name) {
-        Path file = folder.resolve(name).normalize();
-        if (!file.getParent().equals(folder)) {
+        boolean plain = name != null && !name.isBlank() && !name.equals(".") && !name.equals("..")
+                && name.indexOf('/') < 0 && name.indexOf('\\') < 0 && name.chars().noneMatch(c -> c < 0x20 || c == 0x7f);
+        if (!plain) {
             throw new IllegalArgumentException("Not an entry of " + folder + ": '" + name + "'");
         }
-        return file;
+        return folder.resolve(name);
     }
 }

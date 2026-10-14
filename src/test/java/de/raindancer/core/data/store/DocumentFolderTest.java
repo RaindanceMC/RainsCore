@@ -100,6 +100,9 @@ class DocumentFolderTest {
     void noEscape() {
         DocumentFolder folder = DocumentFolder.on(claims(), documents, Documents.Scope.SERVER);
         assertThat(folder.delete("../../x.yml")).isFalse();
+        assertThat(folder.delete("..\\config.yml")).as("a backslash is a separator to a document's name").isFalse();
+        assertThat(folder.delete("..")).isFalse();
+        assertThat(folder.delete("a\u0000.yml")).isFalse();
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> folder.store("../x.yml"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
