@@ -52,7 +52,10 @@ public final class CustomEnchantments {
                         .minimumCost(EnchantmentRegistryEntry.EnchantmentCost.of(1, 10))
                         .maximumCost(EnchantmentRegistryEntry.EnchantmentCost.of(21, 10))
                         .anvilCost(def.anvilCost())
-                        .activeSlots(def.gear().slot()));
+                        .activeSlots(def.gear().slot())
+                        .exclusiveWith(RegistrySet.keySet(RegistryKey.ENCHANTMENT, def.exclusiveWith().stream()
+                                .map(other -> TypedKey.create(RegistryKey.ENCHANTMENT, Key.key(other)))
+                                .toList())));
             }
         }));
     }

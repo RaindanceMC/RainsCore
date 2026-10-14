@@ -21,6 +21,55 @@ class GearTest {
     }
 
     @Test
+    @DisplayName("hand tools are what breaks blocks or kills mobs — a sword and a bow, not armour")
+    void handTools() {
+        for (String tool : new String[]{"stone_pickaxe", "iron_axe", "wooden_shovel", "netherite_hoe",
+                "diamond_sword", "bow", "crossbow", "mace", "trident", "shears"}) {
+            assertThat(Gear.HAND_TOOLS.matches(tool)).as(tool).isTrue();
+        }
+        for (String other : new String[]{"iron_helmet", "elytra", "fishing_rod", "stick", "rainbow"}) {
+            assertThat(Gear.HAND_TOOLS.matches(other)).as(other).isFalse();
+        }
+        assertThat(Gear.HAND_TOOLS.slot()).isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.MAINHAND);
+    }
+
+    @Test
+    @DisplayName("digging, excavating, hoes, leggings, and any gear at all")
+    void theRest() {
+        assertThat(Gear.DIGGING_TOOLS.matches("iron_hoe")).isTrue();
+        assertThat(Gear.DIGGING_TOOLS.matches("iron_sword")).isFalse();
+        assertThat(Gear.EXCAVATING_TOOLS.matches("diamond_shovel")).isTrue();
+        assertThat(Gear.EXCAVATING_TOOLS.matches("diamond_axe")).isFalse();
+        assertThat(Gear.HOE.matches("golden_hoe")).isTrue();
+        assertThat(Gear.LEGGINGS.matches("chainmail_leggings")).isTrue();
+        assertThat(Gear.LEGGINGS.slot()).isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.LEGS);
+        for (String kept : new String[]{"elytra", "shield", "bow", "netherite_sword", "turtle_helmet", "iron_boots"}) {
+            assertThat(Gear.ANY_GEAR.matches(kept)).as(kept).isTrue();
+        }
+        assertThat(Gear.ANY_GEAR.matches("diamond")).isFalse();
+        assertThat(Gear.ANY_GEAR.slot()).isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.ANY);
+    }
+
+    @Test
+    @DisplayName("exclusive enchantments are named by their full key")
+    void exclusives() {
+        EnchantDef def = EnchantDef.builder("rainsenchants:smelting").name("Smelting").gear(Gear.DIGGING_TOOLS)
+                .exclusiveWith("minecraft:silk_touch").build();
+        assertThat(def.exclusiveWith()).containsExactly("minecraft:silk_touch");
+        assertThatThrownBy(() -> EnchantDef.builder("a:b").name("x").gear(Gear.HOE).exclusiveWith("silk_touch").build())
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new EnchantDef("a", "b", "x", 1, Gear.HOE, 1, 1).exclusiveWith()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the elytra is its own gear, worn in the chest slot")
+    void elytra() {
+        assertThat(Gear.ELYTRA.matches("elytra")).isTrue();
+        assertThat(Gear.ELYTRA.matches("diamond_chestplate")).isFalse();
+        assertThat(Gear.ELYTRA.slot()).isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.CHEST);
+    }
+
+    @Test
     @DisplayName("armour pieces are matched by their slot's suffix")
     void armour() {
         assertThat(Gear.HELMET.matches("iron_helmet")).isTrue();

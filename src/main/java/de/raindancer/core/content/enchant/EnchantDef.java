@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  * tags, so how a plugin hands it out (a boss drop, a shop book) stays that plugin's decision.
  */
 public record EnchantDef(String namespace, String path, String name, int maxLevel, Gear gear, int anvilCost,
-                         int weight) {
+                         int weight, java.util.List<String> exclusiveWith) {
 
     private static final Pattern PART = Pattern.compile("[a-z0-9_./-]+");
 
@@ -28,6 +28,17 @@ public record EnchantDef(String namespace, String path, String name, int maxLeve
         if (gear == null) {
             throw new IllegalArgumentException("An enchantment needs gear to go on.");
         }
+        exclusiveWith = exclusiveWith == null ? java.util.List.of() : java.util.List.copyOf(exclusiveWith);
+        for (String other : exclusiveWith) {
+            if (other.indexOf(':') < 1) {
+                throw new IllegalArgumentException("An exclusive enchantment is named by its full key (got '" + other + "').");
+            }
+        }
+    }
+
+    /** The older shape, for plugins built before {@link #exclusiveWith}. */
+    public EnchantDef(String namespace, String path, String name, int maxLevel, Gear gear, int anvilCost, int weight) {
+        this(namespace, path, name, maxLevel, gear, anvilCost, weight, java.util.List.of());
     }
 
     public static Builder builder(String key) {
@@ -51,6 +62,7 @@ public record EnchantDef(String namespace, String path, String name, int maxLeve
         private Gear gear;
         private int anvilCost = 4;
         private int weight = 1;
+        private final java.util.List<String> exclusiveWith = new java.util.ArrayList<>();
 
         private Builder(String namespace, String path) {
             this.namespace = namespace;
@@ -78,8 +90,19 @@ public record EnchantDef(String namespace, String path, String name, int maxLeve
             return this;
         }
 
+        /**
+         * Enchantments this one cannot share an item with, by full key ({@code minecraft:silk_touch}); the game
+         * keeps it from both sides, so naming the pair once is enough.
+         */
+        public Builder exclusiveWith(String... keys) {
+            for (String key : keys) {
+                exclusiveWith.add(key.toLowerCase(Locale.ROOT));
+            }
+            return this;
+        }
+
         public EnchantDef build() {
-            return new EnchantDef(namespace, path, name, maxLevel, gear, anvilCost, weight);
+            return new EnchantDef(namespace, path, name, maxLevel, gear, anvilCost, weight, exclusiveWith);
         }
     }
 }
