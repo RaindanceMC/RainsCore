@@ -231,6 +231,16 @@ jobs:
           MAVEN_OPTS: -Djdk.tls.client.protocols=TLSv1.2
         run: mvn --batch-mode --no-transfer-progress -DskipTests deploy
 
+      # A -SNAPSHOT on master goes to packages.tstieh.de/snapshots on every push: the modules repository
+      # builds against it (rainscore.version) and has no other way to get it.
+      - name: Publish the snapshot to packages.tstieh.de
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && endsWith(steps.jar.outputs.version, '-SNAPSHOT')
+        env:
+          REPOSILITE_USERNAME: ci-deploy
+          REPOSILITE_PASSWORD: ${{ secrets.REPOSILITE_PASSWORD }}
+          MAVEN_OPTS: -Djdk.tls.client.protocols=TLSv1.2
+        run: mvn --batch-mode --no-transfer-progress -DskipTests deploy
+
       # Tagged only now that the release and the Reposilite deploy above have both actually succeeded —
       # not before them. Tagging first and deploying second would mean a deploy that failed partway
       # left a tag behind claiming the version was published, and the next push would see that tag and

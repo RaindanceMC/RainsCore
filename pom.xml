@@ -356,5 +356,10 @@
             <id>packages-releases</id>
             <url>https://packages.tstieh.de/releases</url>
         </repository>
+        <!-- Same credentials as releases (ci-deploy may write both), hence the same server id. -->
+        <snapshotRepository>
+            <id>packages-releases</id>
+            <url>https://packages.tstieh.de/snapshots</url>
+        </snapshotRepository>
     </distributionManagement>
 </project>
