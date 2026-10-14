@@ -287,6 +287,16 @@ public final class CoreSchema {
                 yaw        REAL    NOT NULL,
                 pitch      REAL    NOT NULL,
                 expires_at INTEGER NOT NULL
+            )""",
+            // A namespace of a player's persistent data that follows them from server to server (cosmetics chosen
+            // on survival, worn in the arena) — what sharePlayerData did over the 1.x link.
+            """
+            CREATE TABLE shared_player_data (
+                player     TEXT    NOT NULL,
+                namespace  TEXT    NOT NULL,
+                data       BLOB    NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (player, namespace)
             )""");
 
     /**

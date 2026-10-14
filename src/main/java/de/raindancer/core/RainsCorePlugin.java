@@ -1770,6 +1770,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public void sharePlayerData(String namespace) {
+        if (networkPlayers != null) {
+            // On a network: kept in the database, written as players leave, put back as they arrive anywhere.
+            if (namespace != null && !namespace.isBlank()) {
+                sharedNamespaces.add(namespace);
+            }
+            return;
+        }
         de.raindancer.core.platform.link.LinkProfiles current = profiles;
         if (allProfiles.isEmpty() || namespace == null || namespace.isBlank()) {
             return;
@@ -1861,6 +1868,47 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return java.util.Optional.ofNullable(networkTravel);
     }
 
+    private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile de.raindancer.core.platform.network.SharedPlayerData sharedData;
+
+    /** A player's shared namespaces into the database, read on their thread, written off it, then announced. */
+    private void keepSharedData(Player player) {
+        if (sharedData == null || sharedNamespaces.isEmpty()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        java.util.UUID id = player.getUniqueId();
+        for (String namespace : sharedNamespaces) {
+            byte[] bytes;
+            try {
+                bytes = java.util.Base64.getDecoder().decode(de.raindancer.core.platform.link.PlayerDataPart
+                        .export(player.getPersistentDataContainer(), namespace).get("bytes"));
+            } catch (RuntimeException | java.io.IOException unreadable) {
+                log.warn("{}'s {} data could not be read to be kept: {}", player.getName(), namespace, unreadable.getMessage());
+                continue;
+            }
+            Scheduling.async(this, () -> {
+                if (sharedData.save(id, namespace, bytes, now)) {
+                    bus.publish(de.raindancer.core.platform.network.SharedPlayerData.TOPIC, id.toString(), namespace);
+                }
+            });
+        }
+    }
+
+    /** What the network keeps of a player's shared namespaces, put on them here. Off the server's threads. */
+    private void applySharedData(java.util.UUID id, java.util.Collection<String> namespaces) {
+        for (String namespace : namespaces) {
+            sharedData.read(id, namespace).ifPresent(kept -> {
+                Player online = getServer().getPlayer(id);
+                if (online != null) {
+                    Scheduling.entity(this, online, () -> de.raindancer.core.platform.link.PlayerDataPart.adopt(
+                            online.getPersistentDataContainer(), namespace,
+                            java.util.Map.of("bytes", java.util.Base64.getEncoder().encodeToString(kept.data()))));
+                }
+            });
+        }
+    }
+
     /** Staff who were vanished when they left their last server, read before they are let in. */
     private final java.util.Set<java.util.UUID> arrivingVanished = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -1904,6 +1952,20 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             presence.refreshAll();
         });
         tablists.elsewhere(this::playersByServer);
+        sharedData = new de.raindancer.core.platform.network.SharedPlayerData(databases.core());
+        // Another server kept a fresher copy — the player arrived here before their last server's save landed.
+        bus.subscribe(de.raindancer.core.platform.network.SharedPlayerData.TOPIC, event -> {
+            try {
+                java.util.UUID id = java.util.UUID.fromString(event.key());
+                if (getServer().getPlayer(id) != null && sharedNamespaces.contains(event.payload())) {
+                    applySharedData(id, java.util.List.of(event.payload()));
+                }
+            } catch (IllegalArgumentException notAPlayer) {
+                log.warn("A shared-data event named no player: '{}'", event.key());
+            }
+        });
+        Scheduling.asyncTimer(this, 30, 30, task -> getServer().getOnlinePlayers()
+                .forEach(online -> Scheduling.entity(this, online, () -> keepSharedData(online))));
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
@@ -2324,6 +2386,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             boolean hidden = vanish.isVanished(id);
             String name = event.getPlayer().getName();
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
+            if (!sharedNamespaces.isEmpty()) {
+                Scheduling.async(this, () -> applySharedData(id, java.util.List.copyOf(sharedNamespaces)));
+            }
         }
         de.raindancer.core.platform.link.LinkProfiles following = profiles;
         if (following != null && linkFollows) {
@@ -2425,6 +2490,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (presence != null) {
+            // Read now, on their thread, while the data is still theirs here.
+            keepSharedData(event.getPlayer());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
         }
