@@ -118,4 +118,16 @@ class GearTest {
         }
         org.assertj.core.api.Assertions.assertThat(RainsEnchants.HEAT_SEEKING).isEqualTo("rainsenchants:heat_seeking");
     }
+
+    @Test
+    @DisplayName("what Thor goes on: axes and the mace (thrown) and the trident (a storm where it lands)")
+    void thunder() {
+        for (String weapon : new String[]{"iron_axe", "netherite_axe", "mace", "trident"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.THUNDER.matches(weapon)).as(weapon).isTrue();
+        }
+        for (String other : new String[]{"iron_pickaxe", "bow", "iron_sword"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.THUNDER.matches(other)).as(other).isFalse();
+        }
+        org.assertj.core.api.Assertions.assertThat(RainsEnchants.THOR).isEqualTo("rainsenchants:thor");
+    }
 }
