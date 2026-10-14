@@ -35,7 +35,8 @@ public final class NetworkCalls implements AutoCloseable {
     static final String REPLY = "reply";
 
     private final NetworkBus bus;
-    private final Map<String, Function<Map<String, String>, Map<String, String>>> handlers = new ConcurrentHashMap<>();
+    private final Map<String, Function<Map<String, String>, CompletableFuture<Map<String, String>>>> handlers =
+            new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Optional<Map<String, String>>>> waiting = new ConcurrentHashMap<>();
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "rains-calls-timeouts");
@@ -53,6 +54,15 @@ public final class NetworkCalls implements AutoCloseable {
 
     /** Answers {@code topic} for whoever asks this server. Close the subscription to stop. */
     public NetworkBus.Subscription answer(String topic, Function<Map<String, String>, Map<String, String>> handler) {
+        return answerLater(topic, question -> CompletableFuture.completedFuture(handler.apply(question)));
+    }
+
+    /**
+     * Answers {@code topic} when the returned future completes — for an answer that needs the server thread or
+     * another server. The bus goes on delivering meanwhile; a future that fails is an empty answer.
+     */
+    public NetworkBus.Subscription answerLater(String topic,
+                                               Function<Map<String, String>, CompletableFuture<Map<String, String>>> handler) {
         handlers.put(topic, handler);
         return () -> handlers.remove(topic, handler);
     }
@@ -88,23 +98,33 @@ public final class NetworkCalls implements AutoCloseable {
         }
         String topic = question.remove("~topic");
         String from = question.remove("~from");
-        Function<Map<String, String>, Map<String, String>> handler = topic == null ? null : handlers.get(topic);
+        Function<Map<String, String>, CompletableFuture<Map<String, String>>> handler =
+                topic == null ? null : handlers.get(topic);
         if (handler == null) {
             return;
         }
-        Map<String, String> reply = new LinkedHashMap<>();
-        reply.put("~to", from == null ? "" : from);
+        CompletableFuture<Map<String, String>> answering;
         try {
-            Map<String, String> answered = handler.apply(question);
-            reply.put("~ok", "true");
-            if (answered != null) {
-                reply.putAll(answered);
-            }
+            answering = handler.apply(question);
         } catch (RuntimeException failed) {
-            log.error(failed, "Answering '{}' for {} failed.", topic, from);
-            reply.put("~ok", "false");
+            answering = CompletableFuture.failedFuture(failed);
         }
-        bus.publish(REPLY, event.key(), encode(reply));
+        String key = event.key();
+        (answering == null ? CompletableFuture.<Map<String, String>>completedFuture(null) : answering)
+                .whenComplete((answered, failed) -> {
+                    Map<String, String> reply = new LinkedHashMap<>();
+                    reply.put("~to", from == null ? "" : from);
+                    if (failed != null) {
+                        log.error(failed, "Answering '{}' for {} failed.", topic, from);
+                        reply.put("~ok", "false");
+                    } else {
+                        reply.put("~ok", "true");
+                        if (answered != null) {
+                            reply.putAll(answered);
+                        }
+                    }
+                    bus.publish(REPLY, key, encode(reply));
+                });
     }
 
     private void replied(NetworkEvent event) {

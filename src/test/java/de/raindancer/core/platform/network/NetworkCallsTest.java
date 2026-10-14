@@ -79,4 +79,27 @@ class NetworkCallsTest {
         answering.close();
         assertThat(smp.ask("arena", "x", Map.of(), Duration.ofMillis(300)).get(10, TimeUnit.SECONDS)).isEmpty();
     }
+
+    @Test
+    @DisplayName("an answer given later does not hold up the bus: other questions are answered meanwhile")
+    void answerLater() throws Exception {
+        java.util.concurrent.CompletableFuture<Map<String, String>> slow = new java.util.concurrent.CompletableFuture<>();
+        arena.answerLater("slow", question -> slow);
+        arena.answer("quick", question -> Map.of("at", "once"));
+        var waiting = smp.ask("arena", "slow", Map.of(), Duration.ofSeconds(5));
+        assertThat(smp.ask("arena", "quick", Map.of(), Duration.ofSeconds(5)).get(10, TimeUnit.SECONDS))
+                .contains(Map.of("at", "once"));
+        assertThat(waiting).isNotDone();
+        slow.complete(Map.of("at", "last"));
+        assertThat(waiting.get(10, TimeUnit.SECONDS)).contains(Map.of("at", "last"));
+    }
+
+    @Test
+    @DisplayName("an answer that fails later is an empty answer at once")
+    void answerLaterFails() throws Exception {
+        arena.answerLater("broken", question -> java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("x")));
+        long started = System.nanoTime();
+        assertThat(smp.ask("arena", "broken", Map.of(), Duration.ofSeconds(5)).get(10, TimeUnit.SECONDS)).isEmpty();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)).isLessThan(4_000L);
+    }
 }
