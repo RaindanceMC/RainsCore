@@ -36,6 +36,49 @@ public final class AutoReports {
          * @param text what was seen, in plain words
          */
         Result file(UUID subject, String subjectName, String kind, String text);
+
+        /**
+         * As {@link #file(UUID, String, String, String)}, with links to what the detecting plugin keeps about it —
+         * {@code "evidence" -> "1234"}, {@code "replay" -> "r-77"} — for staff to open from the report. A queue that
+         * keeps no links files the report without them.
+         */
+        default Result file(UUID subject, String subjectName, String kind, String text, java.util.Map<String, String> links) {
+            return file(subject, subjectName, kind, text);
+        }
+    }
+
+    /** Opens what a link points at for a member of staff — offered by the plugin that keeps it. */
+    @FunctionalInterface
+    public interface Opener {
+        /** @return whether there was something to open */
+        boolean open(org.bukkit.entity.Player staff, String id);
+    }
+
+    private static final java.util.Map<String, Opener> openers = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Who opens links of {@code kind} ("evidence", "replay"). */
+    public static void opens(String kind, Opener opener) {
+        if (kind != null && opener != null) {
+            openers.put(kind, opener);
+        }
+    }
+
+    /** Whether a link of {@code kind} can be opened on this server. */
+    public static boolean canOpen(String kind) {
+        return kind != null && openers.containsKey(kind);
+    }
+
+    /** Opens a link for a member of staff. @return whether it was opened */
+    public static boolean open(org.bukkit.entity.Player staff, String kind, String id) {
+        Opener opener = kind == null ? null : openers.get(kind);
+        if (opener == null || staff == null || id == null) {
+            return false;
+        }
+        try {
+            return opener.open(staff, id);
+        } catch (RuntimeException broken) {
+            return false;
+        }
     }
 
     private static final AtomicReference<Sink> sink = new AtomicReference<>();
@@ -56,12 +99,19 @@ public final class AutoReports {
     }
 
     public static Result file(UUID subject, String subjectName, String kind, String text) {
+        return file(subject, subjectName, kind, text, java.util.Map.of());
+    }
+
+    /** As {@link #file(UUID, String, String, String)}, with links to the evidence (see {@link Sink#file}). */
+    public static Result file(UUID subject, String subjectName, String kind, String text,
+                              java.util.Map<String, String> links) {
         Sink handler = sink.get();
         if (handler == null || subject == null || kind == null || kind.isBlank() || text == null || text.isBlank()) {
             return Result.NO_SINK;
         }
         try {
-            Result result = handler.file(subject, subjectName, kind.trim(), text.trim());
+            Result result = handler.file(subject, subjectName, kind.trim(), text.trim(),
+                    links == null ? java.util.Map.of() : java.util.Map.copyOf(links));
             return result == null ? Result.NO_SINK : result;
         } catch (RuntimeException broken) {
             return Result.NO_SINK;
@@ -69,6 +119,7 @@ public final class AutoReports {
     }
 
     public static int forgetFrom(ClassLoader loader) {
+        openers.values().removeIf(opener -> PluginCode.isFrom(opener, loader));
         Sink handler = sink.get();
         if (handler != null && PluginCode.isFrom(handler, loader) && sink.compareAndSet(handler, null)) {
             return 1;
@@ -78,5 +129,6 @@ public final class AutoReports {
 
     public static void clear() {
         sink.set(null);
+        openers.clear();
     }
 }

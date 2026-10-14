@@ -78,4 +78,35 @@ class AutoReportsTest {
         assertThat(AutoReports.forgetFrom(AutoReportsTest.class.getClassLoader())).isEqualTo(1);
         assertThat(AutoReports.available()).isFalse();
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("links travel with a report to a queue that keeps them, and staff open them through whoever offers them")
+    void links() {
+        java.util.List<java.util.Map<String, String>> kept = new java.util.ArrayList<>();
+        AutoReports.provide(new AutoReports.Sink() {
+            @Override
+            public AutoReports.Result file(java.util.UUID subject, String subjectName, String kind, String text) {
+                return AutoReports.Result.FILED;
+            }
+
+            @Override
+            public AutoReports.Result file(java.util.UUID subject, String subjectName, String kind, String text,
+                                           java.util.Map<String, String> links) {
+                kept.add(links);
+                return AutoReports.Result.FILED;
+            }
+        });
+        java.util.List<String> opened = new java.util.ArrayList<>();
+        AutoReports.opens("evidence", (staff, id) -> opened.add(id));
+        try {
+            AutoReports.file(java.util.UUID.randomUUID(), "Alex", "movement", "flew", java.util.Map.of("evidence", "42"));
+            org.assertj.core.api.Assertions.assertThat(kept).containsExactly(java.util.Map.of("evidence", "42"));
+            org.assertj.core.api.Assertions.assertThat(AutoReports.canOpen("evidence")).isTrue();
+            org.assertj.core.api.Assertions.assertThat(AutoReports.open(org.mockito.Mockito.mock(org.bukkit.entity.Player.class), "evidence", "42")).isTrue();
+            org.assertj.core.api.Assertions.assertThat(AutoReports.open(org.mockito.Mockito.mock(org.bukkit.entity.Player.class), "replay", "1")).isFalse();
+            org.assertj.core.api.Assertions.assertThat(opened).containsExactly("42");
+        } finally {
+            AutoReports.clear();
+        }
+    }
 }

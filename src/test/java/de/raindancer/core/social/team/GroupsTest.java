@@ -71,4 +71,38 @@ class GroupsTest {
         assertThat(Groups.group("guild:elves")).isEmpty();
         assertThat(Groups.of(MEMBER)).isEmpty();
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("a group's treasury pays what it can, all or nothing; nobody keeping the group pays nothing")
+    void treasury() {
+        java.util.Map<String, Long> banks = new java.util.HashMap<>(java.util.Map.of("guild:1", 500L));
+        Groups.registerTreasury("guilds", new Groups.Treasury() {
+            @Override
+            public java.util.Optional<Boolean> withdraw(String groupId, de.raindancer.core.social.economy.Money amount, String reason) {
+                Long held = banks.get(groupId);
+                if (held == null) {
+                    return java.util.Optional.empty();
+                }
+                if (held < amount.minor()) {
+                    return java.util.Optional.of(false);
+                }
+                banks.put(groupId, held - amount.minor());
+                return java.util.Optional.of(true);
+            }
+
+            @Override
+            public java.util.Optional<de.raindancer.core.social.economy.Money> balance(String groupId) {
+                return java.util.Optional.ofNullable(banks.get(groupId)).map(de.raindancer.core.social.economy.Money::of);
+            }
+        });
+        try {
+            org.assertj.core.api.Assertions.assertThat(Groups.pay("guild:1", de.raindancer.core.social.economy.Money.of(300), "upkeep")).isTrue();
+            org.assertj.core.api.Assertions.assertThat(Groups.pay("guild:1", de.raindancer.core.social.economy.Money.of(300), "upkeep")).isFalse();
+            org.assertj.core.api.Assertions.assertThat(Groups.balance("guild:1")).contains(de.raindancer.core.social.economy.Money.of(200));
+            org.assertj.core.api.Assertions.assertThat(Groups.pay("guild:9", de.raindancer.core.social.economy.Money.of(1), "upkeep")).isFalse();
+            org.assertj.core.api.Assertions.assertThat(Groups.balance("guild:9")).isEmpty();
+        } finally {
+            Groups.unregisterTreasury("guilds");
+        }
+    }
 }

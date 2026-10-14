@@ -52,6 +52,74 @@ public final class Groups {
     private record Entry(String owner, Source source) {
     }
 
+    /**
+     * A group's own money — a guild bank — that something the group owns can be paid from (a claim's upkeep).
+     * Only the plugin keeping the group knows it; anybody may ask it to pay.
+     */
+    public interface Treasury {
+        /**
+         * Takes {@code amount} from the group's money, all or nothing.
+         *
+         * @return empty when this treasury does not keep that group; true when paid, false when it holds too little
+         *         or could not be written
+         */
+        Optional<Boolean> withdraw(String groupId, de.raindancer.core.social.economy.Money amount, String reason);
+
+        /** What the group holds; empty when this treasury does not keep it. */
+        Optional<de.raindancer.core.social.economy.Money> balance(String groupId);
+    }
+
+    private record Kept(String owner, Treasury treasury) {
+    }
+
+    private static final List<Kept> treasuries = new CopyOnWriteArrayList<>();
+
+    public static synchronized void registerTreasury(String owner, Treasury treasury) {
+        if (owner == null || treasury == null) {
+            return;
+        }
+        treasuries.removeIf(kept -> kept.owner().equals(owner));
+        treasuries.add(new Kept(owner, treasury));
+    }
+
+    public static synchronized boolean unregisterTreasury(String owner) {
+        return treasuries.removeIf(kept -> kept.owner().equals(owner));
+    }
+
+    /** Pays {@code amount} from the group's money, all or nothing. False when nobody keeps it or it holds too little. */
+    public static boolean pay(String groupId, de.raindancer.core.social.economy.Money amount, String reason) {
+        if (groupId == null || amount == null || !amount.isPositive()) {
+            return false;
+        }
+        for (Kept kept : treasuries) {
+            try {
+                Optional<Boolean> paid = kept.treasury().withdraw(groupId, amount, reason);
+                if (paid != null && paid.isPresent()) {
+                    return paid.get();
+                }
+            } catch (RuntimeException failed) {
+                log.error(failed, "The treasury of {} failed to pay for {}.", kept.owner(), groupId);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /** What the group's money holds; empty when nobody keeps it. */
+    public static Optional<de.raindancer.core.social.economy.Money> balance(String groupId) {
+        for (Kept kept : treasuries) {
+            try {
+                Optional<de.raindancer.core.social.economy.Money> held = kept.treasury().balance(groupId);
+                if (held != null && held.isPresent()) {
+                    return held;
+                }
+            } catch (RuntimeException failed) {
+                log.error(failed, "The treasury of {} failed to say what {} holds.", kept.owner(), groupId);
+            }
+        }
+        return Optional.empty();
+    }
+
     private static final List<Entry> entries = new CopyOnWriteArrayList<>();
     private static final Map<String, Boolean> complainedAbout = new ConcurrentHashMap<>();
 
@@ -126,12 +194,16 @@ public final class Groups {
         }
         List<Entry> gone = entries.stream().filter(entry -> entry.source().getClass().getClassLoader() == loader).toList();
         entries.removeAll(gone);
-        return gone.size();
+        List<Kept> goneTreasuries = treasuries.stream()
+                .filter(kept -> kept.treasury().getClass().getClassLoader() == loader).toList();
+        treasuries.removeAll(goneTreasuries);
+        return gone.size() + goneTreasuries.size();
     }
 
     /** For tests. */
     public static synchronized void clear() {
         entries.clear();
+        treasuries.clear();
         complainedAbout.clear();
     }
 }
