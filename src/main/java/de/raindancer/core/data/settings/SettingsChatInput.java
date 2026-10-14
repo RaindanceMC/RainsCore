@@ -83,6 +83,10 @@ public final class SettingsChatInput {
     }
 
     private void apply(Player player, Waiting waiting, String typed) {
+        if (!navigation.registry().mayChange(player, waiting.key())) {
+            chat.no(player, "<red>Changing that for every server needs more; it is left as it was.");
+            return;
+        }
         if (navigation.registry().set(waiting.key(), typed)) {
             SettingsSaving.saveThenTell(navigation.registry(), player);
             chat.ok(player, words().raw("settings.changed"),

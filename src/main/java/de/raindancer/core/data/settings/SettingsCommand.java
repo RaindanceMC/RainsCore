@@ -80,7 +80,11 @@ public final class SettingsCommand implements BasicCommand {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "list" -> list(sender);
             case "get" -> get(sender, args);
-            case "set" -> set(sender, args);
+            case "set" -> set(sender, args, null);
+            case "sethere" -> set(sender, args, SettingsStore.Layer.SERVER);
+            case "setgroup" -> set(sender, args, SettingsStore.Layer.GROUP);
+            case "unsethere" -> unset(sender, args, SettingsStore.Layer.SERVER);
+            case "unsetgroup" -> unset(sender, args, SettingsStore.Layer.GROUP);
             case "reset" -> reset(sender, args);
             case "search", "find" -> search(sender, args);
             default -> {
@@ -118,6 +122,10 @@ public final class SettingsCommand implements BasicCommand {
             chat().tell(sender, "<white><name></white> is <white><value></white>.",
                     Chat.arg("name", setting.title()),
                     Chat.arg("value", navigation().registry().display(args[1])));
+            if (navigation().registry().isLayered(args[1])) {
+                chat().row(sender, "<dark_gray>  set for <where>",
+                        Chat.arg("where", where(navigation().registry().layerOf(args[1]))));
+            }
             List<String> lines = navigation().describe(setting);
             // The last line is the menu's "click to change"; here the buttons below say it.
             for (String line : lines.subList(0, Math.max(0, lines.size() - 1))) {
@@ -136,7 +144,43 @@ public final class SettingsCommand implements BasicCommand {
         }, () -> unknown(sender, args[1]));
     }
 
-    private void set(CommandSender sender, String[] args) {
+    /** Gives a setting back to the next layer: the group's, else the network's. */
+    private void unset(CommandSender sender, String[] args, SettingsStore.Layer layer) {
+        if (args.length < 2) {
+            usage(sender);
+            return;
+        }
+        if (navigation().registry().setting(args[1]).isEmpty()) {
+            unknown(sender, args[1]);
+            return;
+        }
+        if (!navigation().registry().mayChangeAt(sender, args[1], layer)) {
+            refusedReach(sender, layer);
+            return;
+        }
+        navigation().registry().clearOverride(args[1], layer);
+        SettingsSaving.saveThenTell(navigation().registry(), sender);
+        chat().ok(sender, "<white><name></white> is <white><value></white> again, as <where> has it.",
+                Chat.arg("name", args[1]), Chat.arg("value", navigation().registry().display(args[1])),
+                Chat.arg("where", where(navigation().registry().layerOf(args[1]))));
+    }
+
+    private void refusedReach(CommandSender sender, SettingsStore.Layer layer) {
+        chat().no(sender, "<red>Changing it for <where> needs <white><node></white>. <gray>/settings sethere changes it "
+                        + "for this server only.", Chat.arg("where", where(layer)),
+                Chat.arg("node", layer == SettingsStore.Layer.GROUP ? SettingsRegistry.GROUP_PERMISSION
+                        : SettingsRegistry.NETWORK_PERMISSION));
+    }
+
+    private static String where(SettingsStore.Layer layer) {
+        return switch (layer) {
+            case SERVER -> "this server";
+            case GROUP -> "this group of servers";
+            case NETWORK -> "the whole network";
+        };
+    }
+
+    private void set(CommandSender sender, String[] args, SettingsStore.Layer layer) {
         if (args.length < 3) {
             usage(sender);
             return;
@@ -147,11 +191,22 @@ public final class SettingsCommand implements BasicCommand {
             unknown(sender, args[1]);
             return;
         }
-        if (navigation().registry().set(args[1], value)) {
+        SettingsStore.Layer target = layer == null ? navigation().registry().layerOf(args[1]) : layer;
+        if (!navigation().registry().mayChangeAt(sender, args[1], target)) {
+            refusedReach(sender, target);
+            return;
+        }
+        boolean changed = layer == null ? navigation().registry().set(args[1], value)
+                : navigation().registry().set(args[1], value, layer);
+        if (changed) {
             SettingsSaving.saveThenTell(navigation().registry(), sender);
             chat().ok(sender, words().raw("settings.changed"),
                     Chat.arg("name", args[1]),
                     Chat.arg("value", navigation().registry().display(args[1])));
+            if (navigation().registry().isLayered(args[1])) {
+                chat().row(sender, "<dark_gray>  for <where>",
+                        Chat.arg("where", where(navigation().registry().layerOf(args[1]))));
+            }
             return;
         }
         chat().no(sender, words().raw("settings.refused"),
@@ -183,6 +238,10 @@ public final class SettingsCommand implements BasicCommand {
         }
         if (navigation().registry().setting(args[1]).isEmpty()) {
             unknown(sender, args[1]);
+            return;
+        }
+        if (!navigation().registry().mayChange(sender, args[1])) {
+            refusedReach(sender, navigation().registry().layerOf(args[1]));
             return;
         }
         navigation().registry().reset(args[1]);
@@ -250,6 +309,8 @@ public final class SettingsCommand implements BasicCommand {
             chat().row(sender, "<dark_gray>  /settings get <name>");
             chat().row(sender, "<dark_gray>  /settings set <name> <value>");
             chat().row(sender, "<dark_gray>  /settings reset <name>");
+            chat().row(sender, "<dark_gray>  /settings sethere|setgroup <name> <value> — only this server / group");
+            chat().row(sender, "<dark_gray>  /settings unsethere|unsetgroup <name> — back to the network's");
             return;
         }
         // Each line puts the command in the chat box, ready to finish.
@@ -289,14 +350,15 @@ public final class SettingsCommand implements BasicCommand {
             return List.of();
         }
         if (args.length <= 1) {
-            return List.of("list", "search", "get", "set", "reset").stream()
+            return List.of("list", "search", "get", "set", "sethere", "setgroup", "unsethere", "unsetgroup", "reset").stream()
                     .filter(word -> args.length == 0 || word.startsWith(args[0].toLowerCase(Locale.ROOT)))
                     .toList();
         }
         if (args.length == 2 && !args[0].equalsIgnoreCase("search") && !args[0].equalsIgnoreCase("find")) {
             return keysMatching(navigation().registry().keys(), args[1]);
         }
-        if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
+        if (args.length == 3 && (args[0].equalsIgnoreCase("set") || args[0].equalsIgnoreCase("sethere")
+                || args[0].equalsIgnoreCase("setgroup"))) {
             return navigation().registry().setting(args[1])
                     .map(SettingsCommand::valuesFor)
                     .orElse(List.of());

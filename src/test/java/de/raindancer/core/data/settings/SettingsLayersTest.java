@@ -172,4 +172,28 @@ class SettingsLayersTest {
         assertThat(again.layerOf("radius")).isEqualTo(SettingsStore.Layer.SERVER);
         assertThat(again.layerOf("format")).isEqualTo(SettingsStore.Layer.NETWORK);
     }
+
+    @Test
+    @DisplayName("rainscore.settings reaches this server only; the group's and the network's values need more")
+    void reachNeedsPermission() throws Exception {
+        oldFile("smp", "radius: 50\n");
+        SettingsStore<ChatConfig> arena = store(documents("arena", "arena"), "arena", "survival");
+        arena.set("filter", "false", SettingsStore.Layer.GROUP);
+        arena.set("format", "x", SettingsStore.Layer.SERVER);
+        SettingsRegistry registry = new SettingsRegistry();
+        registry.add(arena);
+        org.bukkit.permissions.Permissible admin = org.mockito.Mockito.mock(org.bukkit.permissions.Permissible.class);
+
+        assertThat(registry.mayChange(admin, "radius")).as("the network's value").isFalse();
+        assertThat(registry.mayChange(admin, "filter")).as("the group's value").isFalse();
+        assertThat(registry.mayChange(admin, "format")).as("this server's own").isTrue();
+        assertThat(registry.mayChangeAt(admin, "radius", SettingsStore.Layer.SERVER)).isTrue();
+
+        org.mockito.Mockito.when(admin.hasPermission(SettingsRegistry.GROUP_PERMISSION)).thenReturn(true);
+        assertThat(registry.mayChange(admin, "filter")).isTrue();
+        assertThat(registry.mayChange(admin, "radius")).isFalse();
+        org.mockito.Mockito.when(admin.hasPermission(SettingsRegistry.NETWORK_PERMISSION)).thenReturn(true);
+        assertThat(registry.mayChange(admin, "radius")).isTrue();
+        assertThat(registry.mayChange(null, "radius")).as("code and the console").isTrue();
+    }
 }

@@ -238,6 +238,12 @@ public final class SettingsMenu extends Menu {
     }
 
     private void onClick(Setting<?> setting) {
+        if (!navigation.registry().mayChange(viewer, setting.key())) {
+            chat.raw(viewer, chat.prefixed("<red>That is set for the whole network or a group of servers; changing it "
+                    + "there needs more than changing this server. <gray>/settings sethere <white><key></white> <value> "
+                    + "changes it for this server only.", Chat.arg("key", setting.key())));
+            return;
+        }
         SettingsNavigation.Click what = navigation.click(setting.key());
         switch (what) {
             case CYCLED -> {

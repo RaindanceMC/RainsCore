@@ -207,6 +207,53 @@ public final class SettingsRegistry {
         return storeOf(key).map(store -> store.set(bareKey(key), raw)).orElse(false);
     }
 
+    /** Sets one setting at a layer — the network's, this group's, or this server's own. */
+    public boolean set(String key, String raw, SettingsStore.Layer layer) {
+        return storeOf(key).map(store -> store.set(bareKey(key), raw, layer)).orElse(false);
+    }
+
+    /** Takes a group's or this server's own value away, so the next layer's applies again. */
+    public void clearOverride(String key, SettingsStore.Layer layer) {
+        storeOf(key).ifPresent(store -> store.clearOverride(bareKey(key), layer));
+    }
+
+    /** Where a setting's value comes from here; {@link SettingsStore.Layer#NETWORK} on a server of its own. */
+    public SettingsStore.Layer layerOf(String key) {
+        return storeOf(key).map(store -> store.layerOf(bareKey(key))).orElse(SettingsStore.Layer.NETWORK);
+    }
+
+    /** Changing a setting for the whole network, not only the server one is standing on. */
+    public static final String NETWORK_PERMISSION = "rainscore.settings.network";
+    /** Changing a setting for every server of this server's group. */
+    public static final String GROUP_PERMISSION = "rainscore.settings.group";
+
+    /**
+     * Whether {@code who} may change {@code key} where its value comes from now. On a network,
+     * {@code rainscore.settings} reaches as far as it did in 1.x — this server — and changing what every server
+     * runs takes more: a builder server's admin must not reconfigure the survival server. Null is code or the
+     * console, which may.
+     */
+    public boolean mayChange(org.bukkit.permissions.Permissible who, String key) {
+        return mayChangeAt(who, key, layerOf(key));
+    }
+
+    /** As {@link #mayChange}, for a change aimed at {@code layer}. */
+    public boolean mayChangeAt(org.bukkit.permissions.Permissible who, String key, SettingsStore.Layer layer) {
+        if (who == null || !isLayered(key)) {
+            return true;
+        }
+        return switch (layer) {
+            case SERVER -> true;
+            case GROUP -> who.hasPermission(GROUP_PERMISSION) || who.hasPermission(NETWORK_PERMISSION);
+            case NETWORK -> who.hasPermission(NETWORK_PERMISSION);
+        };
+    }
+
+    /** Whether settings here come in layers — this is a server of a network. */
+    public boolean isLayered(String key) {
+        return storeOf(key).map(SettingsStore::isLayered).orElse(false);
+    }
+
     /** Flips a flag or advances a choice, wherever it lives. */
     public Object cycle(String key) {
         return storeOf(key).map(store -> store.cycle(bareKey(key))).orElse(null);
