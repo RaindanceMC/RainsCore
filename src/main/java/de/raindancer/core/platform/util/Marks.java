@@ -61,6 +61,25 @@ public final class Marks {
     }
 
     /**
+     * Takes the marks off like {@link #drain}, putting each into {@code holding} before it leaves
+     * {@code marks} — so at no instant is a mark in neither. A store whose refresh keeps what is marked or
+     * held would otherwise, in that instant, take the database's older value over a change still being written.
+     */
+    public static <T> Set<T> drainInto(Set<T> marks, Set<T> holding) {
+        Set<T> taken = new LinkedHashSet<>();
+        if (marks == null) {
+            return taken;
+        }
+        for (T mark : marks) {
+            holding.add(mark);
+            if (marks.remove(mark)) {
+                taken.add(mark);
+            }
+        }
+        return taken;
+    }
+
+    /**
      * Puts marks back after a write that did not happen.
      *
      * <p>The other half of the pattern, and the half that is easy to leave out: marks dropped after a

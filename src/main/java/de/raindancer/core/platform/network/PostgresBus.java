@@ -61,6 +61,11 @@ public final class PostgresBus implements NetworkBus {
     private final String listenerName;
 
     private final Map<String, List<Consumer<NetworkEvent>>> handlers = new ConcurrentHashMap<>();
+    private final List<Runnable> resyncs = new CopyOnWriteArrayList<>();
+    private final Duration gapPatience;
+    private final long setupWaitMillis;
+    private boolean startedBlind;
+    private boolean everConnected;
     private final ExecutorService dispatch;
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final Thread listener;
@@ -71,7 +76,10 @@ public final class PostgresBus implements NetworkBus {
     private final TreeSet<Long> seenAbove = new TreeSet<>();
     private final Map<Long, Long> holeNoticedAt = new HashMap<>();
 
-    private PostgresBus(PostgresPool pool, String server, String channel, Duration pollInterval) {
+    private PostgresBus(PostgresPool pool, String server, String channel, Duration pollInterval,
+                        Duration gapPatience, long setupWaitMillis) {
+        this.gapPatience = gapPatience;
+        this.setupWaitMillis = setupWaitMillis;
         this.pool = pool;
         this.server = server;
         this.channel = channel;
@@ -95,13 +103,47 @@ public final class PostgresBus implements NetworkBus {
      * @param pollInterval how often it reads even without a notify; the most a lost notify can delay an event
      */
     public static PostgresBus start(PostgresPool pool, String server, String channel, Duration pollInterval) {
-        PostgresBus bus = new PostgresBus(pool, server, NetworkConfig.normaliseId(channel), pollInterval);
+        return start(pool, server, channel, pollInterval, GAP_PATIENCE);
+    }
+
+    /** As {@link #start(PostgresPool, String, String, Duration)}, waiting {@code gapPatience} for a hole to fill. */
+    public static PostgresBus start(PostgresPool pool, String server, String channel, Duration pollInterval,
+                                    Duration gapPatience) {
+        return start(pool, server, channel, pollInterval, gapPatience, 10_000);
+    }
+
+    static PostgresBus start(PostgresPool pool, String server, String channel, Duration pollInterval,
+                             Duration gapPatience, long setupWaitMillis) {
+        PostgresBus bus = new PostgresBus(pool, server, NetworkConfig.normaliseId(channel), pollInterval,
+                gapPatience, setupWaitMillis);
         bus.prepare();
         // Fixed here, before start() returns, not when the listener's own connection is up: whatever is
         // published after start() is heard, however long that connection takes.
         bus.seenUpTo = bus.newestOrUnknown();
+        bus.startedBlind = bus.seenUpTo < 0;
         bus.listener.start();
         return bus;
+    }
+
+    @Override
+    public Subscription onResync(Runnable handler) {
+        resyncs.add(handler);
+        return () -> resyncs.remove(handler);
+    }
+
+    /** Tells every store to read everything again: events may have been missed. */
+    private void resync(String why) {
+        if (resyncs.isEmpty()) {
+            return;
+        }
+        log.info("The network bus may have missed events ({}); everything is read again.", why);
+        dispatch.execute(() -> resyncs.forEach(handler -> {
+            try {
+                handler.run();
+            } catch (RuntimeException failed) {
+                log.error(failed, "Reading everything again after '{}' failed for one store.", why);
+            }
+        }));
     }
 
     @Override
@@ -118,7 +160,7 @@ public final class PostgresBus implements NetworkBus {
 
     private void prepare() {
         try {
-            Connection connection = pool.borrow("public", 10_000);
+            Connection connection = pool.borrow("public", setupWaitMillis);
             try (Statement statement = connection.createStatement()) {
                 statement.execute("SELECT pg_advisory_xact_lock(" + SETUP_LOCK + ")");
                 statement.execute("""
@@ -226,6 +268,14 @@ public final class PostgresBus implements NetworkBus {
                 if (seenUpTo < 0) {
                     seenUpTo = newest(connection);
                 }
+                if (everConnected) {
+                    // Back after losing the connection: notifies sent meanwhile are gone, and if it was away
+                    // long, so are the events (pruned). It cannot tell which, so it reads everything.
+                    resync("the connection to the database was lost");
+                } else if (startedBlind) {
+                    resync("it started before the database could be reached");
+                }
+                everConnected = true;
                 backoff = 500;
                 var notifications = connection.unwrap(org.postgresql.PGConnection.class);
                 while (running.get()) {
@@ -248,7 +298,7 @@ public final class PostgresBus implements NetworkBus {
 
     private long newestOrUnknown() {
         try {
-            Connection connection = pool.borrow("public", 10_000);
+            Connection connection = pool.borrow("public", setupWaitMillis);
             try {
                 return newest(connection);
             } finally {
@@ -311,12 +361,15 @@ public final class PostgresBus implements NetworkBus {
                 continue;
             }
             long noticed = holeNoticedAt.computeIfAbsent(next, ignored -> now);
-            if (now - noticed < GAP_PATIENCE.toMillis()) {
+            if (now - noticed < gapPatience.toMillis()) {
                 break;
             }
-            // Waited long enough: an id handed to a publish that rolled back. Nothing will ever fill it.
+            // Waited long enough: usually an id handed to a publish that rolled back, which nothing will ever
+            // fill — but possibly a very slow transaction that will commit after all, and its event would then
+            // be skipped. Not knowing which, everything is read again.
             holeNoticedAt.remove(next);
             seenUpTo = next;
+            resync("an event did not arrive within " + gapPatience.toSeconds() + "s");
         }
         holeNoticedAt.keySet().removeIf(id -> id <= seenUpTo);
     }

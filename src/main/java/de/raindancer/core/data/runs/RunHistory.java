@@ -418,8 +418,7 @@ public final class RunHistory {
             if (!isWritable()) {
                 return false;
             }
-            Set<String> writing = Marks.drain(unwritten);
-            inFlight.addAll(writing);
+            Set<String> writing = Marks.drainInto(unwritten, inFlight);
             try {
                 return writeAndAnnounce(writing);
             } finally {
@@ -501,6 +500,7 @@ public final class RunHistory {
         this.bus = network;
         if (network != null) {
             network.subscribe(topic(), event -> refresh(event.key()));
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -508,6 +508,29 @@ public final class RunHistory {
      * Reads one run again. An unwritten change of this server's wins; an unreadable database leaves what
      * is known; a run gone from the database is gone here. Off the server's threads.
      */
+    /** Reads every run of this game again — for when this server may have missed what others announced. */
+    public void refreshAll() {
+        if (database == null || !database.isUsable()) {
+            return;
+        }
+        Optional<List<Run>> read = database.read(connection -> readAll(connection, null));
+        if (read.isEmpty()) {
+            return;
+        }
+        synchronized (runs) {
+            List<Run> kept = runs.stream().filter(run -> unwritten.contains(run.id()) || inFlight.contains(run.id())).toList();
+            Map<String, Run> merged = new LinkedHashMap<>();
+            read.get().forEach(run -> merged.put(run.id(), run));
+            kept.forEach(run -> merged.put(run.id(), run));
+            // Only what differs is swapped, never the whole list emptied and refilled: a leaderboard drawn in
+            // between would show no runs at all.
+            runs.removeIf(run -> !run.equals(merged.get(run.id())));
+            Set<String> present = new java.util.HashSet<>();
+            runs.forEach(run -> present.add(run.id()));
+            merged.values().stream().filter(run -> !present.contains(run.id())).forEach(runs::add);
+        }
+    }
+
     public void refresh(String id) {
         if (id == null || id.isBlank() || database == null || !database.isUsable()) {
             return;

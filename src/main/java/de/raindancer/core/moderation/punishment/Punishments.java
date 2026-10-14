@@ -378,9 +378,48 @@ public final class Punishments {
         if (stored.isEmpty()) {
             return;
         }
+        takeStored(player, stored.get());
+    }
+
+    /**
+     * Reads every punishment again, as {@link #refresh} does one player's — for when this server may have
+     * missed what other servers announced. Off the server's threads.
+     */
+    public void refreshAll() {
+        if (!database.isUsable()) {
+            return;
+        }
+        Optional<Map<UUID, List<Punishment>>> stored = database.read(connection -> {
+            Map<UUID, List<Punishment>> found = new java.util.HashMap<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, target, kind, moderator, reason, given_at, ends_at,
+                           lifter, lifter_reason, lifted_at
+                    FROM punishment""");
+                 ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    try {
+                        Punishment punishment = readOne(rows);
+                        found.computeIfAbsent(punishment.target(), key -> new ArrayList<>()).add(punishment);
+                    } catch (RuntimeException broken) {
+                        log.warn("A punishment row could not be read and was skipped ({})", broken.getMessage());
+                    }
+                }
+            }
+            return found;
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        java.util.Set<UUID> everybody = new java.util.HashSet<>(byPlayer.keySet());
+        everybody.addAll(stored.get().keySet());
+        everybody.forEach(player -> takeStored(player, stored.get().getOrDefault(player, List.of())));
+    }
+
+    /** Takes what the database holds for a player, keeping what this server has not finished writing. */
+    private void takeStored(UUID player, List<Punishment> stored) {
         byPlayer.compute(player, (key, old) -> {
             Map<String, Punishment> merged = new java.util.LinkedHashMap<>();
-            stored.get().forEach(each -> merged.put(each.id(), each));
+            stored.forEach(each -> merged.put(each.id(), each));
             if (old != null) {
                 old.stream().filter(each -> changed.contains(each.id()) || inFlight.contains(each.id()))
                         .forEach(each -> merged.put(each.id(), each));
@@ -403,6 +442,7 @@ public final class Punishments {
                     log.warn("A punishment event named no player: '{}'", event.key());
                 }
             });
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -457,8 +497,7 @@ public final class Punishments {
         }
         // Drained rather than snapshotted — see Marks. Copying the marks and clearing them
         // afterwards loses any change that arrives while the write is running.
-        Set<String> writing = Marks.drain(changed);
-        inFlight.addAll(writing);
+        Set<String> writing = Marks.drainInto(changed, inFlight);
         try {
             writeAndAnnounce(writing);
         } finally {

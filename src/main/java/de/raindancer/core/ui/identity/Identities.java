@@ -462,6 +462,7 @@ public final class Identities {
                     log.warn("An identity event named no player: '{}'", event.key());
                 }
             });
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -493,11 +494,44 @@ public final class Identities {
         if (stored.isEmpty()) {
             return;
         }
+        takeStored(player, stored.get().orElse(null));
+    }
+
+    /** Reads every identity again — for when this server may have missed what others announced. */
+    public void refreshAll() {
+        if (!database.isUsable()) {
+            return;
+        }
+        java.util.Optional<Map<UUID, Identity>> stored = database.read(connection -> {
+            Map<UUID, Identity> found = new java.util.HashMap<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT player, prefix, suffix, nametag_prefix, colour, subtitle FROM identity");
+                 ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    try {
+                        found.put(UUID.fromString(rows.getString("player")), new Identity(orEmpty(rows.getString("prefix")),
+                                orEmpty(rows.getString("suffix")), orEmpty(rows.getString("nametag_prefix")),
+                                orEmpty(rows.getString("colour")), orEmpty(rows.getString("subtitle"))));
+                    } catch (RuntimeException broken) {
+                        log.warn("An identity row could not be read and was skipped ({})", broken.getMessage());
+                    }
+                }
+            }
+            return found;
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        Set<UUID> everybody = new java.util.HashSet<>(identities.keySet());
+        everybody.addAll(stored.get().keySet());
+        everybody.forEach(player -> takeStored(player, stored.get().get(player)));
+    }
+
+    private void takeStored(UUID player, Identity found) {
         identities.compute(player, (key, current) -> {
             if (changed.contains(player) || inFlight.contains(player)) {
                 return current;
             }
-            Identity found = stored.get().orElse(null);
             return found == null || found.isBlank() ? null : found;
         });
     }
@@ -533,8 +567,7 @@ public final class Identities {
         }
         // Drained rather than snapshotted — see Marks. Copying the marks and clearing them
         // afterwards loses any change that arrives while the write is running.
-        Set<UUID> writing = Marks.drain(changed);
-        inFlight.addAll(writing);
+        Set<UUID> writing = Marks.drainInto(changed, inFlight);
         try {
             writeAndAnnounce(writing);
         } finally {

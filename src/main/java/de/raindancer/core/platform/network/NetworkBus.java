@@ -57,6 +57,16 @@ public interface NetworkBus extends AutoCloseable {
     /** Hands every event on {@code topic} from another server to {@code handler}, in the order they were published. */
     Subscription subscribe(String topic, Consumer<NetworkEvent> handler);
 
+    /**
+     * Called when this server may have missed events — it started without reaching the database, lost its
+     * connection to it, or gave up waiting for an event that never arrived. A cache that trusts it heard
+     * everything would then serve stale data for good (a ban that never arrived), so a store reads all of
+     * its keys again here. Runs on the bus's thread.
+     */
+    default Subscription onResync(Runnable handler) {
+        return () -> { };
+    }
+
     @Override
     void close();
 

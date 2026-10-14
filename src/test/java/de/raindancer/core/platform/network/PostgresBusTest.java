@@ -205,4 +205,71 @@ class PostgresBusTest {
             assertThat(bus.publish("t", "", "lost")).isFalse();
         }
     }
+
+    @Test
+    @DisplayName("a hole given up on means an event may be lost: everybody listening is told to read everything again")
+    void abandonedGapResyncs() throws Exception {
+        String channel = channel();
+        PostgresPool pool = PostgresPool.open(TestPostgres.require().withPoolSize(3));
+        PostgresBus arena = PostgresBus.start(pool, "arena", channel, Duration.ofMillis(200), Duration.ofMillis(500));
+        closing.add(arena);
+        closing.add(pool);
+        PostgresBus smp = bus("smp", channel);
+        java.util.concurrent.atomic.AtomicInteger resyncs = new java.util.concurrent.atomic.AtomicInteger();
+        arena.onResync(resyncs::incrementAndGet);
+        try (Connection slow = TestPostgres.connect()) {
+            slow.setAutoCommit(false);
+            try (PreparedStatement insert = slow.prepareStatement(
+                    "INSERT INTO public.rains_event (channel, at, server, topic, key, payload) VALUES (?, ?, 'other', 't', '', 'never')")) {
+                insert.setString(1, channel);
+                insert.setLong(2, System.currentTimeMillis());
+                insert.executeUpdate();
+            }
+            smp.publish("t", "", "after the hole");
+            await().atMost(10, TimeUnit.SECONDS).until(() -> resyncs.get() >= 1);
+            slow.rollback();
+        }
+    }
+
+    @Test
+    @DisplayName("coming back after the events it missed were pruned, it cannot catch up: it resyncs")
+    void prunedWhileAwayResyncs() throws Exception {
+        String channel = channel();
+        PostgresBus smp = bus("smp", channel);
+        PostgresBus arena = bus("arena", channel);
+        java.util.concurrent.atomic.AtomicInteger resyncs = new java.util.concurrent.atomic.AtomicInteger();
+        arena.onResync(resyncs::incrementAndGet);
+        List<String> heard = new CopyOnWriteArrayList<>();
+        arena.subscribe("t", event -> heard.add(event.payload()));
+        smp.publish("t", "", "seen");
+        await().atMost(5, TimeUnit.SECONDS).until(() -> heard.size() == 1);
+
+        try (Connection admin = TestPostgres.connect(); Statement statement = admin.createStatement()) {
+            // While arena is away: two events published and pruned before it is back.
+            statement.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = '"
+                    + arena.listenerName() + "'");
+            smp.publish("t", "", "lost 1");
+            smp.publish("t", "", "lost 2");
+            statement.execute("DELETE FROM public.rains_event WHERE channel = '" + channel + "' AND payload LIKE 'lost%'");
+        }
+        await().atMost(15, TimeUnit.SECONDS).until(() -> resyncs.get() >= 1);
+    }
+
+    @Test
+    @DisplayName("a bus that started without its database resyncs once it reaches it")
+    void startedBlindResyncs() throws Exception {
+        String channel = channel();
+        PostgresPool tiny = PostgresPool.open(TestPostgres.require().withPoolSize(2));
+        closing.add(tiny);
+        // Both of the pool's connections are held, so start() cannot learn where the log stands.
+        Connection one = tiny.borrow("public", 1_000);
+        Connection two = tiny.borrow("public", 1_000);
+        PostgresBus blind = PostgresBus.start(tiny, "late", channel, Duration.ofMillis(200), PostgresBus.GAP_PATIENCE, 200);
+        closing.add(blind);
+        java.util.concurrent.atomic.AtomicInteger resyncs = new java.util.concurrent.atomic.AtomicInteger();
+        blind.onResync(resyncs::incrementAndGet);
+        tiny.giveBack(one);
+        tiny.giveBack(two);
+        await().atMost(10, TimeUnit.SECONDS).until(() -> resyncs.get() == 1);
+    }
 }

@@ -358,10 +358,8 @@ public final class PoiStore {
         // Taking the marks *off* first inverts it. A change arriving during the write puts its key
         // back, and the next flush picks it up. The worst case is one row written twice, which costs
         // nothing.
-        Set<String> writing = Marks.drain(changed);
-        Set<String> removing = Marks.drain(deleted);
-        inFlight.addAll(writing);
-        inFlight.addAll(removing);
+        Set<String> writing = Marks.drainInto(changed, inFlight);
+        Set<String> removing = Marks.drainInto(deleted, inFlight);
         try {
             return writeAndAnnounce(writing, removing);
         } finally {
@@ -466,6 +464,7 @@ public final class PoiStore {
         this.bus = network;
         if (network != null) {
             network.subscribe(TOPIC, event -> refresh(event.key()));
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -508,7 +507,42 @@ public final class PoiStore {
         if (stored.isEmpty()) {
             return;
         }
+        takeStored(id, stored.get().orElse(null));
+    }
+
+    /** Reads every place again — for when this server may have missed what others announced. */
+    public void refreshAll() {
+        if (!database.isUsable()) {
+            return;
+        }
+        Optional<Map<String, Poi>> stored = database.read(connection -> {
+            Map<String, Map<String, String>> tags = readTags(connection);
+            Map<String, Poi> found = new java.util.HashMap<>();
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    SELECT id, name, kind, owner, world, x, y, z, yaw, pitch, icon, label, shared, server
+                    FROM place""");
+                 ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    String id = rows.getString("id");
+                    try {
+                        found.put(id, readOne(rows, tags.getOrDefault(id, Map.of())));
+                    } catch (RuntimeException broken) {
+                        note("'" + id + "' could not be read and was skipped (" + broken.getMessage() + ")");
+                    }
+                }
+            }
+            return found;
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        Set<String> every = new java.util.HashSet<>(places.keySet());
+        every.addAll(stored.get().keySet());
+        every.forEach(id -> takeStored(id, stored.get().get(id)));
+    }
+
+    private void takeStored(String id, Poi found) {
         places.compute(id, (key, current) -> changed.contains(id) || deleted.contains(id) || inFlight.contains(id)
-                ? current : stored.get().orElse(null));
+                ? current : found);
     }
 }

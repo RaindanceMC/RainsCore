@@ -634,6 +634,7 @@ public final class Achievements {
                     log.warn("An achievement event named no player: '{}'", event.key());
                 }
             });
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -673,9 +674,57 @@ public final class Achievements {
         if (stored.isEmpty()) {
             return;
         }
+        takeStored(player, stored.get().getKey(), stored.get().getValue());
+    }
+
+    /** Reads every player's achievements again — for when this server may have missed what others announced. */
+    public void refreshAll() {
+        if (!database.isUsable()) {
+            return;
+        }
+        Optional<Map.Entry<Map<UUID, Map<String, Instant>>, Map<UUID, Map<String, Integer>>>> stored =
+                database.read(connection -> {
+                    Map<UUID, Map<String, Instant>> got = new java.util.HashMap<>();
+                    Map<UUID, Map<String, Integer>> towards = new java.util.HashMap<>();
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "SELECT player, achievement, earned_at FROM achievement_earned");
+                         ResultSet rows = statement.executeQuery()) {
+                        while (rows.next()) {
+                            UUID player = playerOf(rows.getString("player"));
+                            if (player != null) {
+                                got.computeIfAbsent(player, key -> new java.util.HashMap<>())
+                                        .put(rows.getString("achievement"), Instant.ofEpochMilli(rows.getLong("earned_at")));
+                            }
+                        }
+                    }
+                    try (PreparedStatement statement = connection.prepareStatement(
+                            "SELECT player, achievement, sofar FROM achievement_progress");
+                         ResultSet rows = statement.executeQuery()) {
+                        while (rows.next()) {
+                            UUID player = playerOf(rows.getString("player"));
+                            if (player != null) {
+                                towards.computeIfAbsent(player, key -> new java.util.HashMap<>())
+                                        .put(rows.getString("achievement"), rows.getInt("sofar"));
+                            }
+                        }
+                    }
+                    return Map.entry(got, towards);
+                });
+        if (stored.isEmpty()) {
+            return;
+        }
+        Set<UUID> everybody = new java.util.HashSet<>(earned.keySet());
+        everybody.addAll(progress.keySet());
+        everybody.addAll(stored.get().getKey().keySet());
+        everybody.addAll(stored.get().getValue().keySet());
+        everybody.forEach(player -> takeStored(player, stored.get().getKey().getOrDefault(player, Map.of()),
+                stored.get().getValue().getOrDefault(player, Map.of())));
+    }
+
+    private void takeStored(UUID player, Map<String, Instant> storedEarned, Map<String, Integer> storedProgress) {
         synchronized (lockOf(player)) {
-            Map<String, Instant> got = new ConcurrentHashMap<>(stored.get().getKey());
-            Map<String, Integer> towards = new ConcurrentHashMap<>(stored.get().getValue());
+            Map<String, Instant> got = new ConcurrentHashMap<>(storedEarned);
+            Map<String, Integer> towards = new ConcurrentHashMap<>(storedProgress);
             PlayerChanges mine = pending.get(player);
             if (mine != null) {
                 mine.applyTo(got, towards);

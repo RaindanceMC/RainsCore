@@ -170,8 +170,7 @@ public final class Nicknames {
             if (changed.isEmpty() || !database.isUsable()) {
                 return;
             }
-            Set<UUID> writing = Marks.drain(changed);
-            inFlight.addAll(writing);
+            Set<UUID> writing = Marks.drainInto(changed, inFlight);
             try {
                 writeAndAnnounce(writing);
             } finally {
@@ -234,6 +233,7 @@ public final class Nicknames {
                     log.warn("A nickname event named no player: '{}'", event.key());
                 }
             });
+            network.onResync(this::refreshAll);
         }
     }
 
@@ -259,7 +259,39 @@ public final class Nicknames {
         if (stored.isEmpty()) {
             return;
         }
+        takeStored(player, stored.get().orElse(null));
+    }
+
+    /** Reads every nickname again — for when this server may have missed what others announced. */
+    public void refreshAll() {
+        if (!database.isUsable()) {
+            return;
+        }
+        Optional<Map<UUID, Entry>> stored = database.read(connection -> {
+            Map<UUID, Entry> found = new java.util.HashMap<>();
+            try (PreparedStatement statement = connection.prepareStatement("SELECT player, plain, typed FROM nickname");
+                 ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    try {
+                        found.put(UUID.fromString(rows.getString("player")),
+                                new Entry(rows.getString("plain"), rows.getString("typed")));
+                    } catch (RuntimeException broken) {
+                        log.warn("A nickname row could not be read and was skipped ({})", broken.getMessage());
+                    }
+                }
+            }
+            return found;
+        });
+        if (stored.isEmpty()) {
+            return;
+        }
+        Set<UUID> everybody = new java.util.HashSet<>(entries.keySet());
+        everybody.addAll(stored.get().keySet());
+        everybody.forEach(player -> takeStored(player, stored.get().get(player)));
+    }
+
+    private void takeStored(UUID player, Entry found) {
         entries.compute(player, (key, current) -> changed.contains(player) || inFlight.contains(player)
-                ? current : stored.get().orElse(null));
+                ? current : found);
     }
 }
