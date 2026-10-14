@@ -40,6 +40,25 @@ module chooses otherwise. Choosing otherwise is the work of moving a module.
    `TestDatabases.open(path, schema)`; the build runs it on SQLite and PostgreSQL. Two "servers" in one test:
    two stores on one database, `LocalBus.Hub` for the bus.
 
+## Who trusts whom
+
+The trust boundary of a network is its database. Every server holds the credentials, can write any shared
+table and publish any bus event under any server name — a server that is taken over is the whole network
+taken over, and nothing short of signing every message per server would change that. So:
+
+- **Servers trust each other** to speak for themselves and their own console. A server acting "as console"
+  is its own authority.
+- **A server speaks only for its own players.** A request or event about a player is taken only from the
+  server that player is on (`NetworkCalls.answerFrom` + presence). This stops one server's code from acting
+  for another server's players — a bug or a plugin, not an attacker with the database password.
+- **Permissions are checked where the command was typed.** The answering server cannot see the sender's
+  permissions; it must not accept a "bypass" or "admin" claim from another server about them.
+- **Nothing rendered elsewhere is clickable here.** A chat line another server rendered is shown with
+  `FromElsewhere.line(json)`: words and colours, never a click action. Player-typed text travels as plain
+  text and is escaped where it is shown.
+- **Money and items move exactly once** — by the one conditional write that wins (`UPDATE … WHERE state = …`
+  counted by its row count, `DELETE … RETURNING`, the bank's request ids), never by an in-memory flag.
+
 ## The 1.x link and what replaces it
 
 On a network the link stands down (`link.yml` is ignored). Use:
