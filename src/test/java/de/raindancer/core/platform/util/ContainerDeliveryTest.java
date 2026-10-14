@@ -90,4 +90,15 @@ class ContainerDeliveryTest {
         Location nowhere = new Location(null, 0, 0, 0);
         assertThat(ContainerDelivery.deliver(plugin, nowhere, List.of(cobble)).join()).containsExactly(cobble);
     }
+
+    @Test
+    @DisplayName("a container the caller refuses — not the right kind, or not theirs to fill — takes nothing")
+    void refused() {
+        when(world.isChunkLoaded(anyInt(), anyInt())).thenReturn(true);
+        Inventory inventory = chestHolding(Map.of());
+
+        assertThat(ContainerDelivery.deliver(plugin, at, List.of(cobble), state -> false).join()).containsExactly(cobble);
+        verify(inventory, never()).addItem(any(ItemStack[].class));
+        assertThat(ContainerDelivery.deliver(plugin, at, List.of(cobble), state -> state instanceof Chest).join()).isEmpty();
+    }
 }

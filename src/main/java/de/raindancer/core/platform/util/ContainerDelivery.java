@@ -10,6 +10,7 @@ import org.bukkit.plugin.Plugin;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 /**
  * Puts items into a chest, barrel or any other container, wherever it is: on the thread owning its region,
@@ -26,6 +27,15 @@ public final class ContainerDelivery {
      * whatever is done with the rest must hop to its own thread.
      */
     public static CompletableFuture<List<ItemStack>> deliver(Plugin plugin, Location at, List<ItemStack> items) {
+        return deliver(plugin, at, items, state -> true);
+    }
+
+    /**
+     * The same, asking {@code accepts} first — on the container's own thread, with it loaded — whether this
+     * container may be filled at all: the kind wanted, and still somewhere the sender may put things.
+     */
+    public static CompletableFuture<List<ItemStack>> deliver(Plugin plugin, Location at, List<ItemStack> items,
+                                                             Predicate<BlockState> accepts) {
         List<ItemStack> copies = new ArrayList<>(items.size());
         items.forEach(item -> copies.add(item.clone()));
         World world = at.getWorld();
@@ -35,7 +45,7 @@ public final class ContainerDelivery {
         CompletableFuture<List<ItemStack>> done = new CompletableFuture<>();
         Runnable insert = () -> {
             try {
-                done.complete(insert(at, copies));
+                done.complete(insert(at, copies, accepts));
             } catch (RuntimeException failure) {
                 done.complete(copies);
             }
@@ -56,9 +66,9 @@ public final class ContainerDelivery {
         return done;
     }
 
-    private static List<ItemStack> insert(Location at, List<ItemStack> items) {
+    private static List<ItemStack> insert(Location at, List<ItemStack> items, Predicate<BlockState> accepts) {
         BlockState state = at.getBlock().getState(false);
-        if (!(state instanceof Container container)) {
+        if (!(state instanceof Container container) || !accepts.test(state)) {
             return items;
         }
         return new ArrayList<>(container.getInventory().addItem(items.toArray(ItemStack[]::new)).values());
