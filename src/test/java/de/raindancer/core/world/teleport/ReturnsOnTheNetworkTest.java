@@ -110,4 +110,16 @@ class ReturnsOnTheNetworkTest {
         assertThat(alone.of(ALEX)).isPresent();
         assertThat(alone.anywhere(ALEX)).get().extracting(Returns.Elsewhere::server).isEqualTo("");
     }
+
+    @Test
+    @DisplayName("a place taken for a trip that did not happen is put back on its own server")
+    void restoredOnItsServer() {
+        Returns smp = server("smp");
+        Returns arena = server("arena");
+        smp.remember(ALEX, at(10, Waypoint.Cause.TELEPORT));
+        arena.arrived(ALEX);
+        Returns.Elsewhere taken = arena.takeAnywhere(ALEX).orElseThrow();
+        assertThat(arena.restore(ALEX, taken)).isTrue();
+        assertThat(server("hub").arrived(ALEX).anywhere(ALEX)).get().extracting(Returns.Elsewhere::server).isEqualTo("smp");
+    }
 }

@@ -91,6 +91,29 @@ public final class Returns {
         return kept[0];
     }
 
+    /**
+     * Puts back a place taken with {@link #takeAnywhere} for a trip that did not happen — on its own server, not
+     * this one. A death since then still outranks it.
+     */
+    public boolean restore(UUID player, Elsewhere place) {
+        if (player == null || place == null || !place.where().isUsable()) {
+            return false;
+        }
+        boolean[] kept = new boolean[1];
+        places.compute(player, (ignored, held) -> {
+            if (held != null && held.where().cause() == Waypoint.Cause.DEATH
+                    && place.where().cause() != Waypoint.Cause.DEATH) {
+                return held;
+            }
+            kept[0] = true;
+            return place;
+        });
+        if (kept[0] && store != null) {
+            writer.execute(() -> store.save(player, place.server(), place.where()));
+        }
+        return kept[0];
+    }
+
     /** Where they would go back to on this server, without using it up. */
     public Optional<Waypoint> of(UUID player) {
         return anywhere(player).filter(place -> place.server().equals(self)).map(Elsewhere::where);
