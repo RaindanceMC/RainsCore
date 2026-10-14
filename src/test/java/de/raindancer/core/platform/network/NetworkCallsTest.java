@@ -102,4 +102,12 @@ class NetworkCallsTest {
         assertThat(smp.ask("arena", "broken", Map.of(), Duration.ofSeconds(5)).get(10, TimeUnit.SECONDS)).isEmpty();
         assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)).isLessThan(4_000L);
     }
+
+    @Test
+    @DisplayName("a handler can be told which server asked")
+    void answerFrom() throws Exception {
+        arena.answerFrom("who-asked", (from, question) -> java.util.concurrent.CompletableFuture.completedFuture(Map.of("you", from)));
+        assertThat(hubServer.ask("arena", "who-asked", Map.of(), Duration.ofSeconds(5)).get(10, TimeUnit.SECONDS))
+                .contains(Map.of("you", "hub"));
+    }
 }

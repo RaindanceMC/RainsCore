@@ -35,8 +35,8 @@ public final class NetworkCalls implements AutoCloseable {
     static final String REPLY = "reply";
 
     private final NetworkBus bus;
-    private final Map<String, Function<Map<String, String>, CompletableFuture<Map<String, String>>>> handlers =
-            new ConcurrentHashMap<>();
+    private final Map<String, java.util.function.BiFunction<String, Map<String, String>, CompletableFuture<Map<String, String>>>>
+            handlers = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Optional<Map<String, String>>>> waiting = new ConcurrentHashMap<>();
     private final ScheduledExecutorService timeouts = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "rains-calls-timeouts");
@@ -63,6 +63,16 @@ public final class NetworkCalls implements AutoCloseable {
      */
     public NetworkBus.Subscription answerLater(String topic,
                                                Function<Map<String, String>, CompletableFuture<Map<String, String>>> handler) {
+        return answerFrom(topic, (from, question) -> handler.apply(question));
+    }
+
+    /**
+     * As {@link #answerLater}, told which server asked — for a question only some server may ask, or one about a
+     * player who has to be on the asking server.
+     */
+    public NetworkBus.Subscription answerFrom(String topic,
+                                              java.util.function.BiFunction<String, Map<String, String>,
+                                                      CompletableFuture<Map<String, String>>> handler) {
         handlers.put(topic, handler);
         return () -> handlers.remove(topic, handler);
     }
@@ -98,14 +108,14 @@ public final class NetworkCalls implements AutoCloseable {
         }
         String topic = question.remove("~topic");
         String from = question.remove("~from");
-        Function<Map<String, String>, CompletableFuture<Map<String, String>>> handler =
+        java.util.function.BiFunction<String, Map<String, String>, CompletableFuture<Map<String, String>>> handler =
                 topic == null ? null : handlers.get(topic);
         if (handler == null) {
             return;
         }
         CompletableFuture<Map<String, String>> answering;
         try {
-            answering = handler.apply(question);
+            answering = handler.apply(from == null ? "" : from, question);
         } catch (RuntimeException failed) {
             answering = CompletableFuture.failedFuture(failed);
         }
