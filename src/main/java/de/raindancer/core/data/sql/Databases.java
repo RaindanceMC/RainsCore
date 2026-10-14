@@ -77,6 +77,16 @@ public final class Databases implements AutoCloseable {
         return new Databases(null, pool, serverId, onServerThread);
     }
 
+    /**
+     * As {@link #central(PostgresPool, String, BooleanSupplier)}, bringing in what this server kept before it
+     * joined the network: a {@code <name>.db} found in {@code formerFolder} is imported into its namespace the
+     * first time that namespace is opened — see {@link SqliteImport} — and kept renamed.
+     */
+    public static Databases central(PostgresPool pool, String serverId, BooleanSupplier onServerThread,
+                                    Path formerFolder) {
+        return new Databases(formerFolder, pool, serverId, onServerThread);
+    }
+
     /** Whether these live in the network's central database rather than in files of this server's. */
     public boolean isCentral() {
         return pool != null;
@@ -102,9 +112,18 @@ public final class Databases implements AutoCloseable {
      * first schema wins, because it is the one the tables were built from.
      */
     public Database of(String name, Schema schema) {
-        return open.computeIfAbsent(name, key -> isCentral()
-                ? PostgresDatabase.open(pool, key, schema, onServerThread, serverId)
-                : Database.open(folder.resolve(key + ".db"), schema, onServerThread));
+        return open.computeIfAbsent(name, key -> {
+            if (!isCentral()) {
+                return Database.open(folder.resolve(key + ".db"), schema, onServerThread);
+            }
+            PostgresDatabase central = PostgresDatabase.open(pool, key, schema, onServerThread, serverId);
+            // What this server kept in its own file before it joined the network comes along, once.
+            Path former = folder == null ? null : folder.resolve(key + ".db");
+            if (central.isUsable() && former != null && java.nio.file.Files.isRegularFile(former)) {
+                SqliteImport.into(central, former, schema, serverId);
+            }
+            return central;
+        });
     }
 
     /**

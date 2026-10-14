@@ -118,21 +118,19 @@ public final class LootTables {
     }
 
     public void load() {
-        byKey.clear();
-        unread.clear();
-        unreadEntries.clear();
         synchronized (this) {
             problems.clear();
         }
-        if (!store.exists()) {
-            dirty.set(false);
-            return;
-        }
-        YamlConfiguration yaml = store.read();
-        if (!store.problems().isEmpty()) {
+        // Read first, replace after: an unreadable document leaves every table as it was.
+        java.util.Optional<YamlConfiguration> fresh = store.readIfReadable();
+        if (fresh.isEmpty()) {
             carry();
             return;
         }
+        YamlConfiguration yaml = fresh.get();
+        byKey.clear();
+        unread.clear();
+        unreadEntries.clear();
         ConfigurationSection section = yaml.getConfigurationSection("tables");
         if (section == null) {
             dirty.set(false);

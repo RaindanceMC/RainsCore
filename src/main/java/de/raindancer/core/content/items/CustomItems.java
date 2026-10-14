@@ -152,20 +152,19 @@ public final class CustomItems {
     }
 
     public void load() {
-        byKey.clear();
-        unread.clear();
         synchronized (this) {
             problems.clear();
         }
-        if (!store.exists()) {
-            dirty.set(false);
-            return;
-        }
-        YamlConfiguration yaml = store.read();
-        if (!store.problems().isEmpty()) {
+        // Read first, replace after: a document that cannot be read right now leaves every item as it was,
+        // rather than a server whose custom items all vanished because the database blinked.
+        java.util.Optional<YamlConfiguration> fresh = store.readIfReadable();
+        if (fresh.isEmpty()) {
             carry();
             return;
         }
+        YamlConfiguration yaml = fresh.get();
+        byKey.clear();
+        unread.clear();
         ConfigurationSection section = yaml.getConfigurationSection("items");
         if (section == null) {
             dirty.set(false);

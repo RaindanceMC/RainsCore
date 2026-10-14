@@ -139,7 +139,14 @@ public final class YamlStore {
     public boolean exists() {
         if (address != null) {
             bringInFile();
-            return documents.read(address) instanceof Documents.Found;
+            Documents.Read read = documents.read(address);
+            if (read instanceof Documents.Failed failed) {
+                // Not knowing is not "there is none": a caller that took it for absent would start from empty
+                // and could write that over everything the database holds.
+                note("could not be read (" + failed.why() + ")");
+                return true;
+            }
+            return read instanceof Documents.Found;
         }
         return file != null && Files.isRegularFile(file);
     }
@@ -187,6 +194,16 @@ public final class YamlStore {
             note("could not be read (" + failure.getMessage() + ")");
             return new YamlConfiguration();
         }
+    }
+
+    /**
+     * The document if it could be read — an absent one reads as empty — or empty when it could not. For a
+     * store that replaces what it holds with what it reads: on empty it keeps what it has, rather than
+     * emptying itself because the database blinked.
+     */
+    public Optional<YamlConfiguration> readIfReadable() {
+        YamlConfiguration yaml = read();
+        return problems().isEmpty() ? Optional.of(yaml) : Optional.empty();
     }
 
     // ---------------------------------------------------------------------------- writing

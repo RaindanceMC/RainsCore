@@ -124,8 +124,9 @@ public final class StashStore {
     }
 
     private YamlStore file(UUID owner) {
-        // A player's stash is theirs on every server of the network; read fresh on every load.
-        return files.computeIfAbsent(owner, id -> YamlStore.network(folder.resolve(id + ".yml")));
+        // This server's: a stash is a saved inventory, and inventories are each server's own. Shared, a stash
+        // emptied on one server could be emptied again on the next before the first write landed.
+        return files.computeIfAbsent(owner, id -> new YamlStore(folder.resolve(id + ".yml")));
     }
 
     private static String key(ArmourPiece piece) {

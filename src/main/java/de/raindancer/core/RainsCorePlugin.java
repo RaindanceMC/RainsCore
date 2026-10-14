@@ -367,7 +367,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     + "balances, settings — can be read or saved until it can. Check network.yml and that the "
                     + "database is running, then restart.", network.postgres().describe());
         }
-        return Databases.central(pool, network.serverId(), onServerThread);
+        return Databases.central(pool, network.serverId(), onServerThread, getDataFolder().toPath());
     }
 
     /** Who this server is on its network, and where the network's data is. */
@@ -600,7 +600,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         landPolicies = landPolicyStore.load();
         landPolicyStore.problem().ifPresent(trouble -> log.warn("land-flags.yml: {}", trouble));
         // Another server's admin changed a flag: the same object every claim asks is brought in line, in place.
-        landPolicyStore.onChange(() -> landPolicies.restore(landPolicyStore.load().changed()));
+        landPolicyStore.onChange(() -> {
+            de.raindancer.core.world.protection.LandPolicies fresh = landPolicyStore.load();
+            // Only what was actually read: a failed read answers with the built-ins, and taking those would
+            // quietly undo every flag an admin forced — protection switched off by a database hiccup.
+            if (landPolicyStore.problem().isEmpty()) {
+                landPolicies.restore(fresh.changed());
+            } else {
+                log.warn("Land flags changed elsewhere could not be read; the decisions in force are kept.");
+            }
+        });
         land = new Land(landPolicies, messages, System::currentTimeMillis);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(land), this);
         // Worlds a plugin locked (a hub, an arena) are enforced here, the same for every plugin that locks one.

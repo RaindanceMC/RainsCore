@@ -345,9 +345,14 @@ final class LuckPermsGrantStore implements GrantStore {
 
     @Override
     public void load() {
+        // Read first, replace after: a ledger that cannot be read right now is kept, not forgotten.
+        var fresh = ledgerStore.readIfReadable();
+        if (fresh.isEmpty()) {
+            return;
+        }
+        var yaml = fresh.get();
         presetOf.clear();
         ownedNodes.clear();
-        var yaml = ledgerStore.read();
         var presets = yaml.getConfigurationSection("preset");
         if (presets != null) {
             for (String id : presets.getKeys(false)) {

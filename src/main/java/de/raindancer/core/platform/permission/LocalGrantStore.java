@@ -173,8 +173,13 @@ final class LocalGrantStore implements GrantStore {
 
     @Override
     public void load() {
+        // Read first, replace after: grants that cannot be read right now are kept, not taken from everybody.
+        java.util.Optional<org.bukkit.configuration.file.YamlConfiguration> fresh = store.readIfReadable();
+        if (fresh.isEmpty()) {
+            return;
+        }
         granted.clear();
-        readInto(store, this::replaceQuietly);
+        readInto(fresh.get(), this::replaceQuietly);
         dirty.set(false);
     }
 
@@ -201,7 +206,11 @@ final class LocalGrantStore implements GrantStore {
      * {@code grants.yml} the exact same way this class does, for the one-time import.
      */
     static void readInto(YamlStore fromStore, BiConsumer<UUID, Collection<String>> sink) {
-        ConfigurationSection root = fromStore.read().getConfigurationSection("granted");
+        readInto(fromStore.read(), sink);
+    }
+
+    static void readInto(org.bukkit.configuration.ConfigurationSection document, BiConsumer<UUID, Collection<String>> sink) {
+        ConfigurationSection root = document.getConfigurationSection("granted");
         if (root == null) {
             return;
         }
@@ -219,7 +228,7 @@ final class LocalGrantStore implements GrantStore {
         if (!unreadable.isEmpty()) {
             log.error("{} entry/entries in {} are not player ids and have been skipped: {}. Anybody "
                             + "they belonged to has no granted permissions this session.",
-                    unreadable.size(), fromStore.file().getFileName(), String.join(", ", unreadable));
+                    unreadable.size(), "grants.yml", String.join(", ", unreadable));
         }
     }
 }
