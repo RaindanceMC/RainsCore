@@ -1918,6 +1918,25 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile de.raindancer.core.platform.network.FirstSeen firstSeen;
+    private final java.util.Map<java.util.UUID, java.util.concurrent.CompletableFuture<Boolean>> newcomers =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public java.util.concurrent.CompletableFuture<Boolean> isNewPlayer(Player player) {
+        de.raindancer.core.platform.network.FirstSeen seen = firstSeen;
+        if (seen == null) {
+            return java.util.concurrent.CompletableFuture.completedFuture(!player.hasPlayedBefore());
+        }
+        return newcomers.computeIfAbsent(player.getUniqueId(), id -> {
+            // Read here, on their thread: played on this server before, or has minutes played anywhere (a newcomer is
+            // seeded with none).
+            boolean knownBefore = player.hasPlayedBefore() || (playtime != null && playtime.minutes(id) > 0);
+            java.util.concurrent.CompletableFuture<Boolean> answer = new java.util.concurrent.CompletableFuture<>();
+            Scheduling.async(this, () -> answer.complete(seen.arrived(id, network.serverId(), knownBefore)));
+            return answer;
+        });
+    }
     private final java.util.Set<java.util.function.BiConsumer<Player, java.util.Set<String>>> sharedDataApplied =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -2001,6 +2020,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         presence.connect(bus);
         // Every player's own switches follow them, whichever plugin they belong to.
         sharedNamespaces.add(de.raindancer.core.ui.profile.PlayerSwitch.NAMESPACE);
+        firstSeen = new de.raindancer.core.platform.network.FirstSeen(databases.core(), System::currentTimeMillis);
         networkPlayers = new de.raindancer.core.platform.network.NetworkPlayers(presence, networkServers, bus,
                 (player, key, values) -> {
                     Player online = getServer().getPlayer(player);
@@ -2504,6 +2524,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             boolean hidden = vanish.isVanished(id);
             String name = event.getPlayer().getName();
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
+            isNewPlayer(event.getPlayer());
             de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> Scheduling.async(this,
                     () -> returns.arrived(id)));
             de.raindancer.core.platform.network.NetworkCooldowns.installed().ifPresent(cooldowns -> Scheduling.async(this,
@@ -2619,6 +2640,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             sharedArriving.remove(event.getPlayer().getUniqueId());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
+            newcomers.remove(leaving);
             // Where they stood is where /back takes them from the next server.
             de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> returns.left(leaving,
                     de.raindancer.core.world.teleport.Waypoint.of(event.getPlayer().getLocation(),

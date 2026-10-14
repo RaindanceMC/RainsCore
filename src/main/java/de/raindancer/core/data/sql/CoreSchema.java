@@ -346,7 +346,15 @@ public final class CoreSchema {
                 last_used INTEGER NOT NULL,
                 PRIMARY KEY (name, player)
             )""",
-            "CREATE INDEX network_cooldown_by_age ON network_cooldown (last_used)");
+            "CREATE INDEX network_cooldown_by_age ON network_cooldown (last_used)",
+            // When each player was first seen anywhere on the network: a welcome is for somebody new to the
+            // network, not new to one of its servers.
+            """
+            CREATE TABLE network_first_seen (
+                player TEXT    PRIMARY KEY,
+                server TEXT    NOT NULL,
+                at     INTEGER NOT NULL
+            )""");
 
     /**
      * What was done.

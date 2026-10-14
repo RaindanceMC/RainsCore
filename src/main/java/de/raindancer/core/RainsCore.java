@@ -713,6 +713,15 @@ public interface RainsCore {
     }
 
     /**
+     * Whether this player is new — to the whole network, not just to this server (which is all
+     * {@code hasPlayedBefore} knows): a welcome or the rules shown once per player. Asked during their join or
+     * any time while they are on.
+     */
+    default java.util.concurrent.CompletableFuture<Boolean> isNewPlayer(org.bukkit.entity.Player player) {
+        return java.util.concurrent.CompletableFuture.completedFuture(!player.hasPlayedBefore());
+    }
+
+    /**
      * Told once a player's shared data ({@link #sharePlayerData}) is put on them on this server — after they
      * joined, a moment later, or when another server changed it. With the namespaces that came. On the player's
      * thread. A cache of anything kept in that data is refreshed here.
