@@ -138,6 +138,33 @@ public final class Documents {
         return Optional.of(new Address(scope == Scope.NETWORK ? NETWORK_SCOPE : serverScope, owner, name));
     }
 
+    /** This server's scope: its id on a network, "" on a server of its own. */
+    public String serverScope() {
+        return serverScope;
+    }
+
+    /** The plugin folder documents are named under, for writing an exported copy beside them. */
+    public Path root() {
+        return root;
+    }
+
+    /** Every owner (plugin folder) with a document in {@code scope}. */
+    public List<String> owners(String scope) {
+        return database.read(connection -> {
+            List<String> owners = new ArrayList<>();
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT DISTINCT owner FROM document WHERE scope = ? ORDER BY owner")) {
+                statement.setString(1, scope);
+                try (ResultSet rows = statement.executeQuery()) {
+                    while (rows.next()) {
+                        owners.add(rows.getString(1));
+                    }
+                }
+            }
+            return owners;
+        }).orElse(List.of());
+    }
+
     // ------------------------------------------------------------------------------ reading
 
     public Read read(Address address) {

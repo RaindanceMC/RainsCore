@@ -211,4 +211,19 @@ public final class CoreCommands {
         registrar.register(name, "Switch to a loaded world, or wipe one and make it again.",
                 List.of(aliases), new WorldCommand());
     }
+
+    private static final AtomicBoolean DOCUMENTS_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /documents} (alias {@code /files}): export a document — what used to be a plugin's YAML file —
+     * to edit it by hand, and import it back. One per server, taken by the first plugin that asks.
+     */
+    public static boolean documents(Commands registrar) {
+        if (!DOCUMENTS_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register("documents", "Edit a plugin's settings or texts by hand: export, edit, import.",
+                List.of("files"), new de.raindancer.core.data.store.DocumentsCommand());
+        return true;
+    }
 }

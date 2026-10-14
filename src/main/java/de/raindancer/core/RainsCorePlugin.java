@@ -684,6 +684,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                         .of("Core", "settings", "Read and change what every plugin on this server does.")
                         .needing("rainscore.settings"),
                 CommandNote
+                        .of("Core", "documents", "Edit a plugin's settings or texts by hand: they are kept in the database.",
+                                "list [plugin] — what there is", "export <plugin> <name> — write it to edit/",
+                                "import — read every edited file back")
+                        .needing("rainscore.documents"),
+                CommandNote
                         .of("Core", "warp", "Go to a named place.",
                                 "<name> — go there",
                                 "list — every warp you may use")
