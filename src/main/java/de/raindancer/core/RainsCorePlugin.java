@@ -420,6 +420,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 databases.of(de.raindancer.core.data.store.Documents.NAMESPACE, de.raindancer.core.data.store.Documents.SCHEMA),
                 bus, getDataFolder().toPath().toAbsolutePath().getParent(),
                 de.raindancer.core.platform.network.ThisServer.id(), System::currentTimeMillis));
+        // Settings on a network come in layers: the network's, this group's, this server's own.
+        de.raindancer.core.data.settings.SettingsStore.Layers.group(network.isNetwork() ? network.group() : "");
         firstRun = !new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("config.yml")).exists();
 
         // Settings first: everything after this reads them.

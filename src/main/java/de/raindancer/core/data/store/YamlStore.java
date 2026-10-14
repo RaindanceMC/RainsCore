@@ -74,6 +74,9 @@ public final class YamlStore {
     /** Whether the last read found a file it could not parse — one a write must not replace. */
     private boolean unreadable;
 
+    /** Whether this store brings a 1.x file of its name into the database. */
+    private final boolean bringsInFile;
+
     /** Set when the document lives in the database; null keeps it a file. */
     private final Documents documents;
     private final Documents.Address address;
@@ -99,6 +102,19 @@ public final class YamlStore {
 
     /** A store on {@code documents} rather than the installed ones — for tests, and for Core itself. */
     public YamlStore(Path file, Documents documents, Documents.Scope scope) {
+        this(file, documents, scope, true);
+    }
+
+    /**
+     * A document that never brings in a 1.x file of its name — for a second document named like a file that
+     * another store owns (the network's layer of a server's config.yml): the file is that store's to bring in.
+     */
+    public static YamlStore withoutFile(Path file, Documents documents, Documents.Scope scope) {
+        return new YamlStore(file, documents, scope, false);
+    }
+
+    private YamlStore(Path file, Documents documents, Documents.Scope scope, boolean bringsInFile) {
+        this.bringsInFile = bringsInFile;
         this.lock = file == null ? new Object()
                 : LOCKS.computeIfAbsent(file.toAbsolutePath().normalize(), key -> new Object());
         this.file = file;
@@ -570,7 +586,9 @@ public final class YamlStore {
                 }
                 YamlConfiguration current;
                 long version = 0;
+                String before = null;
                 if (now instanceof Documents.Found found) {
+                    before = found.body();
                     Optional<YamlConfiguration> parsed = parse(found.body());
                     if (parsed.isEmpty()) {
                         log.error("{} is not valid YAML, so this change was not written to it. Fix it (export, edit, "
@@ -589,6 +607,11 @@ public final class YamlStore {
                 } catch (RuntimeException failure) {
                     log.error(failure, "Could not build the contents of {}; it is unchanged.", address.key());
                     return false;
+                }
+                if (body.equals(before)) {
+                    // Nothing changed: no write, no new version, nobody told to read it again for nothing.
+                    remember(body, version);
+                    return true;
                 }
                 long expected = version;
                 boolean written = asThisStore(() -> expected == 0
@@ -633,7 +656,7 @@ public final class YamlStore {
      * server of the network brought its own file in first), what is there wins and the file adds the rest.
      */
     private void bringInFile() {
-        if (file == null || !Files.isRegularFile(file) || !documents.firstTimeFor(address)) {
+        if (!bringsInFile || file == null || !Files.isRegularFile(file) || !documents.firstTimeFor(address)) {
             return;
         }
         String text;

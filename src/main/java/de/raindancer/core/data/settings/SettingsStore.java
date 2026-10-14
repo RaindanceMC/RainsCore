@@ -57,12 +57,93 @@ public final class SettingsStore<T> {
     private volatile T current;
 
     public SettingsStore(SettingsSchema<T> schema, Path file) {
+        this(schema, file, de.raindancer.core.data.store.Documents.installed().orElse(null), Layers.group());
+    }
+
+    /**
+     * Settings in {@code documents}: layered — network, group, this server — when they belong to a server of a
+     * network (its scope is not blank); one document per server, as in 1.x, otherwise.
+     *
+     * @param group this server's group on its network; blank for none
+     */
+    public SettingsStore(SettingsSchema<T> schema, Path file, de.raindancer.core.data.store.Documents documents,
+                         String group) {
         this.schema = schema;
         this.file = file;
-        this.store = new YamlStore(file);
+        this.layered = documents != null && !documents.serverScope().isBlank() && file != null;
+        this.store = documents == null ? new YamlStore(file)
+                : new YamlStore(file, documents, de.raindancer.core.data.store.Documents.Scope.SERVER);
+        if (layered) {
+            // The file of 1.x is this server's: only the server's document brings it in, never the network's.
+            this.networkStore = YamlStore.withoutFile(file, documents, de.raindancer.core.data.store.Documents.Scope.NETWORK);
+            this.groupStore = group == null || group.isBlank() ? null
+                    : YamlStore.withoutFile(file.resolveSibling(file.getFileName() + ".group-" + group),
+                    documents, de.raindancer.core.data.store.Documents.Scope.NETWORK);
+            // Another server changed the network's settings or this group's: read again, listeners told.
+            this.networkStore.onChange(this::load);
+            if (groupStore != null) {
+                this.groupStore.onChange(this::load);
+            }
+        } else {
+            this.networkStore = null;
+            this.groupStore = null;
+        }
         // Usable before load(): a plugin that reads a setting while starting up gets the default
         // rather than a NullPointerException.
         this.current = schema.defaults();
+    }
+
+    // ---------------------------------------------------------------------------- layers
+
+    /**
+     * Where a setting's value comes from on a network: the network's (every server), this server's group's, or
+     * this server's alone. The most specific layer that has a value wins.
+     */
+    public enum Layer { NETWORK, GROUP, SERVER }
+
+    /** Marks a document of overrides, as opposed to a 1.x config.yml that still holds every setting. */
+    static final String OVERRIDES = "~overrides";
+
+    private final boolean layered;
+    private final YamlStore networkStore;
+    private final YamlStore groupStore;
+    private final Map<String, Object> networkValues = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Object> groupOverrides = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Object> serverOverrides = new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * What this server changed in the network's and the group's documents since it last wrote them. Only these go
+     * out: writing every value would put this server's older copy back over what another server changed meanwhile.
+     */
+    private final java.util.Set<String> networkChanged = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> groupChanged = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Whether this store keeps layers — a server of a network — rather than one document. */
+    public boolean isLayered() {
+        return layered;
+    }
+
+    /** The layer a setting's value comes from here. Always {@link Layer#NETWORK} when not layered. */
+    public Layer layerOf(String key) {
+        if (serverOverrides.containsKey(key)) {
+            return Layer.SERVER;
+        }
+        return groupOverrides.containsKey(key) ? Layer.GROUP : Layer.NETWORK;
+    }
+
+    /** Which group the stores made from now on belong to. Set once by Core from network.yml. */
+    public static final class Layers {
+        private static volatile String group = "";
+
+        private Layers() {
+        }
+
+        public static void group(String name) {
+            group = name == null ? "" : name;
+        }
+
+        static String group() {
+            return group;
+        }
     }
 
     public SettingsSchema<T> schema() {
@@ -87,6 +168,10 @@ public final class SettingsStore<T> {
      * <p>Also used to reload: listeners are told if anything actually changed.
      */
     public void load() {
+        if (layered) {
+            loadLayers();
+            return;
+        }
         Map<String, Object> values = new LinkedHashMap<>();
         List<String> found = new ArrayList<>();
         YamlConfiguration yaml = readFile(found);
@@ -106,6 +191,214 @@ public final class SettingsStore<T> {
     }
 
     /** The file as YAML, or an empty configuration when it is missing or unreadable. */
+    /**
+     * Network, group and this server's overrides — and, the first time on a network, this server's 1.x
+     * config.yml shared out: it becomes the network's when there is none yet, otherwise only what differs from
+     * the network's stays as this server's. Either way every setting is what it was before.
+     */
+    private synchronized void loadLayers() {
+        List<String> found = new ArrayList<>();
+        // The server's first: it is the one that brings a 1.x file in.
+        java.util.Optional<YamlConfiguration> server = store.readIfReadable();
+        java.util.Optional<YamlConfiguration> network = networkStore.readIfReadable();
+        java.util.Optional<YamlConfiguration> group = groupStore == null ? java.util.Optional.of(new YamlConfiguration())
+                : groupStore.readIfReadable();
+        if (network.isEmpty() || server.isEmpty() || group.isEmpty()) {
+            // Not read is not "nothing set": what is in force stays, rather than every setting falling to its default.
+            for (String problem : java.util.stream.Stream.of(networkStore, store, groupStore)
+                    .filter(Objects::nonNull).flatMap(each -> each.problems().stream()).toList()) {
+                found.add("the settings " + problem + ", so the settings in force are kept");
+            }
+            synchronized (this) {
+                problems.clear();
+                problems.addAll(found);
+            }
+            found.forEach(problem -> log.warn("{}: {}", file.getFileName(), problem));
+            return;
+        }
+        Map<String, Object> networkRead = new LinkedHashMap<>();
+        for (Setting<?> setting : schema.settings()) {
+            networkRead.put(setting.key(), valueFrom(network.get(), setting, found));
+        }
+        Map<String, Object> groupRead = overridesIn(group.get(), found);
+        Map<String, Object> serverRead;
+        boolean legacy = !server.get().getKeys(false).isEmpty() && !server.get().contains(OVERRIDES);
+        if (legacy) {
+            Map<String, Object> theirs = new LinkedHashMap<>();
+            for (Setting<?> setting : schema.settings()) {
+                theirs.put(setting.key(), valueFrom(server.get(), setting, found));
+            }
+            if (network.get().getKeys(false).isEmpty()) {
+                // The first server of the network: its settings are the network's.
+                networkRead.putAll(theirs);
+                serverRead = new LinkedHashMap<>();
+                log.info("{}: this server's settings are now the network's.", file.getFileName());
+            } else {
+                // Another server came first: this one keeps, as its own, only what it had set differently.
+                serverRead = new LinkedHashMap<>();
+                theirs.forEach((key, value) -> {
+                    Object shared = groupRead.containsKey(key) ? groupRead.get(key) : networkRead.get(key);
+                    if (!Objects.equals(shared, value)) {
+                        serverRead.put(key, value);
+                    }
+                });
+                log.info("{}: {} setting(s) differ from the network's and stay this server's own.",
+                        file.getFileName(), serverRead.size());
+            }
+        } else {
+            serverRead = overridesIn(server.get(), found);
+        }
+        // What this server changed and has not written yet stays: it is newer than what was just read.
+        networkChanged.forEach(key -> {
+            if (networkValues.containsKey(key)) {
+                networkRead.put(key, networkValues.get(key));
+            }
+        });
+        groupChanged.forEach(key -> {
+            if (groupOverrides.containsKey(key)) {
+                groupRead.put(key, groupOverrides.get(key));
+            } else {
+                groupRead.remove(key);
+            }
+        });
+        networkValues.clear();
+        networkValues.putAll(networkRead);
+        groupOverrides.clear();
+        groupOverrides.putAll(groupRead);
+        serverOverrides.clear();
+        serverOverrides.putAll(serverRead);
+        synchronized (this) {
+            problems.clear();
+            problems.addAll(found);
+        }
+        found.forEach(problem -> log.warn("{}: {}", file.getFileName(), problem));
+        if (legacy) {
+            // Written out now, so the next start finds layers rather than a 1.x file again — every network value
+            // when this server's settings became the network's, otherwise only its own.
+            if (network.get().getKeys(false).isEmpty()) {
+                schema.settings().forEach(setting -> networkChanged.add(setting.key()));
+            }
+            saveLayers();
+        }
+        publish(effective());
+    }
+
+    private Map<String, Object> overridesIn(YamlConfiguration yaml, List<String> found) {
+        Map<String, Object> overrides = new LinkedHashMap<>();
+        for (Setting<?> setting : schema.settings()) {
+            if (yaml.contains(setting.key())) {
+                overrides.put(setting.key(), valueFrom(yaml, setting, found));
+            }
+        }
+        return overrides;
+    }
+
+    /** What every setting is here: this server's override, else the group's, else the network's. */
+    private T effective() {
+        Map<String, Object> values = new LinkedHashMap<>();
+        for (Setting<?> setting : schema.settings()) {
+            String key = setting.key();
+            values.put(key, serverOverrides.containsKey(key) ? serverOverrides.get(key)
+                    : groupOverrides.containsKey(key) ? groupOverrides.get(key)
+                    : networkValues.getOrDefault(key, setting.defaultValue()));
+        }
+        return schema.instantiate(values);
+    }
+
+    private boolean saveLayers() {
+        java.util.Set<String> network = de.raindancer.core.platform.util.Marks.drain(networkChanged);
+        java.util.Set<String> group = de.raindancer.core.platform.util.Marks.drain(groupChanged);
+        boolean networkWritten = networkStore.update(yaml -> {
+            for (Setting<?> setting : schema.settings()) {
+                // Every setting has its line and its comment in the network's document; only changed values are set.
+                if (network.contains(setting.key()) || !yaml.contains(setting.key())) {
+                    yaml.set(setting.key(), SettingCodec.toYaml(networkValues.getOrDefault(setting.key(), setting.defaultValue())));
+                }
+                yaml.setComments(setting.key(), commentFor(setting));
+            }
+        });
+        boolean groupWritten = groupStore == null || group.isEmpty() || groupStore.update(yaml -> {
+            yaml.set(OVERRIDES, true);
+            for (String key : group) {
+                schema.setting(key).ifPresent(setting -> yaml.set(key, groupOverrides.containsKey(key)
+                        ? SettingCodec.toYaml(groupOverrides.get(key)) : null));
+            }
+        });
+        boolean serverWritten = store.write(yaml -> writeOverrides(yaml, serverOverrides));
+        if (!networkWritten) {
+            networkChanged.addAll(network);
+        }
+        if (!groupWritten) {
+            groupChanged.addAll(group);
+        }
+        return networkWritten && groupWritten && serverWritten;
+    }
+
+    private void writeOverrides(YamlConfiguration yaml, Map<String, Object> overrides) {
+        yaml.set(OVERRIDES, true);
+        yaml.setComments(OVERRIDES, List.of("Only the settings that differ from the network's; the rest are in the",
+                "network's config.yml. Change them with /settings."));
+        for (Setting<?> setting : schema.settings()) {
+            if (overrides.containsKey(setting.key())) {
+                yaml.set(setting.key(), SettingCodec.toYaml(overrides.get(setting.key())));
+                yaml.setComments(setting.key(), commentFor(setting));
+            }
+        }
+    }
+
+    /**
+     * Sets {@code key} at {@code layer} — the whole network's value, this group's, or this server's own.
+     * Refused (false) for an unknown key or a value that does not fit. Saved by {@link #save()}.
+     */
+    public boolean set(String key, String raw, Layer layer) {
+        Setting<?> setting = schema.setting(key).orElse(null);
+        if (setting == null) {
+            return false;
+        }
+        Optional<Object> parsed = SettingCodec.fromText(setting, raw);
+        if (parsed.isEmpty() || !SettingCodec.isInRange(setting, parsed.get())) {
+            return false;
+        }
+        writeAt(setting, parsed.get(), layered ? layer : Layer.NETWORK);
+        return true;
+    }
+
+    /** Takes a group's or this server's own value away, so the next layer's applies again. */
+    public void clearOverride(String key, Layer layer) {
+        if (!layered || layer == Layer.NETWORK) {
+            return;
+        }
+        (layer == Layer.SERVER ? serverOverrides : groupOverrides).remove(key);
+        if (layer == Layer.GROUP) {
+            groupChanged.add(key);
+        }
+        publish(effective());
+    }
+
+    private void writeAt(Setting<?> setting, Object value, Layer layer) {
+        if (!layered) {
+            write(setting, value);
+            return;
+        }
+        switch (layer) {
+            case SERVER -> serverOverrides.put(setting.key(), value);
+            case GROUP -> {
+                if (groupStore == null) {
+                    networkValues.put(setting.key(), value);
+                    networkChanged.add(setting.key());
+                } else {
+                    groupOverrides.put(setting.key(), value);
+                    groupChanged.add(setting.key());
+                }
+            }
+            case NETWORK -> {
+                networkValues.put(setting.key(), value);
+                networkChanged.add(setting.key());
+            }
+        }
+        publish(effective());
+    }
+
     private YamlConfiguration readFile(List<String> found) {
         YamlConfiguration yaml = store.read();
         // Not fatal on purpose. A broken file means this plugin runs on its defaults for one start,
@@ -167,6 +460,9 @@ public final class SettingsStore<T> {
      *         after the file is fixed writes them
      */
     public boolean trySave() {
+        if (layered) {
+            return saveLayers();
+        }
         // An update rather than a write: that is what keeps the unknown keys and whatever the owner
         // wrote around them. It is also atomic, so a server killed here has the old config or the
         // new one and never half of a file it needs to start. The values are read inside it, under
@@ -229,7 +525,9 @@ public final class SettingsStore<T> {
         if (parsed.isEmpty() || !SettingCodec.isInRange(setting, parsed.get())) {
             return false;
         }
-        write(setting, parsed.get());
+        // At the layer the value comes from now: changing the network's value under a server's own would
+        // change nothing anybody here could see.
+        writeAt(setting, parsed.get(), layerOf(key));
         return true;
     }
 
@@ -240,17 +538,23 @@ public final class SettingsStore<T> {
             return null;
         }
         Object next = SettingCodec.cycle(setting, setting.valueIn(current));
-        write(setting, next);
+        writeAt(setting, next, layerOf(key));
         return next;
     }
 
     /** Puts one setting back to what the plugin shipped with. */
     public void reset(String key) {
-        schema.setting(key).ifPresent(setting -> write(setting, setting.defaultValue()));
+        schema.setting(key).ifPresent(setting -> writeAt(setting, setting.defaultValue(), layerOf(key)));
     }
 
     /** Puts all of them back. */
     public void resetAll() {
+        if (layered) {
+            networkValues.clear();
+            schema.settings().forEach(setting -> networkChanged.add(setting.key()));
+            publish(effective());
+            return;
+        }
         publish(schema.defaults());
     }
 
