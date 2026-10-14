@@ -21,6 +21,8 @@ public enum Gear {
     EXCAVATING_TOOLS(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_pickaxe") || path.endsWith("_shovel")),
     /** Whatever breaks blocks or kills mobs from the main hand. */
     HAND_TOOLS(EquipmentSlotGroup.MAINHAND, Gear::handTool),
+    /** What shoots or is thrown: bows, crossbows, tridents. */
+    RANGED(EquipmentSlotGroup.MAINHAND, path -> Set.of("bow", "crossbow", "trident").contains(path)),
     /** Anything worn or held that can be enchanted at all — what is worth keeping through a death. */
     ANY_GEAR(EquipmentSlotGroup.ANY, path -> handTool(path) || path.endsWith("_helmet")
             || path.endsWith("_chestplate") || path.endsWith("_leggings") || path.endsWith("_boots")

@@ -24,6 +24,7 @@ public final class RainsEnchants {
     public static final String SMELTING = "rainsenchants:smelting";
     public static final String TELEKINESIS = "rainsenchants:telekinesis";
     public static final String CHEST_LINK = "rainsenchants:chest_link";
+    public static final String HEAT_SEEKING = "rainsenchants:heat_seeking";
 
     private RainsEnchants() {
     }

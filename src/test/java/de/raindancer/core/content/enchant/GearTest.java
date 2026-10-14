@@ -106,4 +106,16 @@ class GearTest {
         assertThatThrownBy(() -> EnchantDef.builder("a:b").name("x").build())
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("gear");
     }
+
+    @Test
+    @DisplayName("ranged weapons are what shoots or is thrown: bow, crossbow, trident — not a mace or a sword")
+    void ranged() {
+        for (String weapon : new String[]{"bow", "crossbow", "trident"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.RANGED.matches(weapon)).as(weapon).isTrue();
+        }
+        for (String other : new String[]{"mace", "iron_sword", "fishing_rod", "shears"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.RANGED.matches(other)).as(other).isFalse();
+        }
+        org.assertj.core.api.Assertions.assertThat(RainsEnchants.HEAT_SEEKING).isEqualTo("rainsenchants:heat_seeking");
+    }
 }
