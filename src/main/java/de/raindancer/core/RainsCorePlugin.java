@@ -336,6 +336,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     private de.raindancer.core.platform.network.NetworkConfig network;
 
+    private static final long INVENTORY_SAVE_SECONDS = 300;
+    private volatile de.raindancer.core.data.inventory.SavedInventories savedInventories;
+    private volatile de.raindancer.core.data.inventory.InventoryCapture inventoryCapture;
+
+    /** Every server's copy of every player's inventory. */
+    @Override
+    public de.raindancer.core.data.inventory.SavedInventories savedInventories() {
+        return savedInventories;
+    }
+
     /** The network's name on its database: one network per database, so one fixed channel. */
     private static final String BUS_CHANNEL = "rains";
 
@@ -747,6 +757,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // A 1.x server's playtime.yml, brought into the database once (its minutes added) and kept renamed.
         playtime.importFrom(getDataFolder().toPath().resolve("playtime.yml"));
         playtime.connect(bus);
+        // Every player's inventory into the network's database, per server: staff see it from anywhere, and it
+        // outlives the server's files. Not applied on join — inventories stay each server's own.
+        savedInventories = new de.raindancer.core.data.inventory.SavedInventories(databases.core(), System::currentTimeMillis);
+        inventoryCapture = new de.raindancer.core.data.inventory.InventoryCapture(this, savedInventories,
+                de.raindancer.core.platform.network.ThisServer::id);
+        getServer().getPluginManager().registerEvents(inventoryCapture, this);
+        Scheduling.asyncTimer(this, INVENTORY_SAVE_SECONDS, INVENTORY_SAVE_SECONDS,
+                task -> Scheduling.global(this, inventoryCapture::saveEveryone));
         knownNames = new de.raindancer.core.social.presence.KnownNames(getDataFolder().toPath().resolve("known-names.yml"));
         knownNames.load();
         de.raindancer.core.platform.command.PlayerTargets.useKnownNames(knownNames);
@@ -1387,6 +1405,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (settings != null) {
             settings.save();
+        }
+        if (inventoryCapture != null) {
+            // Everybody still on, while the database is still open.
+            inventoryCapture.saveEveryoneNow();
         }
         // Before the databases close: a plugin disabled after Core must not find a store on a closed database.
         de.raindancer.core.data.store.Documents.uninstall();

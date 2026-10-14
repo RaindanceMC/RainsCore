@@ -616,6 +616,14 @@ public interface RainsCore {
     }
 
     /**
+     * Every server's copy of every player's inventory (2.0.0) — for looking at a player's inventory on any server
+     * from any server. Not applied to anybody: inventories stay each server's own.
+     */
+    default de.raindancer.core.data.inventory.SavedInventories savedInventories() {
+        throw new UnsupportedOperationException("this core keeps no inventories");
+    }
+
+    /**
      * How the servers of this network tell each other that something changed: a store writes, then
      * publishes {@code (topic, key)}, and every other server reads that key again. A module whose data
      * lives in the central database uses it the same way. On a server of its own it is silent.

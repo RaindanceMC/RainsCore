@@ -230,7 +230,25 @@ public final class CoreSchema {
                 name       TEXT    PRIMARY KEY,
                 value      TEXT    NOT NULL,
                 created_at INTEGER NOT NULL
-            )""");
+            )""",
+            // 2.0.0: every server's copy of every player's inventory, so staff see it from anywhere. The vanilla
+            // player file stays the live copy; this one is not applied on join (yet).
+            """
+            CREATE TABLE saved_inventory (
+                server      TEXT    NOT NULL,
+                player      TEXT    NOT NULL,
+                saved_at    INTEGER NOT NULL,
+                contents    BLOB    NOT NULL,
+                ender_chest BLOB    NOT NULL,
+                level       INTEGER NOT NULL,
+                progress    REAL    NOT NULL,
+                health      REAL    NOT NULL,
+                food        INTEGER NOT NULL,
+                saturation  REAL    NOT NULL,
+                effects     TEXT    NOT NULL,
+                PRIMARY KEY (server, player)
+            )""",
+            "CREATE INDEX saved_inventory_by_player ON saved_inventory (player, saved_at DESC)");
 
     /**
      * What was done.
