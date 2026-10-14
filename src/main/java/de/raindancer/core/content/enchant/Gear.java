@@ -24,6 +24,8 @@ public enum Gear {
     /** What Thor goes on: axes and the mace, thrown like a hammer, and the trident. */
     THUNDER(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_axe") && !path.endsWith("_pickaxe")
             || "mace".equals(path) || "trident".equals(path)),
+    /** The trident alone. */
+    TRIDENT(EquipmentSlotGroup.MAINHAND, "trident"::equals),
     /** What shoots or is thrown: bows, crossbows, tridents. */
     RANGED(EquipmentSlotGroup.MAINHAND, path -> Set.of("bow", "crossbow", "trident").contains(path)),
     /** Anything worn or held that can be enchanted at all — what is worth keeping through a death. */

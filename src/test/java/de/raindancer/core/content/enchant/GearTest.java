@@ -130,4 +130,12 @@ class GearTest {
         }
         org.assertj.core.api.Assertions.assertThat(RainsEnchants.THOR).isEqualTo("rainsenchants:thor");
     }
+
+    @Test
+    @DisplayName("a trident is a trident: what Volley goes on")
+    void trident() {
+        org.assertj.core.api.Assertions.assertThat(Gear.TRIDENT.matches("trident")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(Gear.TRIDENT.matches("bow")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(RainsEnchants.VOLLEY).isEqualTo("rainsenchants:volley");
+    }
 }
