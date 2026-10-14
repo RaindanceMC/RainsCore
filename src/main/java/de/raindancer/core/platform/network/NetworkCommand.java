@@ -17,7 +17,7 @@ import java.util.Locale;
 
 /**
  * {@code /network} — the servers of the network and who is where; {@code /network bank} — which server keeps the
- * network's money; {@code /network bank here} — makes this server the bank. The bank never moves by itself: its
+ * network's money; {@code /network bank here confirm} — makes this server the bank. The bank never moves by itself: its
  * balances are its own server's, so moving it is the owner's call.
  */
 public final class NetworkCommand implements BasicCommand {
@@ -50,6 +50,12 @@ public final class NetworkCommand implements BasicCommand {
             if (word.equals("bank")) {
                 rains.networkRoles().ifPresentOrElse(roles -> {
                     if (args.length > 1 && args[1].equalsIgnoreCase("here")) {
+                        if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
+                            say(sender, "<yellow>The balances are the bank server's own economy database; they do not "
+                                    + "move with it. Make <white><id></white> the bank only if it already holds the right "
+                                    + "balances. <gray>/network bank here confirm", self);
+                            return;
+                        }
                         if (roles.moveHome(NetworkEconomy.ROLE, self)) {
                             say(sender, "<green>This server (<white><id></white>) is the network's bank now. "
                                     + "<gray>It takes over within a few seconds if it runs an economy.", self);
@@ -83,6 +89,9 @@ public final class NetworkCommand implements BasicCommand {
         }
         if (args.length == 2 && "bank".equalsIgnoreCase(args[0])) {
             return List.of("here");
+        }
+        if (args.length == 3 && "bank".equalsIgnoreCase(args[0]) && "here".equalsIgnoreCase(args[1])) {
+            return List.of("confirm");
         }
         return List.of();
     }

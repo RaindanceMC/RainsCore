@@ -1998,7 +1998,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     secondBankSaid = true;
                     log.error("{} runs here, but {} is the network's bank: this server uses the bank, and {} keeps "
                             + "nothing that counts. Run the economy on one server of the network only. "
-                            + "To make this server the bank instead: /network bank here.",
+                            + "To make this server the bank instead: /network bank here confirm.",
                             local.get().name(), networkRoles.home(de.raindancer.core.social.economy.NetworkEconomy.ROLE)
                                     .orElse("another server"), local.get().name());
                 }
