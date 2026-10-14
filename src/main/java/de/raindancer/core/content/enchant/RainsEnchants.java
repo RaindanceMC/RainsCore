@@ -27,6 +27,16 @@ public final class RainsEnchants {
     public static final String HEAT_SEEKING = "rainsenchants:heat_seeking";
     public static final String THOR = "rainsenchants:thor";
     public static final String VOLLEY = "rainsenchants:volley";
+    public static final String LIFESTEAL = "rainsenchants:lifesteal";
+    public static final String EXECUTIONER = "rainsenchants:executioner";
+    public static final String BLEED = "rainsenchants:bleed";
+    public static final String VENOM = "rainsenchants:venom";
+    public static final String CLEAVE = "rainsenchants:cleave";
+    public static final String ARMOR_PIERCE = "rainsenchants:armor_pierce";
+    public static final String BERSERK = "rainsenchants:berserk";
+    public static final String OVERPOWER = "rainsenchants:overpower";
+    public static final String UNDYING = "rainsenchants:undying";
+    public static final String FUSION = "rainsenchants:fusion";
 
     private RainsEnchants() {
     }

@@ -24,6 +24,11 @@ public enum Gear {
     /** What Thor goes on: axes and the mace, thrown like a hammer, and the trident. */
     THUNDER(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_axe") && !path.endsWith("_pickaxe")
             || "mace".equals(path) || "trident".equals(path)),
+    /** What strikes up close: swords, axes, the mace and spears. */
+    MELEE(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_sword") || path.endsWith("_axe") && !path.endsWith("_pickaxe")
+            || "mace".equals(path) || path.endsWith("_spear")),
+    /** Axes alone. */
+    AXES(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_axe") && !path.endsWith("_pickaxe")),
     /** The trident alone. */
     TRIDENT(EquipmentSlotGroup.MAINHAND, "trident"::equals),
     /** What shoots or is thrown: bows, crossbows, tridents. */

@@ -138,4 +138,22 @@ class GearTest {
         org.assertj.core.api.Assertions.assertThat(Gear.TRIDENT.matches("bow")).isFalse();
         org.assertj.core.api.Assertions.assertThat(RainsEnchants.VOLLEY).isEqualTo("rainsenchants:volley");
     }
+
+    @Test
+    @DisplayName("melee weapons: swords, axes, the mace and spears; axes alone for Cleave")
+    void melee() {
+        for (String weapon : new String[]{"iron_sword", "netherite_axe", "mace", "iron_spear"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.MELEE.matches(weapon)).as(weapon).isTrue();
+        }
+        for (String other : new String[]{"iron_pickaxe", "bow", "trident", "iron_shovel"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.MELEE.matches(other)).as(other).isFalse();
+        }
+        org.assertj.core.api.Assertions.assertThat(Gear.AXES.matches("golden_axe")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(Gear.AXES.matches("golden_pickaxe")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(Gear.AXES.matches("iron_sword")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(java.util.List.of(RainsEnchants.LIFESTEAL, RainsEnchants.EXECUTIONER,
+                RainsEnchants.BLEED, RainsEnchants.VENOM, RainsEnchants.CLEAVE, RainsEnchants.ARMOR_PIERCE,
+                RainsEnchants.BERSERK, RainsEnchants.OVERPOWER, RainsEnchants.UNDYING, RainsEnchants.FUSION))
+                .allMatch(key -> key.startsWith("rainsenchants:")).doesNotHaveDuplicates();
+    }
 }
