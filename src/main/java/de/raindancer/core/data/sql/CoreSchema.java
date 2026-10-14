@@ -215,7 +215,22 @@ public final class CoreSchema {
             "CREATE INDEX place_by_server ON place (server)",
             // 2.0.0: a world's seeds are the seeds of that server's world; another server's "world" is another world.
             "ALTER TABLE world_seed ADD COLUMN server TEXT NOT NULL DEFAULT ''",
-            "CREATE INDEX world_seed_by_server ON world_seed (server, world)");
+            "CREATE INDEX world_seed_by_server ON world_seed (server, world)",
+            // 2.0.0: playtime in the database, counted by whichever server the player is on, added up.
+            """
+            CREATE TABLE playtime (
+                player  TEXT    PRIMARY KEY,
+                minutes INTEGER NOT NULL,
+                active  INTEGER NOT NULL
+            )""",
+            // 2.0.0: secrets every server of a network must share — the key blocked-join addresses are hashed
+            // with, the seal on banknotes. Made once by whichever server needs one first.
+            """
+            CREATE TABLE secret (
+                name       TEXT    PRIMARY KEY,
+                value      TEXT    NOT NULL,
+                created_at INTEGER NOT NULL
+            )""");
 
     /**
      * What was done.

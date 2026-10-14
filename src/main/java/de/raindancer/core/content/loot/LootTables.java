@@ -37,7 +37,12 @@ public final class LootTables {
 
     public LootTables(Path file) {
         this.file = file;
-        this.store = new YamlStore(file);
+        // The network's one set of tables, read again when another server changes them.
+        this.store = YamlStore.network(file);
+        this.store.onChange(() -> {
+            flush();
+            load();
+        });
     }
 
     // ---------------------------------------------------------------------------- defining

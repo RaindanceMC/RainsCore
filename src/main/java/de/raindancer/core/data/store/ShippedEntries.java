@@ -43,23 +43,25 @@ public final class ShippedEntries {
      */
     public static Merged bringUp(java.nio.file.Path file, java.util.function.Supplier<java.io.InputStream> shipped,
                                  String section, Set<String> fields) {
+        return bringUp(new YamlStore(file), shipped, section, fields);
+    }
+
+    /** As {@link #bringUp(java.nio.file.Path, java.util.function.Supplier, String, Set)}, into a store of the caller's scope. */
+    public static Merged bringUp(YamlStore store, java.util.function.Supplier<java.io.InputStream> shipped,
+                                 String section, Set<String> fields) {
         try (java.io.InputStream in = shipped.get()) {
             if (in == null) {
                 return new Merged("", List.of(), List.of());
             }
             String offered = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            if (!java.nio.file.Files.exists(file)) {
-                java.nio.file.Files.createDirectories(file.toAbsolutePath().getParent());
-                java.nio.file.Files.writeString(file, merge(offered, offered, section, fields).text());
+            java.util.Optional<String> now = store.readText();
+            if (now.isEmpty()) {
+                store.writeTextIfAbsent(merge(offered, offered, section, fields).text());
                 return new Merged("", List.of(), List.of());
             }
-            String now = java.nio.file.Files.readString(file);
-            Merged merged = merge(now, offered, section, fields);
-            if (merged.changed() || !now.contains(SEEN)) {
-                java.nio.file.Path writing = file.resolveSibling(file.getFileName() + ".writing");
-                java.nio.file.Files.writeString(writing, merged.text());
-                java.nio.file.Files.move(writing, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            Merged merged = merge(now.get(), offered, section, fields);
+            if (merged.changed() || !now.get().contains(SEEN)) {
+                store.writeText(merged.text());
             }
             return merged;
         } catch (java.io.IOException failed) {

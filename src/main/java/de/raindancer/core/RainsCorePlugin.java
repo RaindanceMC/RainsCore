@@ -387,12 +387,30 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     public void onEnable() {
         long startedAt = System.nanoTime();
         instance = this;
-        firstRun = !Files.exists(getDataFolder().toPath().resolve("config.yml"));
 
         // Before everything: which server this is on its network, and where the network's data is.
         network = de.raindancer.core.platform.network.NetworkConfig.load(getDataFolder().toPath(), System.getenv(),
                 () -> getServer().getPort() > 0 ? "server_" + getServer().getPort() : "server");
         network.problems().forEach(problem -> log.warn("network.yml: {}", problem));
+
+        // The database next, before any setting is read: from 2.0.0 every YAML document of every plugin —
+        // config.yml included — is a row in it, brought over from its 1.x file the first time it is used.
+        databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread());
+        // On a network: which server this is, for places and seeds kept per server; and the bus the
+        // servers tell each other what changed on. A server on its own keeps both blank and silent.
+        if (network.isNetwork()) {
+            de.raindancer.core.platform.network.ThisServer.set(network.serverId());
+            bus = de.raindancer.core.platform.network.PostgresBus.start(databases.pool(), network.serverId(),
+                    BUS_CHANNEL, java.time.Duration.ofSeconds(1));
+        } else {
+            de.raindancer.core.platform.network.ThisServer.set("");
+            bus = de.raindancer.core.platform.network.LocalBus.alone(network.serverId());
+        }
+        de.raindancer.core.data.store.Documents.install(new de.raindancer.core.data.store.Documents(
+                databases.of(de.raindancer.core.data.store.Documents.NAMESPACE, de.raindancer.core.data.store.Documents.SCHEMA),
+                bus, getDataFolder().toPath().toAbsolutePath().getParent(),
+                de.raindancer.core.platform.network.ThisServer.id(), System::currentTimeMillis));
+        firstRun = !new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("config.yml")).exists();
 
         // Settings first: everything after this reads them.
         settings = settingsFor(SettingsSchema.of(CoreConfig.class, CoreConfig.DEFAULTS),
@@ -419,17 +437,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // The guard is therefore armed at the end of onEnable rather than switched off. Passing a
         // supplier that always answers false would have disabled it for the whole run — a safety net
         // that never fires, which is worse than none because it reads as proof.
-        databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread());
-        // On a network: which server this is, for places and seeds kept per server; and the bus the
-        // servers tell each other what changed on. A server on its own keeps both blank and silent.
-        if (network.isNetwork()) {
-            de.raindancer.core.platform.network.ThisServer.set(network.serverId());
-            bus = de.raindancer.core.platform.network.PostgresBus.start(databases.pool(), network.serverId(),
-                    BUS_CHANNEL, java.time.Duration.ofSeconds(1));
-        } else {
-            de.raindancer.core.platform.network.ThisServer.set("");
-            bus = de.raindancer.core.platform.network.LocalBus.alone(network.serverId());
-        }
         audit = new Audit(databases.audit(), System::currentTimeMillis);
 
         // Before anything that says anything. The file is written out on the first start, and on every
@@ -479,9 +486,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         identities = new Identities(databases.core());
         identities.load();
         identities.connect(bus);
-        prefixes = new de.raindancer.core.ui.chat.PrefixService(
-                new de.raindancer.core.ui.chat.PrefixFile(getDataFolder().toPath().resolve("prefix.yml")));
+        de.raindancer.core.ui.chat.PrefixFile prefixFile =
+                new de.raindancer.core.ui.chat.PrefixFile(getDataFolder().toPath().resolve("prefix.yml"));
+        prefixes = new de.raindancer.core.ui.chat.PrefixService(prefixFile);
         prefixes.reload();
+        prefixFile.onChange(prefixes::reload);
         nicknames = new de.raindancer.core.ui.identity.Nicknames(databases.core());
         nicknames.load();
         nicknames.connect(bus);
@@ -590,6 +599,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         landPolicyStore = new LandPolicyStore(getDataFolder().toPath().resolve("land-flags.yml"));
         landPolicies = landPolicyStore.load();
         landPolicyStore.problem().ifPresent(trouble -> log.warn("land-flags.yml: {}", trouble));
+        // Another server's admin changed a flag: the same object every claim asks is brought in line, in place.
+        landPolicyStore.onChange(() -> landPolicies.restore(landPolicyStore.load().changed()));
         land = new Land(landPolicies, messages, System::currentTimeMillis);
         getServer().getPluginManager().registerEvents(new BlockProtectionListener(land), this);
         // Worlds a plugin locked (a hub, an arena) are enforced here, the same for every plugin that locks one.
@@ -717,8 +728,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         getServer().getPluginManager().registerEvents(new PlayerPowerListener(powers), this);
 
         vanish = new Vanish(new BukkitVanishSink(this));
-        playtime = new de.raindancer.core.social.presence.Playtime(getDataFolder().toPath().resolve("playtime.yml"));
+        playtime = new de.raindancer.core.social.presence.Playtime(databases.core());
         playtime.load();
+        // A 1.x server's playtime.yml, brought into the database once (its minutes added) and kept renamed.
+        playtime.importFrom(getDataFolder().toPath().resolve("playtime.yml"));
+        playtime.connect(bus);
         knownNames = new de.raindancer.core.social.presence.KnownNames(getDataFolder().toPath().resolve("known-names.yml"));
         knownNames.load();
         de.raindancer.core.platform.command.PlayerTargets.useKnownNames(knownNames);
@@ -1360,6 +1374,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (settings != null) {
             settings.save();
         }
+        // Before the databases close: a plugin disabled after Core must not find a store on a closed database.
+        de.raindancer.core.data.store.Documents.uninstall();
         if (bus != null) {
             // After the last flush has announced itself, before the pool it publishes through is closed.
             bus.close();
@@ -1941,24 +1957,27 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      * simply stop matching new ones; nothing else depends on it.
      */
     private byte[] addressKey() {
-        java.nio.file.Path file = getDataFolder().toPath().resolve("address-hash.key");
-        try {
-            if (java.nio.file.Files.isRegularFile(file)) {
-                byte[] kept = java.nio.file.Files.readAllBytes(file);
-                if (kept.length >= 16) {
-                    return kept;
-                }
-            }
-            byte[] fresh = new byte[32];
-            new java.security.SecureRandom().nextBytes(fresh);
-            java.nio.file.Files.createDirectories(file.getParent());
-            java.nio.file.Files.write(file, fresh);
-            return fresh;
-        } catch (java.io.IOException unwritable) {
-            getLogger().warning("Could not keep address-hash.key (" + unwritable.getMessage()
-                    + "); blocked joins are recorded without an address.");
-            return new byte[0];
+        // The network's one key, so a blocked join hashed on one server is recognised on all of them; a 1.x
+        // server's address-hash.key becomes it when it is the first.
+        return secrets().bytes("address-hash", 32, getDataFolder().toPath().resolve("address-hash.key"))
+                .orElseGet(() -> {
+                    log.warn("The address key could not be read from the database; blocked joins are recorded "
+                            + "without an address until it can.");
+                    return new byte[0];
+                });
+    }
+
+    private volatile de.raindancer.core.data.store.Secrets secrets;
+
+    /** Secrets the servers of a network share — made once, kept in the database. */
+    @Override
+    public de.raindancer.core.data.store.Secrets secrets() {
+        de.raindancer.core.data.store.Secrets here = secrets;
+        if (here == null) {
+            here = new de.raindancer.core.data.store.Secrets(databases.core(), System::currentTimeMillis);
+            secrets = here;
         }
+        return here;
     }
 
     @Override

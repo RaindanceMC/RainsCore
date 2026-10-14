@@ -39,8 +39,9 @@ public final class Changelog {
     private volatile boolean dirty;
 
     public Changelog(Path entriesFile, Path seenFile, LongSupplier clock) {
-        this.entriesFile = new YamlStore(entriesFile);
-        this.seenFile = new YamlStore(seenFile);
+        // One changelog for the network, and what each player has seen of it wherever they read it.
+        this.entriesFile = YamlStore.network(entriesFile);
+        this.seenFile = YamlStore.network(seenFile);
         this.clock = clock;
     }
 

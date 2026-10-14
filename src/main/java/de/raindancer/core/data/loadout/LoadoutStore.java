@@ -139,6 +139,7 @@ public final class LoadoutStore {
     }
 
     private YamlStore file(UUID owner) {
-        return files.computeIfAbsent(owner, id -> new YamlStore(folder.resolve(id + ".yml")));
+        // A player's loadouts are theirs on every server of the network; read fresh on every load.
+        return files.computeIfAbsent(owner, id -> YamlStore.network(folder.resolve(id + ".yml")));
     }
 }

@@ -50,29 +50,36 @@ public final class LandPolicyStore {
     private static final String FLAGS = "flags";
 
     private final Path file;
+    /** The network's one set of decisions: a flag forced off on one server is forced off on all of them. */
+    private final YamlStore store;
     private volatile String problem;
 
     public LandPolicyStore(Path file) {
         this.file = file;
+        this.store = file == null ? null : YamlStore.network(file);
+    }
+
+    /** Runs {@code reload} when another server changes the decisions. */
+    public void onChange(Runnable reload) {
+        if (store != null) {
+            store.onChange(reload);
+        }
     }
 
     /** What the file says, or everything as it ships when there is no file. */
     public LandPolicies load() {
         LandPolicies policies = LandPolicies.builtIn();
         problem = null;
-        if (file == null || !Files.isRegularFile(file)) {
+        if (store == null || !store.exists()) {
             return policies;
         }
 
-        YamlConfiguration yaml = new YamlConfiguration();
-        try {
-            yaml.loadFromString(Files.readString(file));
-        } catch (Exception broken) {
-            problem = file.getFileName() + " could not be read (" + broken.getMessage()
-                    + "); every flag is at its built-in setting";
+        YamlConfiguration yaml = store.read();
+        if (!store.problems().isEmpty()) {
+            String why = String.join("; ", store.problems());
+            problem = file.getFileName() + " could not be read (" + why + "); every flag is at its built-in setting";
             log.warn("{} could not be read ({}). Every flag is at its built-in setting until this is "
-                    + "fixed — your saved flag decisions are NOT being applied.",
-                    file.getFileName(), broken.getMessage());
+                    + "fixed — your saved flag decisions are NOT being applied.", file.getFileName(), why);
             return policies;
         }
 
@@ -112,11 +119,11 @@ public final class LandPolicyStore {
         if (file == null) {
             return;
         }
-        if (problem != null && Files.isRegularFile(file)) {
+        if (problem != null && store.exists()) {
             // Loaded as built-ins because it would not parse: what is in memory is not what the admin
             // decided, and writing it — or deleting the file for having "no changes" — loses every
             // decision in there. Set aside first, and refuse if even that fails.
-            if (new YamlStore(file).quarantine().isEmpty()) {
+            if (store.quarantine().isEmpty()) {
                 throw new IOException(file.getFileName() + " could not be read and could not be set "
                         + "aside, so it was not written over");
             }
@@ -126,13 +133,15 @@ public final class LandPolicyStore {
         if (changed.isEmpty()) {
             // Not an empty file: no file. An admin who undid every change should not be left with
             // something on disk implying they made one.
-            Files.deleteIfExists(file);
+            if (!store.delete()) {
+                throw new IOException(file.getFileName() + " could not be removed");
+            }
             return;
         }
 
         // Through YamlStore: a temporary, then an atomic move. Written in place, a crash or a full disk
         // mid-write left half a file, and every flag fell back to its built-in on the next start.
-        boolean written = new YamlStore(file).write(yaml -> {
+        boolean written = store.write(yaml -> {
             yaml.options().setHeader(List.of(
                     "What this server decided about the land flags.",
                     "",

@@ -52,7 +52,13 @@ public final class CustomItems {
 
     public CustomItems(Path file) {
         this.file = file;
-        this.store = new YamlStore(file);
+        // The network's one catalogue: an item defined on one server exists on all of them.
+        this.store = YamlStore.network(file);
+        // Changed elsewhere: what was changed here goes on top first, then everything is read again.
+        this.store.onChange(() -> {
+            flush();
+            load();
+        });
     }
 
     // ---------------------------------------------------------------------------- defining

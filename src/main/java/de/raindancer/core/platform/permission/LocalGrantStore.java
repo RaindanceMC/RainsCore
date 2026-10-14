@@ -33,7 +33,12 @@ final class LocalGrantStore implements GrantStore {
     private final AtomicBoolean dirty = new AtomicBoolean();
 
     LocalGrantStore(Path folder) {
-        this.store = new YamlStore(folder.resolve("grants.yml"));
+        // What a player was granted is theirs on every server of the network.
+        this.store = YamlStore.network(folder.resolve("grants.yml"));
+        this.store.onChange(() -> {
+            flush();
+            load();
+        });
     }
 
     @Override

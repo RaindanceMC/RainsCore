@@ -27,7 +27,14 @@ public final class KnownNames {
     private volatile boolean dirty;
 
     public KnownNames(Path file) {
-        this.file = new YamlStore(file);
+        // One directory of names for the network, each server adding the names it saw; read again when another adds.
+        this.file = YamlStore.network(file);
+        this.file.onChange(() -> {
+            if (dirty) {
+                save();
+            }
+            load();
+        });
     }
 
     public void load() {

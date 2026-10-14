@@ -610,6 +610,11 @@ public interface RainsCore {
      * What this server is called, for anything that names it to a player — the owner's server-name setting,
      * else the MOTD's first line. Plain text, never empty.
      */
+    /** Secrets every server of the network shares — the banknote seal, the address-hash key. */
+    default de.raindancer.core.data.store.Secrets secrets() {
+        throw new UnsupportedOperationException("this core keeps no secrets");
+    }
+
     /**
      * How the servers of this network tell each other that something changed: a store writes, then
      * publishes {@code (topic, key)}, and every other server reads that key again. A module whose data

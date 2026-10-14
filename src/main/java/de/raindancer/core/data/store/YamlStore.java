@@ -17,7 +17,16 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * A YAML file on disk, read and written without losing it.
+ * A YAML document, read and written without losing it — a row in the database once Core runs (2.0.0),
+ * a file on disk otherwise.
+ *
+ * <h2>In the database</h2>
+ * With Core running, a store whose file is under the plugins folder keeps its document in Core's database
+ * instead ({@link Documents}), named by that path. The first time it is used, an existing 1.x file is
+ * brought in and renamed {@code *.imported-2.0.0}. Writes state the version they read; when another
+ * server wrote in between, this write is merged onto theirs value by value and tried again. A document is
+ * this server's by default — as its file was — or the whole network's ({@link #network(Path)}).
+ * Everything below about files applies to a file outside the plugins folder, and to tests without Core.
  *
  * <h2>Why this exists</h2>
  * Because the same twenty lines were written seven times in this library alone — {@code PoiStore},
@@ -65,17 +74,73 @@ public final class YamlStore {
     /** Whether the last read found a file it could not parse — one a write must not replace. */
     private boolean unreadable;
 
+    /** Set when the document lives in the database; null keeps it a file. */
+    private final Documents documents;
+    private final Documents.Address address;
+
+    /** What this store last read or wrote of its document — the base a write is merged from. */
+    private volatile String baseBody = "";
+    private volatile long baseVersion;
+    private volatile boolean baseKnown;
+
+    /** How often a write is tried again when other writers keep getting in first. */
+    private static final int ATTEMPTS = 8;
+    private static final String IMPORTED = ".imported-2.0.0";
+
+    /** This server's document, kept in the database when Core runs; a file otherwise. */
     public YamlStore(Path file) {
+        this(file, Documents.installed().orElse(null), Documents.Scope.SERVER);
+    }
+
+    /** One document for the whole network: every server reads and writes the same one. */
+    public static YamlStore network(Path file) {
+        return new YamlStore(file, Documents.installed().orElse(null), Documents.Scope.NETWORK);
+    }
+
+    /** A store on {@code documents} rather than the installed ones — for tests, and for Core itself. */
+    public YamlStore(Path file, Documents documents, Documents.Scope scope) {
         this.lock = file == null ? new Object()
                 : LOCKS.computeIfAbsent(file.toAbsolutePath().normalize(), key -> new Object());
         this.file = file;
+        this.documents = documents;
+        this.address = documents == null || file == null ? null
+                : documents.addressOf(file, scope == null ? Documents.Scope.SERVER : scope).orElse(null);
     }
+
+    /** Whether the document is kept in the database rather than in its file. */
+    public boolean inDatabase() {
+        return address != null;
+    }
+
+    /**
+     * Runs {@code listener} whenever the document is written by somebody else — another store on it, or
+     * another server of the network. For a store that keeps what it read and has to read it again.
+     */
+    public de.raindancer.core.platform.network.NetworkBus.Subscription onChange(Runnable listener) {
+        if (address == null) {
+            return () -> { };
+        }
+        // Not for this store's own writes: it knows what it wrote, and reloading in the middle of its own
+        // write would throw away whatever it changed since.
+        return documents.listen(address, () -> {
+            if (WRITING.get() != this) {
+                listener.run();
+            }
+        });
+    }
+
+    /** The store writing on this thread right now, so its own listener can tell its own write from others'. */
+    private static final ThreadLocal<YamlStore> WRITING = new ThreadLocal<>();
 
     public Path file() {
         return file;
     }
 
     public boolean exists() {
+        if (address != null) {
+            bringInFile();
+            return documents.read(address) instanceof Documents.Found;
+        }
         return file != null && Files.isRegularFile(file);
     }
 
@@ -97,6 +162,9 @@ public final class YamlStore {
         synchronized (this) {
             problems.clear();
             unreadable = false;
+        }
+        if (address != null) {
+            return readDocument();
         }
         if (file == null || !Files.isRegularFile(file)) {
             return new YamlConfiguration();
@@ -135,6 +203,9 @@ public final class YamlStore {
         if (file == null || contents == null) {
             return false;
         }
+        if (address != null) {
+            return writeDocument(contents);
+        }
         return put(new YamlConfiguration(), contents);
     }
 
@@ -155,6 +226,9 @@ public final class YamlStore {
         if (file == null || change == null) {
             return false;
         }
+        if (address != null) {
+            return updateDocument(change);
+        }
         synchronized (lock) {
             YamlConfiguration current = read();
             if (unreadable) {
@@ -170,18 +244,27 @@ public final class YamlStore {
     }
 
     private boolean put(YamlConfiguration yaml, Consumer<YamlConfiguration> contents) {
+        return put(yaml, contents, null);
+    }
+
+    /** {@code exactText}, when given, is written as it is instead of the YAML built by {@code contents}. */
+    private boolean put(YamlConfiguration yaml, Consumer<YamlConfiguration> contents, String exactText) {
         synchronized (lock) {
-            return putLocked(yaml, contents);
+            return putLocked(yaml, contents, exactText);
         }
     }
 
-    private boolean putLocked(YamlConfiguration yaml, Consumer<YamlConfiguration> contents) {
+    private boolean putLocked(YamlConfiguration yaml, Consumer<YamlConfiguration> contents, String exactText) {
         // The contents are built under the same lock as the move, so two writers cannot each read
         // what they know and then land in the opposite order — the older picture last.
         String text;
         try {
-            contents.accept(yaml);
-            text = yaml.saveToString();
+            if (exactText != null) {
+                text = exactText;
+            } else {
+                contents.accept(yaml);
+                text = yaml.saveToString();
+            }
         } catch (RuntimeException failure) {
             // Nothing has been touched yet, so there is nothing to undo — which is the reason the
             // caller's work happens before the file is opened rather than into it.
@@ -249,6 +332,9 @@ public final class YamlStore {
      * @return where it was put, or empty when there was nothing to move
      */
     public synchronized Optional<Path> quarantine() {
+        if (address != null) {
+            return quarantineDocument();
+        }
         if (file == null || !Files.isRegularFile(file)) {
             return Optional.empty();
         }
@@ -271,5 +357,353 @@ public final class YamlStore {
             problems.add(problem);
         }
         log.warn("{}: {}", file == null ? "?" : file.getFileName(), problem);
+    }
+
+    /** Removes the document — or the file — altogether. True when it is gone, also when it never was. */
+    public boolean delete() {
+        if (file == null) {
+            return true;
+        }
+        if (address != null) {
+            bringInFile();
+            synchronized (lock) {
+                baseKnown = false;
+                return asThisStore(() -> documents.delete(address));
+            }
+        }
+        synchronized (lock) {
+            try {
+                Files.deleteIfExists(file);
+                return true;
+            } catch (IOException failure) {
+                log.error(failure, "Could not delete {}.", file);
+                return false;
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------- as text
+
+    /**
+     * The document as the text it is, comments and order included — for a store that edits it line by line
+     * rather than as YAML. Empty when there is none or it cannot be read.
+     */
+    public Optional<String> readText() {
+        if (address != null) {
+            bringInFile();
+            return documents.read(address) instanceof Documents.Found found ? Optional.of(found.body()) : Optional.empty();
+        }
+        if (file == null || !Files.isRegularFile(file)) {
+            return Optional.empty();
+        }
+        try {
+            synchronized (this) {
+                return Optional.of(Files.readString(file));
+            }
+        } catch (IOException unreadableFile) {
+            note("could not be read (" + unreadableFile.getMessage() + ")");
+            return Optional.empty();
+        }
+    }
+
+    /** Writes the document as {@code text}, exactly — nothing parsed, nothing merged. */
+    public boolean writeText(String text) {
+        if (file == null || text == null) {
+            return false;
+        }
+        if (address != null) {
+            synchronized (lock) {
+                for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
+                    Documents.Read now = documents.read(address);
+                    if (now instanceof Documents.Failed) {
+                        return false;
+                    }
+                    boolean written = now instanceof Documents.Found found
+                            ? asThisStore(() -> documents.compareAndSet(address, found.version(), text))
+                            : asThisStore(() -> documents.insertIfAbsent(address, text));
+                    if (written) {
+                        baseKnown = false;
+                        return true;
+                    }
+                    if (!documents.isUsable()) {
+                        return false;
+                    }
+                }
+                return false;
+            }
+        }
+        return put(new YamlConfiguration(), ignored -> { }, text);
+    }
+
+    /** Writes {@code text} only when there is no document yet; false when there is one, or on failure. */
+    public boolean writeTextIfAbsent(String text) {
+        if (file == null || text == null) {
+            return false;
+        }
+        if (address != null) {
+            bringInFile();
+            return asThisStore(() -> documents.insertIfAbsent(address, text));
+        }
+        if (Files.isRegularFile(file)) {
+            return false;
+        }
+        return put(new YamlConfiguration(), ignored -> { }, text);
+    }
+
+    // ---------------------------------------------------------------------------- in the database
+
+    private YamlConfiguration readDocument() {
+        bringInFile();
+        Documents.Read read = documents.read(address);
+        if (read instanceof Documents.Failed failed) {
+            synchronized (this) {
+                unreadable = true;
+            }
+            note("could not be read (" + failed.why() + ")");
+            return new YamlConfiguration();
+        }
+        if (read instanceof Documents.Absent) {
+            remember("", 0);
+            return new YamlConfiguration();
+        }
+        Documents.Found found = (Documents.Found) read;
+        Optional<YamlConfiguration> parsed = parse(found.body());
+        if (parsed.isEmpty()) {
+            synchronized (this) {
+                unreadable = true;
+            }
+            note("could not be read (it is not valid YAML)");
+            return new YamlConfiguration();
+        }
+        remember(found.body(), found.version());
+        return parsed.get();
+    }
+
+    private boolean writeDocument(Consumer<YamlConfiguration> contents) {
+        bringInFile();
+        synchronized (lock) {
+            YamlConfiguration mine = new YamlConfiguration();
+            String body;
+            try {
+                contents.accept(mine);
+                body = mine.saveToString();
+            } catch (RuntimeException failure) {
+                log.error(failure, "Could not build the contents of {}; it is unchanged.", address.key());
+                return false;
+            }
+            if (unreadable && quarantineDocument().isEmpty()) {
+                log.error("Not writing {}: it could not be read, and could not be set aside either.", address.key());
+                return false;
+            }
+            for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
+                Documents.Read now = documents.read(address);
+                if (now instanceof Documents.Failed failed) {
+                    log.error("Could not write {} ({}); it is unchanged.", address.key(), failed.why());
+                    return false;
+                }
+                if (now instanceof Documents.Absent) {
+                    if (asThisStore(() -> documents.insertIfAbsent(address, body))) {
+                        remember(body, 1);
+                        return true;
+                    }
+                    if (!documents.isUsable()) {
+                        return false;
+                    }
+                    continue;
+                }
+                Documents.Found found = (Documents.Found) now;
+                String toWrite = body;
+                if (baseKnown && found.version() != baseVersion) {
+                    // Somebody wrote since this store read: what this store changed goes on top of theirs.
+                    Optional<YamlConfiguration> theirs = parse(found.body());
+                    Optional<YamlConfiguration> base = parse(baseBody);
+                    if (theirs.isPresent() && base.isPresent()) {
+                        YamlMerge.Result merged = YamlMerge.threeWay(base.get(), mine, theirs.get());
+                        if (!merged.conflicts().isEmpty()) {
+                            log.warn("{}: written over a change made elsewhere at {}", address.key(),
+                                    String.join(", ", merged.conflicts()));
+                        }
+                        toWrite = merged.yaml().saveToString();
+                    }
+                }
+                String merged = toWrite;
+                if (asThisStore(() -> documents.compareAndSet(address, found.version(), merged))) {
+                    remember(toWrite, found.version() + 1);
+                    return true;
+                }
+                if (!documents.isUsable()) {
+                    return false;
+                }
+            }
+            log.error("{} was being written by others the whole time; this write was given up after {} tries.",
+                    address.key(), ATTEMPTS);
+            return false;
+        }
+    }
+
+    private boolean updateDocument(Consumer<YamlConfiguration> change) {
+        bringInFile();
+        synchronized (lock) {
+            for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
+                Documents.Read now = documents.read(address);
+                if (now instanceof Documents.Failed failed) {
+                    log.error("{} could not be read ({}), so this change was not written to it.", address.key(),
+                            failed.why());
+                    return false;
+                }
+                YamlConfiguration current;
+                long version = 0;
+                if (now instanceof Documents.Found found) {
+                    Optional<YamlConfiguration> parsed = parse(found.body());
+                    if (parsed.isEmpty()) {
+                        log.error("{} is not valid YAML, so this change was not written to it. Fix it (export, edit, "
+                                + "import) and the next change will be kept.", address.key());
+                        return false;
+                    }
+                    current = parsed.get();
+                    version = found.version();
+                } else {
+                    current = new YamlConfiguration();
+                }
+                String body;
+                try {
+                    change.accept(current);
+                    body = current.saveToString();
+                } catch (RuntimeException failure) {
+                    log.error(failure, "Could not build the contents of {}; it is unchanged.", address.key());
+                    return false;
+                }
+                long expected = version;
+                boolean written = asThisStore(() -> expected == 0
+                        ? documents.insertIfAbsent(address, body)
+                        : documents.compareAndSet(address, expected, body));
+                if (written) {
+                    remember(body, version == 0 ? 1 : version + 1);
+                    return true;
+                }
+                if (!documents.isUsable()) {
+                    return false;
+                }
+            }
+            log.error("{} was being written by others the whole time; this change was given up after {} tries.",
+                    address.key(), ATTEMPTS);
+            return false;
+        }
+    }
+
+    private Optional<Path> quarantineDocument() {
+        Documents.Read read = documents.read(address);
+        if (!(read instanceof Documents.Found found)) {
+            return Optional.empty();
+        }
+        String keptName = address.name() + ".broken-" + STAMP.format(LocalDateTime.now());
+        Documents.Address kept = new Documents.Address(address.scope(), address.owner(), keptName);
+        if (!documents.insertIfAbsent(kept, found.body()) || !documents.delete(address)) {
+            log.error("Could not set aside the unreadable document {}", address.key());
+            return Optional.empty();
+        }
+        synchronized (this) {
+            unreadable = false;
+        }
+        baseKnown = false;
+        log.warn("{} could not be read and has been kept as {} rather than written over.", address.key(), keptName);
+        return Optional.of(file.resolveSibling(file.getFileName() + keptName.substring(address.name().length())));
+    }
+
+    /**
+     * The first time this document is used in a run: a file left from 1.x is brought into the database and
+     * renamed {@code *.imported-2.0.0} — never deleted. When the document already has content (another
+     * server of the network brought its own file in first), what is there wins and the file adds the rest.
+     */
+    private void bringInFile() {
+        if (file == null || !Files.isRegularFile(file) || !documents.firstTimeFor(address)) {
+            return;
+        }
+        String text;
+        try {
+            text = Files.readString(file);
+        } catch (IOException unreadableFile) {
+            log.error(unreadableFile, "{} could not be read, so it was not moved into the database.", file);
+            return;
+        }
+        Optional<YamlConfiguration> fromFile = parse(text);
+        if (fromFile.isEmpty()) {
+            log.error("{} is not valid YAML, so it was not moved into the database. Fix it and restart.", file);
+            return;
+        }
+        for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
+            Documents.Read now = documents.read(address);
+            if (now instanceof Documents.Failed failed) {
+                log.error("{} could not be moved into the database ({}); it stays a file until it can.", file,
+                        failed.why());
+                return;
+            }
+            if (now instanceof Documents.Absent) {
+                if (documents.insertIfAbsent(address, text)) {
+                    retire(file, "moved into the database");
+                    return;
+                }
+                continue;
+            }
+            Documents.Found found = (Documents.Found) now;
+            Optional<YamlConfiguration> stored = parse(found.body());
+            if (stored.isEmpty()) {
+                log.error("{} in the database is not valid YAML, so {} was not merged into it.", address.key(), file);
+                return;
+            }
+            YamlMerge.Result merged = YamlMerge.importInto(fromFile.get(), stored.get());
+            String body = merged.yaml().saveToString();
+            if (body.equals(stored.get().saveToString()) || documents.compareAndSet(address, found.version(), body)) {
+                if (!merged.conflicts().isEmpty()) {
+                    log.warn("{}: kept what the database had at {} over this server's file", address.key(),
+                            String.join(", ", merged.conflicts()));
+                }
+                retire(file, "merged into the database");
+                return;
+            }
+        }
+        log.error("{} could not be merged into the database; it stays a file and is tried again next start.", file);
+    }
+
+    private static void retire(Path file, String what) {
+        Path kept = file.resolveSibling(file.getFileName() + IMPORTED);
+        if (Files.exists(kept)) {
+            kept = file.resolveSibling(file.getFileName() + IMPORTED + "-" + STAMP.format(LocalDateTime.now()));
+        }
+        try {
+            Files.move(file, kept);
+            log.info("{} was {}; the file is kept as {}.", file.getFileName(), what, kept.getFileName());
+        } catch (IOException failure) {
+            log.warn("{} was {}, but could not be renamed ({}); it will be merged again next start, which "
+                    + "changes nothing.", file, what, failure.getMessage());
+        }
+    }
+
+    private boolean asThisStore(java.util.function.BooleanSupplier write) {
+        YamlStore before = WRITING.get();
+        WRITING.set(this);
+        try {
+            return write.getAsBoolean();
+        } finally {
+            WRITING.set(before);
+        }
+    }
+
+    private void remember(String body, long version) {
+        synchronized (lock) {
+            baseBody = body;
+            baseVersion = version;
+            baseKnown = true;
+        }
+    }
+
+    private static Optional<YamlConfiguration> parse(String body) {
+        YamlConfiguration yaml = new YamlConfiguration();
+        try {
+            yaml.loadFromString(body == null ? "" : body);
+            return Optional.of(yaml);
+        } catch (InvalidConfigurationException | RuntimeException broken) {
+            return Optional.empty();
+        }
     }
 }

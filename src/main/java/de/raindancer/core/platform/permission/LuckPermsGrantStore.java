@@ -74,7 +74,12 @@ final class LuckPermsGrantStore implements GrantStore {
 
     LuckPermsGrantStore(Path folder, LuckPerms luckPerms) {
         this.luckPerms = luckPerms;
-        this.ledgerStore = new YamlStore(folder.resolve("grants-luckperms.yml"));
+        // LuckPerms shares the grants over its own messaging; the ledger of what Rain granted is the network's too.
+        this.ledgerStore = YamlStore.network(folder.resolve("grants-luckperms.yml"));
+        this.ledgerStore.onChange(() -> {
+            flush();
+            load();
+        });
     }
 
     @Override

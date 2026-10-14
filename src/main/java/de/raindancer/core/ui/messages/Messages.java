@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.messages;
 
+import de.raindancer.core.data.store.YamlStore;
+
 import net.kyori.adventure.audience.Audience;
 import de.raindancer.core.platform.log.Log;
 import de.raindancer.core.platform.log.LogChannel;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -237,9 +240,10 @@ public final class Messages {
         shipped = Map.copyOf(defaults);
 
         Map<String, Object> owner = new LinkedHashMap<>();
-        if (file != null && Files.isRegularFile(file)) {
+        Optional<String> ownersText = text();
+        if (ownersText.isPresent()) {
             try {
-                flatten(parse(Files.readString(file)), "", owner);
+                flatten(parse(ownersText.get()), "", owner);
             } catch (Exception broken) {
                 // Their file, their mistake — and it costs them the translation rather than every
                 // message the plugin has.
@@ -291,16 +295,11 @@ public final class Messages {
      * @return whether a file was written
      */
     public boolean writeIfMissing(InputStream bundledDefaults) {
-        if (file == null || bundledDefaults == null || Files.isRegularFile(file)) {
+        if (file == null || bundledDefaults == null || text().isPresent()) {
             return false;
         }
         try (InputStream stream = bundledDefaults) {
-            Path parent = file.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            Files.copy(stream, file);
-            return true;
+            return document().writeTextIfAbsent(new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
         } catch (IOException failure) {
             log.warn("Could not write {} ({}); the built-in messages are being used.",
                     file, failure.getMessage());
@@ -341,7 +340,7 @@ public final class Messages {
         if (file == null || bundledDefaults == null) {
             return -2;
         }
-        if (!Files.isRegularFile(file)) {
+        if (text().isEmpty()) {
             return writeIfMissing(bundledDefaults) ? -1 : -2;
         }
 
@@ -357,7 +356,7 @@ public final class Messages {
         String text;
         Map<String, Object> owned = new LinkedHashMap<>();
         try {
-            text = Files.readString(file);
+            text = text().orElseThrow(() -> new IOException("it is gone"));
             flatten(parse(text), "", owned);
         } catch (Exception broken) {
             // Deliberately not repaired. Somebody is mid-edit, or the disk filled during a write, and
@@ -382,19 +381,15 @@ public final class Messages {
             insert(lines, key, fromJar.get(key));
         }
 
-        try {
-            Path backup = file.resolveSibling(file.getFileName() + "."
-                    + LocalDateTime.now().format(
-                            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".bak");
-            Files.copy(file, backup);
-            Files.writeString(file, String.join("\n", lines));
-            log.info("Added {} new message(s) to {}; your wording was kept and the previous file is "
-                    + "beside it as {}.", added.size(), file.getFileName(), backup.getFileName());
-        } catch (IOException failure) {
-            log.warn("Could not update {} ({}); the built-in wording is used for the new messages.",
-                    file.getFileName(), failure.getMessage());
+        Path backup = file.resolveSibling(file.getFileName() + "."
+                + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + ".bak");
+        YamlStore before = document().inDatabase() ? YamlStore.network(backup) : new YamlStore(backup);
+        if (!before.writeText(text) || !document().writeText(String.join("\n", lines))) {
+            log.warn("Could not update {}; the built-in wording is used for the new messages.", file.getFileName());
             return -2;
         }
+        log.info("Added {} new message(s) to {}; your wording was kept and the previous one is kept as {}.",
+                added.size(), file.getFileName(), backup.getFileName());
         return added.size();
     }
 
@@ -1124,5 +1119,24 @@ public final class Messages {
                 into.put(path, value);
             }
         }
+    }
+
+    /**
+     * The owner's messages.yml: one document for the whole network (2.0.0), so a line reworded once reads the
+     * same on every server; a file when Core's documents are not installed.
+     */
+    private YamlStore document() {
+        YamlStore here = store;
+        if (here == null) {
+            here = YamlStore.network(file);
+            store = here;
+        }
+        return here;
+    }
+
+    private volatile YamlStore store;
+
+    private Optional<String> text() {
+        return file == null ? Optional.empty() : document().readText();
     }
 }

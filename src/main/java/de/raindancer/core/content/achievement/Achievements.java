@@ -108,7 +108,9 @@ public final class Achievements {
     public Achievements(Path file, Database database, LongSupplier clock) {
         this.database = database;
         this.file = file;
-        this.store = new YamlStore(file);
+        // The network's one set of definitions; read again when another server changes them.
+        this.store = YamlStore.network(file);
+        this.store.onChange(this::reloadDefinitions);
         this.clock = clock;
     }
 
@@ -387,6 +389,19 @@ public final class Achievements {
      * somebody wrote, and who <em>earned</em> it is something the server recorded. The two have
      * different owners and different failure modes, so they have different homes.
      */
+    /** The definitions again, after another server changed them — players' achievements are left as they are. */
+    private void reloadDefinitions() {
+        flushDefinitions();
+        YamlConfiguration yaml = store.read();
+        if (!store.problems().isEmpty()) {
+            return;
+        }
+        defined.clear();
+        unread.clear();
+        readDefinitions(yaml.getConfigurationSection("achievements"));
+        dirty.set(false);
+    }
+
     private void loadPlayers() {
         earned.clear();
         progress.clear();
