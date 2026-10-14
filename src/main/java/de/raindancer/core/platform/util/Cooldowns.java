@@ -70,7 +70,7 @@ public final class Cooldowns<K> {
      * A wait on players that follows them from server to server on a network — {@code /back}, {@code /home}:
      * anything a player could otherwise dodge by switching servers. On a server of its own, a plain one.
      *
-     * @param name what it is the wait for, unique across plugins ({@code "tpa.back"})
+     * @param name what it is the wait for, unique across plugins ({@code "tpa:back"})
      */
     public static Cooldowns<java.util.UUID> shared(String name) {
         return de.raindancer.core.platform.network.NetworkCooldowns.installed()
