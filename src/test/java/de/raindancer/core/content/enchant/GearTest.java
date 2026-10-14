@@ -153,7 +153,7 @@ class GearTest {
         org.assertj.core.api.Assertions.assertThat(Gear.AXES.matches("iron_sword")).isFalse();
         org.assertj.core.api.Assertions.assertThat(java.util.List.of(RainsEnchants.LIFESTEAL, RainsEnchants.EXECUTIONER,
                 RainsEnchants.BLEED, RainsEnchants.VENOM, RainsEnchants.CLEAVE, RainsEnchants.ARMOR_PIERCE,
-                RainsEnchants.BERSERK, RainsEnchants.OVERPOWER, RainsEnchants.UNDYING, RainsEnchants.FUSION))
+                RainsEnchants.BERSERK, RainsEnchants.OVERPOWER, RainsEnchants.UNDYING, RainsEnchants.FUSION, RainsEnchants.AUTOPILOT))
                 .allMatch(key -> key.startsWith("rainsenchants:")).doesNotHaveDuplicates();
     }
 

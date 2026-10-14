@@ -37,6 +37,7 @@ public final class RainsEnchants {
     public static final String OVERPOWER = "rainsenchants:overpower";
     public static final String UNDYING = "rainsenchants:undying";
     public static final String FUSION = "rainsenchants:fusion";
+    public static final String AUTOPILOT = "rainsenchants:autopilot";
 
     private RainsEnchants() {
     }
