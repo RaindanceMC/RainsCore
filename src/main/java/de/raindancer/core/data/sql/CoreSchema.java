@@ -248,7 +248,33 @@ public final class CoreSchema {
                 effects     TEXT    NOT NULL,
                 PRIMARY KEY (server, player)
             )""",
-            "CREATE INDEX saved_inventory_by_player ON saved_inventory (player, saved_at DESC)");
+            "CREATE INDEX saved_inventory_by_player ON saved_inventory (player, saved_at DESC)",
+            // 2.0.0: the network's servers (a heartbeat each) and who is on which.
+            """
+            CREATE TABLE network_server (
+                id           TEXT    PRIMARY KEY,
+                grp          TEXT    NOT NULL,
+                name         TEXT    NOT NULL,
+                started_at   INTEGER NOT NULL,
+                heartbeat_at INTEGER NOT NULL,
+                players      INTEGER NOT NULL
+            )""",
+            """
+            CREATE TABLE network_presence (
+                player     TEXT    PRIMARY KEY,
+                name       TEXT    NOT NULL,
+                name_lower TEXT    NOT NULL,
+                server     TEXT    NOT NULL,
+                vanished   INTEGER NOT NULL,
+                since      INTEGER NOT NULL
+            )""",
+            "CREATE INDEX network_presence_by_name ON network_presence (name_lower)",
+            // Vanish follows staff from server to server: still vanished when they arrive.
+            """
+            CREATE TABLE network_vanish (
+                player TEXT    PRIMARY KEY,
+                since  INTEGER NOT NULL
+            )""");
 
     /**
      * What was done.

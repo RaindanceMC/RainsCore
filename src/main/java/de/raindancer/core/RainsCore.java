@@ -606,10 +606,6 @@ public interface RainsCore {
         return java.util.Set.of();
     }
 
-    /**
-     * What this server is called, for anything that names it to a player — the owner's server-name setting,
-     * else the MOTD's first line. Plain text, never empty.
-     */
     /** Secrets every server of the network shares — the banknote seal, the address-hash key. */
     default de.raindancer.core.data.store.Secrets secrets() {
         throw new UnsupportedOperationException("this core keeps no secrets");
@@ -621,6 +617,14 @@ public interface RainsCore {
      */
     default de.raindancer.core.data.inventory.SavedInventories savedInventories() {
         throw new UnsupportedOperationException("this core keeps no inventories");
+    }
+
+    /**
+     * Everybody on the network and where — and a message to any of them on whichever server they are on.
+     * Empty on a server of its own (where {@link #playersElsewhere} and the link still answer, as in 1.x).
+     */
+    default java.util.Optional<de.raindancer.core.platform.network.NetworkPlayers> networkPlayers() {
+        return java.util.Optional.empty();
     }
 
     /**
@@ -640,6 +644,10 @@ public interface RainsCore {
         return de.raindancer.core.platform.network.NetworkConfig.STANDALONE;
     }
 
+    /**
+     * What this server is called, for anything that names it to a player — the owner's server-name setting,
+     * else the MOTD's first line. Plain text, never empty.
+     */
     default String serverName() {
         return de.raindancer.core.ui.text.ServerName.resolve("", "", org.bukkit.Bukkit.motd());
     }

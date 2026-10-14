@@ -156,6 +156,7 @@ public final class Vanish {
             departureWasFaked.add(who);
         }
         log.info("{} vanished.", who);
+        changed(who, true);
         return true;
     }
 
@@ -179,7 +180,26 @@ public final class Vanish {
             sink.announceArrival(who, Set.copyOf(maySee));
         }
         log.info("{} is visible again.", who);
+        changed(who, false);
         return true;
+    }
+
+    private final java.util.List<java.util.function.BiConsumer<UUID, Boolean>> listeners =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Told whenever somebody vanishes ({@code true}) or reappears — on the thread that did it. */
+    public void onChange(java.util.function.BiConsumer<UUID, Boolean> listener) {
+        listeners.add(listener);
+    }
+
+    private void changed(UUID who, boolean vanished) {
+        for (var listener : listeners) {
+            try {
+                listener.accept(who, vanished);
+            } catch (RuntimeException failed) {
+                log.error(failed, "A vanish listener failed for {}.", who);
+            }
+        }
     }
 
     /**

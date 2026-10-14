@@ -891,11 +891,20 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         resourcePacks = new ResourcePacks(getDataFolder().toPath().resolve("packs"),
                 new BukkitPackSink());
         startResourcePacks(settings.current());
-        link = de.raindancer.core.platform.link.NetworkLink.start(getDataFolder().toPath().resolve("link.yml"),
-                de.raindancer.core.platform.log.Log.of("link")).orElse(null);
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
-        peerLinks = de.raindancer.core.platform.link.NetworkLink.peers(linkFile, de.raindancer.core.platform.log.Log.of("link"));
-        linkServerName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
+        if (network.isNetwork()) {
+            // On a network every server reaches every other through the network's database: the two-server link
+            // of 1.x stands down, and link.yml is left as it is for a server that leaves the network again.
+            link = null;
+            peerLinks = java.util.Map.of();
+            linkServerName = "";
+            log.info("On a network: link.yml is not used; the servers talk through the network's database.");
+        } else {
+            link = de.raindancer.core.platform.link.NetworkLink.start(linkFile,
+                    de.raindancer.core.platform.log.Log.of("link")).orElse(null);
+            peerLinks = de.raindancer.core.platform.link.NetworkLink.peers(linkFile, de.raindancer.core.platform.log.Log.of("link"));
+            linkServerName = de.raindancer.core.platform.link.NetworkLink.serverName(linkFile);
+        }
         java.util.Map<String, de.raindancer.core.platform.link.ServerLink> allLinks = new java.util.LinkedHashMap<>();
         if (link != null) {
             allLinks.put("", link);
@@ -948,6 +957,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             rosterTimer = de.raindancer.core.platform.util.Scheduling.asyncTimer(this, 2, 5,
                     task -> rosters.values().forEach(each -> each.exchange().exceptionally(unreachable -> null)));
             tablists.elsewhere(this::playersByServer);
+        }
+        if (network.isNetwork()) {
+            startPresence();
         }
         if (!allLinks.isEmpty()) {
             fileSync = new de.raindancer.core.platform.link.FileSync(getDataFolder().toPath().getParent(),
@@ -1410,6 +1422,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Everybody still on, while the database is still open.
             inventoryCapture.saveEveryoneNow();
         }
+        if (presence != null) {
+            // Off the list at once rather than when the heartbeat goes stale.
+            presence.clearThisServer();
+            networkServers.leave();
+        }
         // Before the databases close: a plugin disabled after Core must not find a store on a closed database.
         de.raindancer.core.data.store.Documents.uninstall();
         if (bus != null) {
@@ -1821,8 +1838,67 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return profiles != null && linkFollows;
     }
 
+    // ---------------------------------------------------------------------------- the network's players
+
+    private volatile de.raindancer.core.platform.network.NetworkServers networkServers;
+    private volatile de.raindancer.core.platform.network.Presence presence;
+    private volatile de.raindancer.core.platform.network.NetworkPlayers networkPlayers;
+    /** Staff who were vanished when they left their last server, read before they are let in. */
+    private final java.util.Set<java.util.UUID> arrivingVanished = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Who is on which server of the network: a heartbeat for this server, a row for each player here, and
+     * the whole list read again every few seconds. Vanish follows staff from server to server.
+     */
+    private void startPresence() {
+        networkServers = new de.raindancer.core.platform.network.NetworkServers(databases.core(), network.serverId(),
+                network.group(), System::currentTimeMillis);
+        presence = new de.raindancer.core.platform.network.Presence(databases.core(), networkServers, System::currentTimeMillis);
+        presence.connect(bus);
+        networkPlayers = new de.raindancer.core.platform.network.NetworkPlayers(presence, networkServers, bus,
+                (player, key, values) -> {
+                    Player online = getServer().getPlayer(player);
+                    if (online == null) {
+                        return false;
+                    }
+                    Scheduling.entity(this, online, () -> messages.send(online, key, values.toArray()));
+                    return true;
+                });
+        vanish.onChange((who, vanished) -> Scheduling.async(this, () -> presence.vanished(who, vanished)));
+        Scheduling.async(this, () -> {
+            // Whatever a crash of this server left listed goes first.
+            presence.clearThisServer();
+            networkServers.heartbeat(serverName(), 0);
+            presence.refreshAll();
+        });
+        Scheduling.asyncTimer(this, 5, 5, task -> {
+            networkServers.heartbeat(serverName(), getServer().getOnlinePlayers().size());
+            presence.refreshAll();
+        });
+        tablists.elsewhere(this::playersByServer);
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+    public void onPreLoginForPresence(org.bukkit.event.player.AsyncPlayerPreLoginEvent event) {
+        if (presence != null && event.getLoginResult() == org.bukkit.event.player.AsyncPlayerPreLoginEvent.Result.ALLOWED
+                && presence.wasVanished(event.getUniqueId())) {
+            arrivingVanished.add(event.getUniqueId());
+        }
+    }
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.network.NetworkPlayers> networkPlayers() {
+        return java.util.Optional.ofNullable(networkPlayers);
+    }
+
     @Override
     public java.util.Set<String> playersElsewhere() {
+        if (networkPlayers != null) {
+            java.util.Set<String> names = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            networkPlayers.everyone(false).stream().filter(here -> !here.server().equals(networkPlayers.self()))
+                    .forEach(here -> names.add(here.name()));
+            return names;
+        }
         java.util.Set<String> all = new java.util.HashSet<>();
         rosters.values().forEach(each -> all.addAll(each.elsewhere()));
         return all;
@@ -1830,6 +1906,17 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public java.util.Map<String, java.util.Set<String>> playersByServer() {
+        if (networkPlayers != null) {
+            java.util.Map<String, java.util.Set<String>> byName = new java.util.TreeMap<>();
+            networkPlayers.byServer(false).forEach((server, here) -> {
+                if (!server.equals(networkPlayers.self())) {
+                    String shown = networkServers.byId(server).map(de.raindancer.core.platform.network.NetworkServers.Server::name)
+                            .orElse(server);
+                    here.forEach(each -> byName.computeIfAbsent(shown, key -> new java.util.TreeSet<>()).add(each.name()));
+                }
+            });
+            return byName;
+        }
         java.util.Map<String, java.util.Set<String>> byServer = new java.util.TreeMap<>();
         rosters.forEach((peerName, each) -> {
             String shown = !each.serverName().isBlank() ? each.serverName()
@@ -2189,6 +2276,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         offerOwnerHint(event.getPlayer());
+        if (presence != null) {
+            java.util.UUID id = event.getPlayer().getUniqueId();
+            if (arrivingVanished.remove(id) && !vanish.isVanished(id)) {
+                // Before anybody here has had a tick to see them: vanished on the last server, vanished here.
+                vanish.vanish(id);
+            }
+            boolean hidden = vanish.isVanished(id);
+            String name = event.getPlayer().getName();
+            Scheduling.async(this, () -> presence.joined(id, name, hidden));
+        }
         de.raindancer.core.platform.link.LinkProfiles following = profiles;
         if (following != null && linkFollows) {
             following.fetch(event.getPlayer().getUniqueId());
@@ -2288,6 +2385,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        if (presence != null) {
+            java.util.UUID leaving = event.getPlayer().getUniqueId();
+            Scheduling.async(this, () -> presence.left(leaving));
+        }
         if (mentionCompletions != null) {
             mentionCompletions.forget(event.getPlayer().getUniqueId());
         }
