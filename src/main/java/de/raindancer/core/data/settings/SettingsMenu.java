@@ -237,6 +237,15 @@ public final class SettingsMenu extends Menu {
         return material;
     }
 
+    /** Asked again when a choice lands: where the value comes from may have changed while the chooser was open. */
+    private boolean mayStill(Setting<?> setting) {
+        if (navigation.registry().mayChange(viewer, setting.key())) {
+            return true;
+        }
+        chat.no(viewer, "<red>That is set for the whole network or a group of servers now; it was left as it was.");
+        return false;
+    }
+
     private void onClick(Setting<?> setting) {
         if (!navigation.registry().mayChange(viewer, setting.key())) {
             chat.raw(viewer, chat.prefixed("<red>That is set for the whole network or a group of servers; changing it "
@@ -253,6 +262,9 @@ public final class SettingsMenu extends Menu {
             case NEEDS_MATERIAL_CHOICE -> new ItemChooser(viewer, brand(), this,
                     "Choose " + setting.title(),
                     chosen -> {
+                        if (!mayStill(setting)) {
+                            return;
+                        }
                         navigation.registry().set(setting.key(), chosen.name());
                         SettingsSaving.saveThenTell(navigation.registry(), viewer);
                         refresh();
@@ -262,6 +274,9 @@ public final class SettingsMenu extends Menu {
                     NamedTextColor.NAMES.value(
                             navigation.registry().display(setting.key())),
                     chosen -> {
+                        if (!mayStill(setting)) {
+                            return;
+                        }
                         navigation.registry().set(setting.key(),
                                 NamedTextColor.NAMES.key(chosen));
                         SettingsSaving.saveThenTell(navigation.registry(), viewer);
@@ -290,6 +305,9 @@ public final class SettingsMenu extends Menu {
                     this, setting.title(), setting.choices(),
                     navigation.registry().display(setting.key()),
                     chosen -> {
+                        if (!mayStill(setting)) {
+                            return;
+                        }
                         navigation.registry().set(setting.key(), chosen);
                         SettingsSaving.saveThenTell(navigation.registry(), viewer);
                         refresh();
@@ -297,6 +315,9 @@ public final class SettingsMenu extends Menu {
             case NEEDS_NUMBER_CHOICE -> new AmountChooser(viewer, brand(),
                     this, setting.title(), currentNumber(setting), setting.min(), setting.max(),
                     chosen -> {
+                        if (!mayStill(setting)) {
+                            return;
+                        }
                         navigation.registry().set(setting.key(), String.valueOf(chosen));
                         SettingsSaving.saveThenTell(navigation.registry(), viewer);
                         refresh();

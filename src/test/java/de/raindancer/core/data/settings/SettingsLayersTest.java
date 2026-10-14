@@ -196,4 +196,15 @@ class SettingsLayersTest {
         assertThat(registry.mayChange(admin, "radius")).isTrue();
         assertThat(registry.mayChange(null, "radius")).as("code and the console").isTrue();
     }
+
+    @Test
+    @DisplayName("a group value on a server without a group is refused, never written as the network's")
+    void noGroupNoGroupValue() throws Exception {
+        oldFile("smp", "radius: 50\n");
+        store(documents("smp", "smp"), "smp", "");
+        SettingsStore<ChatConfig> lone = store(documents("lone", "lone"), "lone", "");
+        assertThat(lone.set("radius", "9", SettingsStore.Layer.GROUP)).isFalse();
+        assertThat(lone.current().radius()).isEqualTo(50);
+        assertThat(lone.layerOf("radius")).isEqualTo(SettingsStore.Layer.NETWORK);
+    }
 }

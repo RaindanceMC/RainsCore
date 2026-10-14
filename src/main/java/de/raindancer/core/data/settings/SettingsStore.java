@@ -359,8 +359,7 @@ public final class SettingsStore<T> {
         if (parsed.isEmpty() || !SettingCodec.isInRange(setting, parsed.get())) {
             return false;
         }
-        writeAt(setting, parsed.get(), layered ? layer : Layer.NETWORK);
-        return true;
+        return writeAt(setting, parsed.get(), layered ? layer : Layer.NETWORK);
     }
 
     /** Takes a group's or this server's own value away, so the next layer's applies again. */
@@ -375,21 +374,21 @@ public final class SettingsStore<T> {
         publish(effective());
     }
 
-    private void writeAt(Setting<?> setting, Object value, Layer layer) {
+    private boolean writeAt(Setting<?> setting, Object value, Layer layer) {
         if (!layered) {
             write(setting, value);
-            return;
+            return true;
         }
         switch (layer) {
             case SERVER -> serverOverrides.put(setting.key(), value);
             case GROUP -> {
                 if (groupStore == null) {
-                    networkValues.put(setting.key(), value);
-                    networkChanged.add(setting.key());
-                } else {
-                    groupOverrides.put(setting.key(), value);
-                    groupChanged.add(setting.key());
+                    // No group: refused, never quietly the network's — the right to change a group is not the
+                    // right to change every server.
+                    return false;
                 }
+                groupOverrides.put(setting.key(), value);
+                groupChanged.add(setting.key());
             }
             case NETWORK -> {
                 networkValues.put(setting.key(), value);
@@ -397,6 +396,7 @@ public final class SettingsStore<T> {
             }
         }
         publish(effective());
+        return true;
     }
 
     private YamlConfiguration readFile(List<String> found) {
