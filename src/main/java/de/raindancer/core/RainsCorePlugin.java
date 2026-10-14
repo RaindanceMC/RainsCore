@@ -405,7 +405,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
         // The database next, before any setting is read: from 2.0.0 every YAML document of every plugin —
         // config.yml included — is a row in it, brought over from its 1.x file the first time it is used.
-        databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread());
+        // Not while stopping either: every plugin's last flush runs on this thread then, before this one disables.
+        databases = openDatabases(() -> watchingThreads && getServer().isPrimaryThread() && !getServer().isStopping());
         // On a network: which server this is, for places and seeds kept per server; and the bus the
         // servers tell each other what changed on. A server on its own keeps both blank and silent.
         if (network.isNetwork()) {
