@@ -417,7 +417,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             bus = de.raindancer.core.platform.network.LocalBus.alone(network.serverId());
         }
         de.raindancer.core.data.store.Documents.install(new de.raindancer.core.data.store.Documents(
-                databases.of(de.raindancer.core.data.store.Documents.NAMESPACE, de.raindancer.core.data.store.Documents.SCHEMA),
+                databases.shared(de.raindancer.core.data.store.Documents.NAMESPACE, de.raindancer.core.data.store.Documents.SCHEMA),
                 bus, getDataFolder().toPath().toAbsolutePath().getParent(),
                 de.raindancer.core.platform.network.ThisServer.id(), System::currentTimeMillis));
         // Settings on a network come in layers: the network's, this group's, this server's own.
@@ -1033,7 +1033,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // and this is where the queue is turned into rows. Separate from the flushes below because
         // those write YAML on the main thread by design and this must not.
         chatLog = new de.raindancer.core.moderation.chatlog.ChatLog(
-                databases.of("chatlog", de.raindancer.core.moderation.chatlog.ChatLog.SCHEMA), System::currentTimeMillis);
+                databases.shared("chatlog", de.raindancer.core.moderation.chatlog.ChatLog.SCHEMA), System::currentTimeMillis);
         chatLog.enabled(settings.current().chatLogEnabled());
         getServer().getPluginManager().registerEvents(
                 new de.raindancer.core.moderation.chatlog.ChatLogListener(chatLog, messages,
@@ -1869,11 +1869,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /**
+     * Players whose kept data has not been put on them yet. Saving them before it is would write what this server
+     * had before they arrived, stamped newer, over what they brought — so they are not saved until it is.
+     */
+    private final java.util.Set<java.util.UUID> sharedArriving = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private volatile de.raindancer.core.platform.network.SharedPlayerData sharedData;
 
     /** A player's shared namespaces into the database, read on their thread, written off it, then announced. */
     private void keepSharedData(Player player) {
-        if (sharedData == null || sharedNamespaces.isEmpty()) {
+        if (sharedData == null || sharedNamespaces.isEmpty() || sharedArriving.contains(player.getUniqueId())) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -1897,16 +1902,22 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     /** What the network keeps of a player's shared namespaces, put on them here. Off the server's threads. */
     private void applySharedData(java.util.UUID id, java.util.Collection<String> namespaces) {
+        java.util.Map<String, byte[]> found = new java.util.LinkedHashMap<>();
         for (String namespace : namespaces) {
-            sharedData.read(id, namespace).ifPresent(kept -> {
-                Player online = getServer().getPlayer(id);
-                if (online != null) {
-                    Scheduling.entity(this, online, () -> de.raindancer.core.platform.link.PlayerDataPart.adopt(
-                            online.getPersistentDataContainer(), namespace,
-                            java.util.Map.of("bytes", java.util.Base64.getEncoder().encodeToString(kept.data()))));
-                }
-            });
+            sharedData.read(id, namespace).ifPresent(kept -> found.put(namespace, kept.data()));
         }
+        Player online = getServer().getPlayer(id);
+        if (online == null) {
+            sharedArriving.remove(id);
+            return;
+        }
+        // All of them in one go on the player's thread, and only then may this server save them.
+        Scheduling.entity(this, online, () -> {
+            found.forEach((namespace, data) -> de.raindancer.core.platform.link.PlayerDataPart.adopt(
+                    online.getPersistentDataContainer(), namespace,
+                    java.util.Map.of("bytes", java.util.Base64.getEncoder().encodeToString(data))));
+            sharedArriving.remove(id);
+        }, () -> sharedArriving.remove(id));
     }
 
     /** Staff who were vanished when they left their last server, read before they are let in. */
@@ -2387,6 +2398,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             String name = event.getPlayer().getName();
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
             if (!sharedNamespaces.isEmpty()) {
+                sharedArriving.add(id);
                 Scheduling.async(this, () -> applySharedData(id, java.util.List.copyOf(sharedNamespaces)));
             }
         }
@@ -2490,8 +2502,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         if (presence != null) {
-            // Read now, on their thread, while the data is still theirs here.
+            // Read now, on their thread, while the data is still theirs here — unless what they brought was never
+            // put on them; then the database keeps what it had.
             keepSharedData(event.getPlayer());
+            sharedArriving.remove(event.getPlayer().getUniqueId());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
         }

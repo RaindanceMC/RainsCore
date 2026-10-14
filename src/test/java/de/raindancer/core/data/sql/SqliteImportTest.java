@@ -234,4 +234,34 @@ class SqliteImportTest {
             })).as("not brought in a second time").contains(2);
         }
     }
+
+    @Test
+    @DisplayName("of() is this server's own namespace on a network; shared() the network's one")
+    void ofIsThisServersSharedIsTheNetworks() throws Exception {
+        String name = TestPostgres.freshNamespace("scoped");
+        PostgresPool pool = PostgresPool.open(TestPostgres.require().withPoolSize(3));
+        try (Databases smp = Databases.central(pool, "smp", () -> false, folder)) {
+            smp.of(name, SCHEMA).write(connection -> {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO thing (id, name) VALUES ('mine', 'smp only')");
+                }
+            });
+            smp.shared(name, SCHEMA).write(connection -> {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO thing (id, name) VALUES ('ours', 'everybody')");
+                }
+            });
+        }
+        PostgresPool other = PostgresPool.open(TestPostgres.require().withPoolSize(3));
+        try (Databases arena = Databases.central(other, "arena", () -> false, folder)) {
+            Database.Query<Integer> count = connection -> {
+                try (Statement statement = connection.createStatement(); var rows = statement.executeQuery("SELECT count(*) FROM thing")) {
+                    rows.next();
+                    return rows.getInt(1);
+                }
+            };
+            assertThat(arena.of(name, SCHEMA).read(count)).as("arena's own is empty").contains(0);
+            assertThat(arena.shared(name, SCHEMA).read(count)).contains(1);
+        }
+    }
 }

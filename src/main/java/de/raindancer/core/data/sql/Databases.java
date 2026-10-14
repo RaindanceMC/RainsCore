@@ -112,18 +112,42 @@ public final class Databases implements AutoCloseable {
      * first schema wins, because it is the one the tables were built from.
      */
     public Database of(String name, Schema schema) {
-        return open.computeIfAbsent(name, key -> {
+        // On a network: this server's own namespace, as its own <name>.db file was. A plugin whose stores were
+        // written for one server must not find a second server writing the same rows from a stale copy — it
+        // asks for shared() once its stores are safe for that.
+        return open(name, schema, isCentral() ? name + "_" + NetworkName.of(serverId) : name);
+    }
+
+    /**
+     * The network's one database of this name — every server reads and writes the same tables. Only for stores
+     * built for that: they refresh what other servers change and never write a stale copy back. On a server of
+     * its own it is the same file {@link #of} gives.
+     */
+    public Database shared(String name, Schema schema) {
+        return open(name, schema, name);
+    }
+
+    private Database open(String name, Schema schema, String namespace) {
+        return open.computeIfAbsent(namespace, key -> {
             if (!isCentral()) {
-                return Database.open(folder.resolve(key + ".db"), schema, onServerThread);
+                return Database.open(folder.resolve(name + ".db"), schema, onServerThread);
             }
             PostgresDatabase central = PostgresDatabase.open(pool, key, schema, onServerThread, serverId);
             // What this server kept in its own file before it joined the network comes along, once.
-            Path former = folder == null ? null : folder.resolve(key + ".db");
+            Path former = folder == null ? null : folder.resolve(name + ".db");
             if (central.isUsable() && former != null && java.nio.file.Files.isRegularFile(former)) {
                 SqliteImport.into(central, former, schema, serverId);
             }
             return central;
         });
+    }
+
+    /** A server id as part of a namespace: lower case letters, digits and _, short enough for Postgres' 63. */
+    private static final class NetworkName {
+        static String of(String serverId) {
+            String clean = serverId == null ? "" : serverId.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
+            return clean.length() > 30 ? clean.substring(0, 30) : clean;
+        }
     }
 
     /**
@@ -140,12 +164,12 @@ public final class Databases implements AutoCloseable {
      * code.
      */
     public Database core() {
-        return of(CORE, CoreSchema.CORE);
+        return shared(CORE, CoreSchema.CORE);
     }
 
     /** The audit journal, which is its own file because it only grows and is aged out. */
     public Database audit() {
-        return of(AUDIT, CoreSchema.AUDIT);
+        return shared(AUDIT, CoreSchema.AUDIT);
     }
 
     /** Whether a database is open and complete. */
