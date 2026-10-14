@@ -47,6 +47,8 @@ public final class Cooldowns<K> {
     private final LongSupplier clock;
 
     private volatile Duration between;
+    /** Told of every go recorded — how a cooldown that follows the player is written down. */
+    private final java.util.function.BiConsumer<K, Long> recorded;
 
     /** With the system clock, which is what production wants. */
     public Cooldowns() {
@@ -55,7 +57,32 @@ public final class Cooldowns<K> {
 
     /** @param clock milliseconds, and only ever asked for — never set */
     public Cooldowns(LongSupplier clock) {
+        this(clock, null);
+    }
+
+    /** @param recorded told of every go recorded, after it is; null for nobody */
+    public Cooldowns(LongSupplier clock, java.util.function.BiConsumer<K, Long> recorded) {
         this.clock = clock == null ? System::currentTimeMillis : clock;
+        this.recorded = recorded;
+    }
+
+    /**
+     * A wait on players that follows them from server to server on a network — {@code /back}, {@code /home}:
+     * anything a player could otherwise dodge by switching servers. On a server of its own, a plain one.
+     *
+     * @param name what it is the wait for, unique across plugins ({@code "tpa.back"})
+     */
+    public static Cooldowns<java.util.UUID> shared(String name) {
+        return de.raindancer.core.platform.network.NetworkCooldowns.installed()
+                .map(network -> network.of(name, System::currentTimeMillis))
+                .orElseGet(Cooldowns::new);
+    }
+
+    /** Takes in a go recorded elsewhere — a later one wins. For a cooldown that follows the player. */
+    public void restore(K who, long lastUsedAt) {
+        if (who != null) {
+            lastUsed.merge(who, lastUsedAt, Math::max);
+        }
     }
 
     // ------------------------------------------------------------------------ how long
@@ -109,6 +136,9 @@ public final class Cooldowns<K> {
             allowed.set(true);
             return now;
         });
+        if (allowed.get() && recorded != null) {
+            recorded.accept(who, now);
+        }
         return allowed.get();
     }
 
@@ -151,7 +181,11 @@ public final class Cooldowns<K> {
         if (who == null || between == null) {
             return;
         }
-        lastUsed.put(who, clock.getAsLong());
+        long now = clock.getAsLong();
+        lastUsed.put(who, now);
+        if (recorded != null) {
+            recorded.accept(who, now);
+        }
     }
 
     /** Forgets one key's wait. Called when a player logs out. */

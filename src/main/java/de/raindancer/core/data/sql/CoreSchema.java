@@ -337,7 +337,16 @@ public final class CoreSchema {
                 pitch  REAL    NOT NULL,
                 cause  TEXT    NOT NULL,
                 at     INTEGER NOT NULL
-            )""");
+            )""",
+            // Waits that follow the player: a cooldown started on one server is still running on the next.
+            """
+            CREATE TABLE network_cooldown (
+                name      TEXT    NOT NULL,
+                player    TEXT    NOT NULL,
+                last_used INTEGER NOT NULL,
+                PRIMARY KEY (name, player)
+            )""",
+            "CREATE INDEX network_cooldown_by_age ON network_cooldown (last_used)");
 
     /**
      * What was done.

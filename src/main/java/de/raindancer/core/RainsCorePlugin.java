@@ -1053,6 +1053,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             de.raindancer.core.world.teleport.Returns.install(new de.raindancer.core.world.teleport.Returns(
                     returnsStore, network.serverId(), task -> Scheduling.async(this, task)));
             Scheduling.asyncTimer(this, 60, 60, task -> chores.ifMine(returnsStore::prune));
+            // Cooldowns that follow the player: switching servers is not a way past a wait.
+            de.raindancer.core.platform.network.NetworkCooldowns cooldowns = new de.raindancer.core.platform.network.NetworkCooldowns(
+                    databases.core(), System::currentTimeMillis, task -> Scheduling.async(this, task));
+            de.raindancer.core.platform.network.NetworkCooldowns.install(cooldowns);
+            Scheduling.asyncTimer(this, 600, 600, task -> chores.ifMine(cooldowns::prune));
         } else {
             de.raindancer.core.world.teleport.Returns.install(new de.raindancer.core.world.teleport.Returns());
         }
@@ -1442,6 +1447,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         chores.release();
         de.raindancer.core.world.teleport.Returns.install(null);
+        de.raindancer.core.platform.network.NetworkCooldowns.install(null);
         if (networkRoles != null) {
             // The bank's role goes at once, so another server running an economy takes it without waiting.
             networkRoles.release(de.raindancer.core.social.economy.NetworkEconomy.ROLE);
@@ -2480,6 +2486,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
             de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> Scheduling.async(this,
                     () -> returns.arrived(id)));
+            de.raindancer.core.platform.network.NetworkCooldowns.installed().ifPresent(cooldowns -> Scheduling.async(this,
+                    () -> cooldowns.arrived(id)));
             if (!sharedNamespaces.isEmpty()) {
                 sharedArriving.add(id);
                 Scheduling.async(this, () -> applySharedData(id, java.util.List.copyOf(sharedNamespaces)));
