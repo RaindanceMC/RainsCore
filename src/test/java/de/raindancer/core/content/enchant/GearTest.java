@@ -156,4 +156,15 @@ class GearTest {
                 RainsEnchants.BERSERK, RainsEnchants.OVERPOWER, RainsEnchants.UNDYING, RainsEnchants.FUSION))
                 .allMatch(key -> key.startsWith("rainsenchants:")).doesNotHaveDuplicates();
     }
+
+    @Test
+    @DisplayName("what Heat-seeking goes on: what shoots or is thrown, Thor's hammers included")
+    void seeking() {
+        for (String weapon : new String[]{"bow", "crossbow", "trident", "mace", "iron_axe"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.SEEKING.matches(weapon)).as(weapon).isTrue();
+        }
+        for (String other : new String[]{"iron_pickaxe", "iron_sword", "fishing_rod"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.SEEKING.matches(other)).as(other).isFalse();
+        }
+    }
 }
