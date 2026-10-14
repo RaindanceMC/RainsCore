@@ -60,6 +60,20 @@ class YamlStoreInTheDatabaseTest {
     }
 
     @Test
+    @DisplayName("a 1.x text file (not .yml) is brought in as it is, even when it is no YAML at all")
+    void importsAnOldTextFile() throws Exception {
+        Path old = file("RainsPerformanceOptimizer", "reports/report-31.txt");
+        Files.createDirectories(old.getParent());
+        String report = "Report #31 — one tick took 1306 ms\n  [Server thread] at: something: [unclosed\n";
+        Files.writeString(old, report);
+        YamlStore store = new YamlStore(old, server("smp"), Documents.Scope.SERVER);
+
+        assertThat(store.readText()).hasValue(report);
+        assertThat(old).doesNotExist();
+        assertThat(old.resolveSibling("report-31.txt.imported-2.0.0")).exists();
+    }
+
+    @Test
     @DisplayName("a 1.x file is brought in on first use, comments and all, and kept renamed, never deleted")
     void importsTheOldFile() throws Exception {
         Path old = file("RainsEssentials", "rules.yml");

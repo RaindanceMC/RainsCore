@@ -666,6 +666,21 @@ public final class YamlStore {
             log.error(unreadableFile, "{} could not be read, so it was not moved into the database.", file);
             return;
         }
+        String fileName = file.getFileName().toString();
+        if (!fileName.endsWith(".yml") && !fileName.endsWith(".yaml")) {
+            // A text document (a report, a key): brought in as it is, nothing to parse or merge. Where the network
+            // already has one, that stands.
+            Documents.Read now = documents.read(address);
+            if (now instanceof Documents.Failed failed) {
+                log.error("{} could not be moved into the database ({}); it stays a file until it can.", file,
+                        failed.why());
+                return;
+            }
+            if (now instanceof Documents.Found || documents.insertIfAbsent(address, text)) {
+                retire(file, "moved into the database");
+            }
+            return;
+        }
         Optional<YamlConfiguration> fromFile = parse(text);
         if (fromFile.isEmpty()) {
             log.error("{} is not valid YAML, so it was not moved into the database. Fix it and restart.", file);
