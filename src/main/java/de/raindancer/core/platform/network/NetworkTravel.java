@@ -60,24 +60,44 @@ public final class NetworkTravel implements Listener {
      * A destination on this server is a plain teleport. On the player's thread.
      */
     public void send(Player player, String server, Optional<Arrivals.Destination> destination) {
+        travel(player, server, destination);
+    }
+
+    /**
+     * As {@link #send}, saying how it went: true once they left this server (or were teleported here), false when
+     * they were not moved — so whatever was charged for the trip can be given back.
+     */
+    public java.util.concurrent.CompletableFuture<Boolean> travel(Player player, String server,
+                                                                 Optional<Arrivals.Destination> destination) {
+        java.util.concurrent.CompletableFuture<Boolean> moved = new java.util.concurrent.CompletableFuture<>();
         if (server == null || server.isBlank()) {
-            return;
+            moved.complete(false);
+            return moved;
         }
         if (server.equals(self.get())) {
-            destination.flatMap(NetworkTravel::location).ifPresent(player::teleportAsync);
-            return;
+            destination.flatMap(NetworkTravel::location).ifPresentOrElse(
+                    place -> player.teleportAsync(place).whenComplete((done, failed) -> moved.complete(failed == null && Boolean.TRUE.equals(done))),
+                    () -> moved.complete(false));
+            return moved;
         }
         Runnable hop = () -> Scheduling.entity(plugin, player, () -> {
             ProxyTransfer.send(plugin, player, server);
-            Scheduling.entityLater(plugin, player, NOT_MOVED_TICKS, () -> {
+            // Retired = they left this server before the check, which is what being moved looks like from here.
+            Object check = player.getScheduler().runDelayed(plugin, ignored -> {
                 if (player.isOnline()) {
                     say.say(player, "travel.failed", server);
+                    moved.complete(false);
+                } else {
+                    moved.complete(true);
                 }
-            });
-        });
+            }, () -> moved.complete(true), NOT_MOVED_TICKS);
+            if (check == null) {
+                moved.complete(true);
+            }
+        }, () -> moved.complete(!player.isOnline()));
         if (destination.isEmpty()) {
             hop.run();
-            return;
+            return moved;
         }
         // Written before the hop, never after: the next server reads it as the player arrives.
         Scheduling.async(plugin, () -> {
@@ -86,8 +106,10 @@ public final class NetworkTravel implements Listener {
             } else {
                 log.warn("Where {} was to land on {} could not be written; they were not sent.", player.getName(), server);
                 Scheduling.entity(plugin, player, () -> say.say(player, "travel.failed", server));
+                moved.complete(false);
             }
         });
+        return moved;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

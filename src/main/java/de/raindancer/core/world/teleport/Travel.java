@@ -72,9 +72,11 @@ public final class Travel {
      * @param groundwork the search for somewhere safe, started at departure rather than on arrival —
      *                   see {@link #prepare}. Null when there is nothing to prepare
      */
+    /** @param elsewhere what ends a trip that does not end in a teleport here; null for one that does */
     private record Journey(Location destination, Trip trip, TravelWatcher watcher,
                            ScheduledTask countdown,
-                           CompletableFuture<Optional<Spot>> groundwork) {
+                           CompletableFuture<Optional<Spot>> groundwork,
+                           java.util.function.Consumer<Player> elsewhere) {
     }
 
     private final Plugin plugin;
@@ -152,6 +154,20 @@ public final class Travel {
      * until it is up; {@link TravelListener} is what notices they have not.
      */
     public void go(Player traveller, Location destination, Trip trip, TravelWatcher watcher) {
+        begin(traveller, destination, trip, watcher, null);
+    }
+
+    /**
+     * A trip that does not end in a teleport here — a hop to another server of the network: the same warm-up,
+     * standing still and cancelling as {@link #go}, and then {@code away} instead of the teleport. No way back is
+     * recorded; the watcher hears {@code arrived} with where they stood.
+     */
+    public void goElsewhere(Player traveller, Trip trip, TravelWatcher watcher, java.util.function.Consumer<Player> away) {
+        begin(traveller, null, trip, watcher, away);
+    }
+
+    private void begin(Player traveller, Location destination, Trip trip, TravelWatcher watcher,
+                       java.util.function.Consumer<Player> away) {
         if (traveller == null || trip == null) {
             return;
         }
@@ -172,7 +188,7 @@ public final class Travel {
         TravelWatcher told = new Finishing(who, watcher == null ? new TravelWatcher() {
         } : watcher);
 
-        if (destination == null || destination.getWorld() == null) {
+        if (away == null && (destination == null || destination.getWorld() == null)) {
             // Not an error and not a reason to delete anything: a multiverse server unloads worlds
             // for maintenance, and the place works again when the world comes back.
             told.refused(traveller, TravelReason.WORLD_MISSING, trip);
@@ -181,7 +197,11 @@ public final class Travel {
         if (!trip.hasWarmup()) {
             // Nothing to prepare during: there is no warm-up to do it in.
             departing(traveller, trip);
-            arrive(traveller, destination, trip, told, null);
+            if (away != null) {
+                leave(traveller, trip, told, away);
+            } else {
+                arrive(traveller, destination, trip, told, null);
+            }
             return;
         }
 
@@ -214,8 +234,9 @@ public final class Travel {
         // The warm-up is dead time the player is already standing through. Spending it on the work the
         // arrival would otherwise do is what turns "you are being teleported" followed by four seconds of
         // nothing into an arrival that happens when it says it does.
-        journeys.put(who, new Journey(destination.clone(), trip, told, countdown,
-                prepare(destination, trip)));
+        journeys.put(who, away != null
+                ? new Journey(null, trip, told, countdown, null, away)
+                : new Journey(destination.clone(), trip, told, countdown, prepare(destination, trip), null));
         shimmer(traveller, trip);
 
         // The window this closes: between begin() above and the put() on the line before, a movement
@@ -282,8 +303,12 @@ public final class Travel {
             case ARRIVED -> {
                 task.cancel();
                 journeys.remove(who);
-                arrive(traveller, journey.destination(), journey.trip(), journey.watcher(),
-                        journey.groundwork());
+                if (journey.elsewhere() != null) {
+                    leave(traveller, journey.trip(), journey.watcher(), journey.elsewhere());
+                } else {
+                    arrive(traveller, journey.destination(), journey.trip(), journey.watcher(),
+                            journey.groundwork());
+                }
             }
             // A stray tick from a task that was already cancelled. Nothing to do but stop.
             case NOTHING_PENDING -> {
@@ -410,6 +435,14 @@ public final class Travel {
      * is safe. Deliberately not "fall back to the exact spot": that puts the player in the place
      * already known to be dangerous, which is the whole thing the safety package exists to stop.
      */
+    private void leave(Player traveller, Trip trip, TravelWatcher watcher, java.util.function.Consumer<Player> away) {
+        try {
+            away.accept(traveller);
+        } finally {
+            watcher.arrived(traveller, traveller.getLocation(), trip);
+        }
+    }
+
     private void arrive(Player traveller, Location destination, Trip trip, TravelWatcher watcher,
                         CompletableFuture<Optional<Spot>> groundwork) {
         if (!trip.safeArrival() || safety == null) {
