@@ -43,7 +43,7 @@ public final class Economies {
             if (providers.stream().anyMatch(each -> each.economy() == economy)) {
                 return;
             }
-            if (!providers.isEmpty()) {
+            if (!providers.isEmpty() && !(providers.getLast().economy() instanceof NetworkEconomy)) {
                 log.warn("{} now provides the server's money, in place of {}. Two economies on one "
                         + "server keep two sets of balances.", economy.name(), providers.getLast().economy().name());
             }

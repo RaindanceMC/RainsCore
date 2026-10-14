@@ -297,6 +297,14 @@ public final class CoreSchema {
                 data       BLOB    NOT NULL,
                 updated_at INTEGER NOT NULL,
                 PRIMARY KEY (player, namespace)
+            )""",
+            // One server of the network holds each role (the economy's bank, the one that draws the lottery):
+            // a lease it renews, which another server takes over once it runs out.
+            """
+            CREATE TABLE network_role (
+                role         TEXT    PRIMARY KEY,
+                server       TEXT    NOT NULL,
+                heartbeat_at INTEGER NOT NULL
             )""");
 
     /**

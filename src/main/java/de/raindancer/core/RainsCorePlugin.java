@@ -1424,6 +1424,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Everybody still on, while the database is still open.
             inventoryCapture.saveEveryoneNow();
         }
+        if (networkRoles != null) {
+            // The bank's role goes at once, so another server running an economy takes it without waiting.
+            networkRoles.release(de.raindancer.core.social.economy.NetworkEconomy.ROLE);
+        }
+        if (networkEconomy != null) {
+            de.raindancer.core.social.economy.Economies.retract(networkEconomy);
+        }
         if (networkCalls != null) {
             networkCalls.close();
         }
@@ -1856,6 +1863,19 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.network.Presence presence;
     private volatile de.raindancer.core.platform.network.NetworkPlayers networkPlayers;
     private volatile de.raindancer.core.platform.network.NetworkCalls networkCalls;
+    private volatile de.raindancer.core.platform.network.NetworkRoles networkRoles;
+    private volatile de.raindancer.core.social.economy.NetworkEconomy networkEconomy;
+
+    /** This server's own economy, if it runs one — not the network's, which only asks the bank. */
+    private java.util.Optional<de.raindancer.core.social.economy.Economy> localEconomy() {
+        return de.raindancer.core.social.economy.Economies.current()
+                .filter(economy -> !(economy instanceof de.raindancer.core.social.economy.NetworkEconomy));
+    }
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.network.NetworkRoles> networkRoles() {
+        return java.util.Optional.ofNullable(networkRoles);
+    }
     private volatile de.raindancer.core.platform.network.NetworkTravel networkTravel;
 
     @Override
@@ -1944,6 +1964,18 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 });
         vanish.onChange((who, vanished) -> Scheduling.async(this, () -> presence.vanished(who, vanished)));
         networkCalls = new de.raindancer.core.platform.network.NetworkCalls(bus);
+        networkRoles = new de.raindancer.core.platform.network.NetworkRoles(databases.core(), network.serverId(),
+                System::currentTimeMillis);
+        // The network's money: a server running an economy of its own keeps it and holds the bank's role; every
+        // other server asks that one. A local economy provided later takes over here, as the last provided does.
+        networkEconomy = new de.raindancer.core.social.economy.NetworkEconomy(networkCalls, networkRoles);
+        de.raindancer.core.social.economy.Economies.provide(this, networkEconomy);
+        de.raindancer.core.social.economy.NetworkEconomy.serve(networkCalls, this::localEconomy);
+        Scheduling.asyncTimer(this, 5, 5, task -> {
+            if (localEconomy().isPresent()) {
+                networkRoles.claim(de.raindancer.core.social.economy.NetworkEconomy.ROLE);
+            }
+        });
         networkTravel = new de.raindancer.core.platform.network.NetworkTravel(this,
                 new de.raindancer.core.platform.network.Arrivals(databases.core()), network::serverId,
                 System::currentTimeMillis, (player, key, server) -> messages.send(player, key, "server",

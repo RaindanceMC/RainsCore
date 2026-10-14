@@ -637,6 +637,11 @@ public interface RainsCore {
         return java.util.Optional.empty();
     }
 
+    /** Roles one server of the network holds at a time — the bank, the lottery draw. Empty on a server of its own. */
+    default java.util.Optional<de.raindancer.core.platform.network.NetworkRoles> networkRoles() {
+        return java.util.Optional.empty();
+    }
+
     /**
      * How the servers of this network tell each other that something changed: a store writes, then
      * publishes {@code (topic, key)}, and every other server reads that key again. A module whose data
