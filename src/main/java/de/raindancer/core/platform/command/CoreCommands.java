@@ -226,4 +226,19 @@ public final class CoreCommands {
                 List.of("files"), new de.raindancer.core.data.store.DocumentsCommand());
         return true;
     }
+
+    private static final AtomicBoolean NETWORK_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /network}: the network's servers and who is on them, and which server is the bank
+     * ({@code /network bank here} moves it). One per server, taken by the first plugin that asks.
+     */
+    public static boolean network(Commands registrar) {
+        if (!NETWORK_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register("network", "The network's servers, and which one keeps the money.",
+                List.of(), new de.raindancer.core.platform.network.NetworkCommand());
+        return true;
+    }
 }

@@ -96,4 +96,22 @@ class NetworkRolesTest {
         threads.shutdownNow();
         assertThat(holders).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("a role with a home never wanders: another server does not take it over when it lapses")
+    void homeIsSticky() {
+        NetworkRoles smp = server("smp");
+        NetworkRoles arena = server("arena");
+        assertThat(smp.claimHome("economy")).isTrue();
+        clock.addAndGet(NetworkRoles.LEASE_MILLIS + 1);
+        assertThat(arena.claimHome("economy")).isFalse();
+        assertThat(arena.holder("economy")).isEmpty();
+        assertThat(arena.home("economy")).contains("smp");
+        assertThat(smp.claimHome("economy")).as("its home takes it back").isTrue();
+
+        assertThat(arena.moveHome("economy", "arena")).isTrue();
+        assertThat(smp.claimHome("economy")).as("moved away, at once").isFalse();
+        assertThat(arena.claimHome("economy")).isTrue();
+        assertThat(smp.holder("economy")).contains("arena");
+    }
 }

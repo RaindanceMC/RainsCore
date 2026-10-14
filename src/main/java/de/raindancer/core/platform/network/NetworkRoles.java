@@ -49,6 +49,67 @@ public final class NetworkRoles {
         return written && holder(role).filter(self::equals).isPresent();
     }
 
+    /**
+     * As {@link #claim}, for a role that belongs to one server: the first server to claim it becomes its home and
+     * no other server ever takes it over by itself — an owner moves it with {@link #moveHome}.
+     */
+    public boolean claimHome(String role) {
+        long now = clock.getAsLong();
+        boolean written = database.write(connection -> {
+            try (PreparedStatement home = connection.prepareStatement(
+                    "INSERT INTO network_role_home (role, server, since) VALUES (?, ?, ?) ON CONFLICT(role) DO NOTHING");
+                 // The home is checked in the same statement that takes the lease, so a move in between cannot
+                 // leave the old home holding it.
+                 PreparedStatement claim = connection.prepareStatement("""
+                    INSERT INTO network_role (role, server, heartbeat_at)
+                    SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM network_role_home WHERE role = ? AND server = ?)
+                    ON CONFLICT(role) DO UPDATE SET server = excluded.server, heartbeat_at = excluded.heartbeat_at
+                    WHERE network_role.server = excluded.server OR network_role.heartbeat_at < ?""")) {
+                home.setString(1, role);
+                home.setString(2, self);
+                home.setLong(3, now);
+                home.executeUpdate();
+                claim.setString(1, role);
+                claim.setString(2, self);
+                claim.setLong(3, now);
+                claim.setString(4, role);
+                claim.setString(5, self);
+                claim.setLong(6, now - LEASE_MILLIS);
+                claim.executeUpdate();
+            }
+        });
+        return written && holder(role).filter(self::equals).isPresent();
+    }
+
+    /** The server {@code role} belongs to, if one claimed it as its home. */
+    public Optional<String> home(String role) {
+        return database.read(connection -> {
+            try (PreparedStatement select = connection.prepareStatement("SELECT server FROM network_role_home WHERE role = ?")) {
+                select.setString(1, role);
+                try (ResultSet rows = select.executeQuery()) {
+                    return rows.next() ? Optional.of(rows.getString(1)) : Optional.<String>empty();
+                }
+            }
+        }).orElse(Optional.empty());
+    }
+
+    /** Gives {@code role} a new home — an owner's decision, never the code's. Its current lease ends at once. */
+    public boolean moveHome(String role, String server) {
+        return database.write(connection -> {
+            try (PreparedStatement move = connection.prepareStatement("""
+                    INSERT INTO network_role_home (role, server, since) VALUES (?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET server = excluded.server, since = excluded.since""");
+                 PreparedStatement drop = connection.prepareStatement("DELETE FROM network_role WHERE role = ?")) {
+                move.setString(1, role);
+                move.setString(2, server);
+                move.setLong(3, clock.getAsLong());
+                move.executeUpdate();
+                drop.setString(1, role);
+                drop.executeUpdate();
+            }
+        });
+    }
+
     /** Who holds {@code role} now — nobody when the lease ran out. */
     public Optional<String> holder(String role) {
         long since = clock.getAsLong() - LEASE_MILLIS;

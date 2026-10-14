@@ -305,7 +305,25 @@ public final class CoreSchema {
                 role         TEXT    PRIMARY KEY,
                 server       TEXT    NOT NULL,
                 heartbeat_at INTEGER NOT NULL
-            )""");
+            )""",
+            // The server a role belongs to. The bank's ledger is its own server's: a bank that moved by itself would
+            // answer from a different set of balances.
+            """
+            CREATE TABLE network_role_home (
+                role   TEXT    PRIMARY KEY,
+                server TEXT    NOT NULL,
+                since  INTEGER NOT NULL
+            )""",
+            // Every money movement asked of the bank, by request id: written before the money moves, its outcome
+            // after — a retry, even one after the bank restarted, is never applied twice.
+            """
+            CREATE TABLE economy_request (
+                id      TEXT    PRIMARY KEY,
+                outcome TEXT,
+                balance INTEGER,
+                at      INTEGER NOT NULL
+            )""",
+            "CREATE INDEX economy_request_by_age ON economy_request (at)");
 
     /**
      * What was done.

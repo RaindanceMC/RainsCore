@@ -1866,6 +1866,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.network.NetworkRoles networkRoles;
     private volatile de.raindancer.core.social.economy.NetworkEconomy networkEconomy;
     private volatile boolean secondBankSaid;
+    private int bankPruneTicks;
 
     /** This server's own economy, if it runs one — not the network's, which only asks the bank. */
     private java.util.Optional<de.raindancer.core.social.economy.Economy> localEconomy() {
@@ -1973,17 +1974,22 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // other server asks that one. A local economy provided later takes over here, as the last provided does.
         networkEconomy = new de.raindancer.core.social.economy.NetworkEconomy(networkCalls, networkRoles);
         de.raindancer.core.social.economy.Economies.provide(this, networkEconomy);
+        de.raindancer.core.social.economy.BankRequests bankRequests =
+                new de.raindancer.core.social.economy.BankRequests(databases.core(), System::currentTimeMillis);
         de.raindancer.core.social.economy.NetworkEconomy.serve(networkCalls, this::localEconomy,
                 () -> networkRoles.holder(de.raindancer.core.social.economy.NetworkEconomy.ROLE)
-                        .filter(network.serverId()::equals).isPresent(), System::currentTimeMillis);
+                        .filter(network.serverId()::equals).isPresent(), bankRequests);
         Scheduling.asyncTimer(this, 5, 5, task -> {
             java.util.Optional<de.raindancer.core.social.economy.Economy> local = localEconomy();
             if (local.isEmpty()) {
                 return;
             }
-            if (networkRoles.claim(de.raindancer.core.social.economy.NetworkEconomy.ROLE)) {
+            if (networkRoles.claimHome(de.raindancer.core.social.economy.NetworkEconomy.ROLE)) {
                 de.raindancer.core.social.economy.Economies.prefer(local.get());
                 secondBankSaid = false;
+                if (++bankPruneTicks % 720 == 1) {
+                    bankRequests.prune();
+                }
             } else {
                 // Another server is the bank: this one uses it too. Its own economy running beside it would keep a
                 // second set of balances for whoever plays here.
@@ -1991,8 +1997,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 if (!secondBankSaid) {
                     secondBankSaid = true;
                     log.error("{} runs here, but {} is the network's bank: this server uses the bank, and {} keeps "
-                            + "nothing that counts. Run the economy on one server of the network only.",
-                            local.get().name(), networkRoles.holder(de.raindancer.core.social.economy.NetworkEconomy.ROLE)
+                            + "nothing that counts. Run the economy on one server of the network only. "
+                            + "To make this server the bank instead: /network bank here.",
+                            local.get().name(), networkRoles.home(de.raindancer.core.social.economy.NetworkEconomy.ROLE)
                                     .orElse("another server"), local.get().name());
                 }
             }

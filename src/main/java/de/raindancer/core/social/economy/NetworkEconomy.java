@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -29,9 +30,6 @@ public final class NetworkEconomy implements Economy {
 
     /** How often a money movement is asked again, with the same request id, before it counts as unanswered. */
     static final int TRIES = 3;
-
-    /** How long the bank remembers a movement's answer by its request id, so a repeat is never applied twice. */
-    static final long REMEMBERED_MILLIS = 10 * 60_000L;
 
     private final NetworkCalls calls;
     private final NetworkRoles roles;
@@ -129,20 +127,12 @@ public final class NetworkEconomy implements Economy {
     }
 
     /**
-     * Answers the network's money questions from {@code local} — this server's own economy, when it has one.
-     * Only the server holding {@value #ROLE} is ever asked.
-     */
-    public static NetworkBus.Subscription serve(NetworkCalls calls, Supplier<Optional<Economy>> local) {
-        return serve(calls, local, () -> true, System::currentTimeMillis);
-    }
-
-    /**
-     * As {@link #serve(NetworkCalls, Supplier)}, answering only while {@code isBank} — a server that lost the role a
-     * moment ago must not keep moving money for callers that looked it up before.
+     * Answers the network's money questions from {@code local} — this server's own economy, when it has one —
+     * while {@code isBank}: a server that lost the role a moment ago must not keep moving money for callers that
+     * looked it up before. Every movement goes through {@code requests}, so none is applied twice.
      */
     public static NetworkBus.Subscription serve(NetworkCalls calls, Supplier<Optional<Economy>> local,
-                                                java.util.function.BooleanSupplier isBank, java.util.function.LongSupplier clock) {
-        Map<String, Remembered> answered = new java.util.concurrent.ConcurrentHashMap<>();
+                                                BooleanSupplier isBank, BankRequests requests) {
         NetworkBus.Subscription currency = calls.answer(LinkedEconomy.CURRENCY,
                 data -> local.get().map(money -> LinkedEconomy.encode(money.currency())).orElse(Map.of()));
         NetworkBus.Subscription balance = calls.answer(LinkedEconomy.BALANCE, data -> local.get()
@@ -154,37 +144,43 @@ public final class NetworkEconomy implements Economy {
         NetworkBus.Subscription move = calls.answer(LinkedEconomy.MOVE, data -> {
             Optional<Economy> found = local.get();
             if (found.isEmpty() || !isBank.getAsBoolean()) {
-                return Map.of("outcome", EconomyResult.Outcome.UNAVAILABLE.name());
+                return unavailable();
             }
-            String request = data.getOrDefault("request", "");
-            long now = clock.getAsLong();
-            answered.values().removeIf(old -> now - old.at() > REMEMBERED_MILLIS);
-            if (!request.isEmpty()) {
-                Remembered before = answered.get(request);
-                if (before != null) {
-                    return before.answer();
-                }
-            }
-            Economy money = found.get();
+            UUID player;
+            UUID to;
+            Money amount;
             try {
-                UUID player = UUID.fromString(data.get("player"));
-                Money amount = Money.of(Long.parseLong(data.get("amount")));
-                String reason = data.getOrDefault("reason", "");
-                EconomyResult result = switch (data.getOrDefault("kind", "")) {
-                    case "deposit" -> money.deposit(player, amount, reason, "network");
-                    case "withdraw" -> money.withdraw(player, amount, reason, "network");
-                    case "transfer" -> money.transfer(player, UUID.fromString(data.get("to")), amount, reason);
-                    default -> EconomyResult.failed(EconomyResult.Outcome.REFUSED, amount, Money.ZERO);
-                };
-                Map<String, String> answer = Map.of("outcome", result.outcome().name(),
-                        "balance", String.valueOf(result.balance().minor()));
-                if (!request.isEmpty()) {
-                    answered.put(request, new Remembered(answer, now));
-                }
-                return answer;
+                player = UUID.fromString(data.get("player"));
+                to = data.containsKey("to") ? UUID.fromString(data.get("to")) : null;
+                amount = Money.of(Long.parseLong(data.get("amount")));
             } catch (RuntimeException garbled) {
                 return Map.of("outcome", EconomyResult.Outcome.REFUSED.name());
             }
+            String request = data.getOrDefault("request", "");
+            switch (requests.begin(request)) {
+                case BankRequests.Answered before -> {
+                    return answer(before.outcome(), before.balance());
+                }
+                case BankRequests.Uncertain uncertain -> {
+                    return unavailable();
+                }
+                case BankRequests.GoAhead ahead -> {
+                }
+            }
+            Economy money = found.get();
+            String reason = data.getOrDefault("reason", "");
+            // A throw from here leaves the request unfinished: whether money moved is not known, so it is never
+            // tried again.
+            EconomyResult result = switch (data.getOrDefault("kind", "")) {
+                case "deposit" -> money.deposit(player, amount, reason, "network");
+                case "withdraw" -> money.withdraw(player, amount, reason, "network");
+                case "transfer" -> to == null
+                        ? EconomyResult.failed(EconomyResult.Outcome.REFUSED, amount, Money.ZERO)
+                        : money.transfer(player, to, amount, reason);
+                default -> EconomyResult.failed(EconomyResult.Outcome.REFUSED, amount, Money.ZERO);
+            };
+            requests.finish(request, result.outcome(), result.balance());
+            return answer(result.outcome(), result.balance());
         });
         return () -> {
             currency.close();
@@ -193,7 +189,11 @@ public final class NetworkEconomy implements Economy {
         };
     }
 
-    /** A movement's answer, kept by its request id. */
-    private record Remembered(Map<String, String> answer, long at) {
+    private static Map<String, String> answer(EconomyResult.Outcome outcome, Money balance) {
+        return Map.of("outcome", outcome.name(), "balance", String.valueOf(balance.minor()));
+    }
+
+    private static Map<String, String> unavailable() {
+        return Map.of("outcome", EconomyResult.Outcome.UNAVAILABLE.name());
     }
 }
