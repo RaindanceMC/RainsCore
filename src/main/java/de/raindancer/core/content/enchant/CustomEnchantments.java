@@ -27,6 +27,10 @@ import java.util.Optional;
  *
  * <p>{@link #register} runs in a plugin's <em>bootstrapper</em>: Paper freezes the enchantment registry
  * before {@code onEnable}, so a registration made there is too late — silently.
+ *
+ * <p>Which enchantments one excludes is a <em>tag</em> ({@code <namespace>:exclusive_set/<name>}), as vanilla does it,
+ * never a list of enchantments: Geyser reads a list while the registry is still being built, fails, and Bedrock
+ * players then see none of their items.
  */
 public final class CustomEnchantments {
 
@@ -37,6 +41,17 @@ public final class CustomEnchantments {
         if (definitions.isEmpty()) {
             return;
         }
+        context.getLifecycleManager().registerEventHandler(
+                io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.TAGS.postFlatten(RegistryKey.ENCHANTMENT),
+                event -> {
+                    for (EnchantDef def : definitions) {
+                        if (!def.exclusiveWith().isEmpty()) {
+                            event.registrar().setTag(exclusiveTag(def), def.exclusiveWith().stream()
+                                    .map(other -> TypedKey.create(RegistryKey.ENCHANTMENT, Key.key(other)))
+                                    .toList());
+                        }
+                    }
+                });
         context.getLifecycleManager().registerEventHandler(RegistryEvents.ENCHANTMENT.compose().newHandler(event -> {
             var items = RegistryAccess.registryAccess().getRegistry(RegistryKey.ITEM);
             for (EnchantDef def : definitions) {
@@ -53,11 +68,17 @@ public final class CustomEnchantments {
                         .maximumCost(EnchantmentRegistryEntry.EnchantmentCost.of(21, 10))
                         .anvilCost(def.anvilCost())
                         .activeSlots(def.gear().slot())
-                        .exclusiveWith(RegistrySet.keySet(RegistryKey.ENCHANTMENT, def.exclusiveWith().stream()
-                                .map(other -> TypedKey.create(RegistryKey.ENCHANTMENT, Key.key(other)))
-                                .toList())));
+                        .exclusiveWith(def.exclusiveWith().isEmpty()
+                                ? RegistrySet.keySet(RegistryKey.ENCHANTMENT, List.of())
+                                : event.getOrCreateTag(exclusiveTag(def))));
             }
         }));
+    }
+
+    /** The tag of what {@code def} excludes. */
+    static io.papermc.paper.registry.tag.TagKey<Enchantment> exclusiveTag(EnchantDef def) {
+        return io.papermc.paper.registry.tag.TagKey.create(RegistryKey.ENCHANTMENT,
+                Key.key(def.namespace(), "exclusive_set/" + def.path()));
     }
 
     public static Optional<Enchantment> find(String key) {
