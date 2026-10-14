@@ -37,6 +37,8 @@ public final class SettingsRegistry {
 
     private final List<SettingsStore<?>> stores = new CopyOnWriteArrayList<>();
 
+    private final java.util.Set<String> toldAbout = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     /** Adds a plugin's settings to the combined tree. */
     public void add(SettingsStore<?> store) {
         if (store == null) {
@@ -44,9 +46,12 @@ public final class SettingsRegistry {
         }
         stores.add(store);
         for (Map.Entry<String, List<String>> clash : clashes().entrySet()) {
-            log.warn("The setting '{}' is declared by more than one plugin ({}). A command using "
-                            + "that name alone reaches the first; use plugin:key to be sure.",
-                    clash.getKey(), String.join(", ", clash.getValue()));
+            // Nothing is wrong: plugin:key reaches either. Said once per name, for whoever reads the debug log.
+            if (toldAbout.add(clash.getKey() + "=" + clash.getValue())) {
+                log.debug("The setting '{}' is declared by more than one plugin ({}). A command using "
+                                + "that name alone reaches the first; use plugin:key to be sure.",
+                        clash.getKey(), String.join(", ", clash.getValue()));
+            }
         }
     }
 

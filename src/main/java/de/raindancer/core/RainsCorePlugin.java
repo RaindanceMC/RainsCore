@@ -1003,9 +1003,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             });
         }
 
-        // From here on, database work on a thread running the world is a mistake and is reported as
-        // one. Before here it was the startup read, which is allowed.
-        watchingThreads = true;
+        // Once the server is up, database work on a thread running the world is a mistake and is reported as
+        // one. Until then it is the plugins reading their stores as they enable — after this one, too —
+        // which has to happen there and is no error.
+        getServer().getPluginManager().registerEvents(new org.bukkit.event.Listener() {
+            @org.bukkit.event.EventHandler
+            public void started(org.bukkit.event.server.ServerLoadEvent event) {
+                watchingThreads = true;
+            }
+        }, this);
 
         getServer().getPluginManager().registerEvents(this, this);
         // One listener for every menu in every plugin: a menu is its inventory's holder, so this

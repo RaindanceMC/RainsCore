@@ -164,7 +164,7 @@ public final class Secrets {
                         file.getFileName(), kept.getFileName());
             } else {
                 // Another server's key got there first. Hashes and seals made with this file's key stop matching.
-                log.warn("{} was not used: the network already had its own. Things made with this server's old key "
+                log.info("{} was not used: the network already had its own. Things made with this server's old key "
                         + "(blocked-join hashes, banknotes) will not match it. The file is kept as {}.",
                         file.getFileName(), kept.getFileName());
             }

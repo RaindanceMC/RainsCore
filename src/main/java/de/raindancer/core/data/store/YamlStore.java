@@ -695,7 +695,8 @@ public final class YamlStore {
             String body = merged.yaml().saveToString();
             if (body.equals(stored.get().saveToString()) || documents.compareAndSet(address, found.version(), body)) {
                 if (!merged.conflicts().isEmpty()) {
-                    log.warn("{}: kept what the database had at {} over this server's file", address.key(),
+                    // What joining a network means: the network's values stand. Information, not a fault.
+                    log.info("{}: kept what the database had at {} over this server's file", address.key(),
                             String.join(", ", merged.conflicts()));
                 }
                 retire(file, "merged into the database");
