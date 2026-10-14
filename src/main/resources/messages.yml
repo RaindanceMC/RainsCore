@@ -377,3 +377,8 @@ cues:
   not-a-sound: "<red>Nothing in that could be read as a sound, so nothing changed."
   not-a-particle: "<red>Nothing in that could be read as a particle, so nothing changed."
   busy: "<red>You are already being asked something else — answer or cancel that first."
+
+# A player sent to another server of the network (2.0.0).
+travel:
+  failed: "<red>Could not reach <white><server></white> just now — you are still here."
+  arrival-lost: "<yellow>You arrived, but the place you were sent to is not on this server any more."

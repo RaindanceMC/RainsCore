@@ -627,6 +627,16 @@ public interface RainsCore {
         return java.util.Optional.empty();
     }
 
+    /** Asking another server of the network a question and getting its answer. Empty on a server of its own. */
+    default java.util.Optional<de.raindancer.core.platform.network.NetworkCalls> networkCalls() {
+        return java.util.Optional.empty();
+    }
+
+    /** Sending a player to another server of the network, to its spawn or to a place there. Empty on a server of its own. */
+    default java.util.Optional<de.raindancer.core.platform.network.NetworkTravel> networkTravel() {
+        return java.util.Optional.empty();
+    }
+
     /**
      * How the servers of this network tell each other that something changed: a store writes, then
      * publishes {@code (topic, key)}, and every other server reads that key again. A module whose data

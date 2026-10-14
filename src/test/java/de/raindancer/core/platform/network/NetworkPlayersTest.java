@@ -89,4 +89,17 @@ class NetworkPlayersTest {
         Server smp = server("smp", Set.of());
         assertThat(smp.players().tell(UUID.randomUUID(), "hello")).isFalse();
     }
+
+    @Test
+    @DisplayName("a vanished player on another server cannot be told: answering would give them away")
+    void vanishedIsOffline() {
+        Server smp = server("smp", Set.of());
+        Server arena = server("arena", Set.of(ALEX));
+        arena.presence().joined(ALEX, "Alex", true);
+        smp.servers().refresh();
+        smp.presence().refreshAll();
+        assertThat(smp.players().tell(ALEX, "hello")).isFalse();
+        hub.drain();
+        assertThat(arena.said()).isEmpty();
+    }
 }

@@ -274,6 +274,19 @@ public final class CoreSchema {
             CREATE TABLE network_vanish (
                 player TEXT    PRIMARY KEY,
                 since  INTEGER NOT NULL
+            )""",
+            // Where a player sent to another server is to land: written before the transfer, taken on arrival.
+            """
+            CREATE TABLE network_arrival (
+                player     TEXT    PRIMARY KEY,
+                server     TEXT    NOT NULL,
+                world      TEXT    NOT NULL,
+                x          REAL    NOT NULL,
+                y          REAL    NOT NULL,
+                z          REAL    NOT NULL,
+                yaw        REAL    NOT NULL,
+                pitch      REAL    NOT NULL,
+                expires_at INTEGER NOT NULL
             )""");
 
     /**

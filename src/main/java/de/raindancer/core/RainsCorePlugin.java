@@ -1422,6 +1422,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Everybody still on, while the database is still open.
             inventoryCapture.saveEveryoneNow();
         }
+        if (networkCalls != null) {
+            networkCalls.close();
+        }
         if (presence != null) {
             // Off the list at once rather than when the heartbeat goes stale.
             presence.clearThisServer();
@@ -1843,6 +1846,19 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.network.NetworkServers networkServers;
     private volatile de.raindancer.core.platform.network.Presence presence;
     private volatile de.raindancer.core.platform.network.NetworkPlayers networkPlayers;
+    private volatile de.raindancer.core.platform.network.NetworkCalls networkCalls;
+    private volatile de.raindancer.core.platform.network.NetworkTravel networkTravel;
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.network.NetworkCalls> networkCalls() {
+        return java.util.Optional.ofNullable(networkCalls);
+    }
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.network.NetworkTravel> networkTravel() {
+        return java.util.Optional.ofNullable(networkTravel);
+    }
+
     /** Staff who were vanished when they left their last server, read before they are let in. */
     private final java.util.Set<java.util.UUID> arrivingVanished = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -1858,13 +1874,21 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         networkPlayers = new de.raindancer.core.platform.network.NetworkPlayers(presence, networkServers, bus,
                 (player, key, values) -> {
                     Player online = getServer().getPlayer(player);
-                    if (online == null) {
+                    // Vanished is offline to anything sent from elsewhere: answering "said" would give them away.
+                    if (online == null || vanish.isVanished(player)) {
                         return false;
                     }
                     Scheduling.entity(this, online, () -> messages.send(online, key, values.toArray()));
                     return true;
                 });
         vanish.onChange((who, vanished) -> Scheduling.async(this, () -> presence.vanished(who, vanished)));
+        networkCalls = new de.raindancer.core.platform.network.NetworkCalls(bus);
+        networkTravel = new de.raindancer.core.platform.network.NetworkTravel(this,
+                new de.raindancer.core.platform.network.Arrivals(databases.core()), network::serverId,
+                System::currentTimeMillis, (player, key, server) -> messages.send(player, key, "server",
+                        networkServers.byId(server).map(de.raindancer.core.platform.network.NetworkServers.Server::name)
+                                .orElse(server)));
+        getServer().getPluginManager().registerEvents(networkTravel, this);
         Scheduling.async(this, () -> {
             // Whatever a crash of this server left listed goes first.
             presence.clearThisServer();
@@ -1872,7 +1896,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             presence.refreshAll();
         });
         Scheduling.asyncTimer(this, 5, 5, task -> {
-            networkServers.heartbeat(serverName(), getServer().getOnlinePlayers().size());
+            // Visible players only: the count is shown on other servers, and vanished staff are not there to count.
+            networkServers.heartbeat(serverName(), (int) getServer().getOnlinePlayers().stream()
+                    .filter(online -> !vanish.isVanished(online.getUniqueId())).count());
             presence.refreshAll();
         });
         tablists.elsewhere(this::playersByServer);
@@ -1884,6 +1910,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 && presence.wasVanished(event.getUniqueId())) {
             arrivingVanished.add(event.getUniqueId());
         }
+    }
+
+    /** Whether this server lets {@code player} vanish: one of the nodes a plugin registered as staff's, or op. */
+    private boolean mayVanishHere(Player player) {
+        return player.isOp() || vanish.staffNodes().stream().anyMatch(player::hasPermission);
     }
 
     @Override
@@ -2279,8 +2310,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (presence != null) {
             java.util.UUID id = event.getPlayer().getUniqueId();
             if (arrivingVanished.remove(id) && !vanish.isVanished(id)) {
-                // Before anybody here has had a tick to see them: vanished on the last server, vanished here.
-                vanish.vanish(id);
+                if (mayVanishHere(event.getPlayer())) {
+                    // Before anybody here has had a tick to see them: vanished on the last server, vanished here.
+                    vanish.vanish(id);
+                } else {
+                    // Vanished elsewhere is not a right to it here — demoted since, or a node only some servers
+                    // grant. Forgotten, so the next server does not try either.
+                    Scheduling.async(this, () -> presence.vanished(id, false));
+                }
             }
             boolean hidden = vanish.isVanished(id);
             String name = event.getPlayer().getName();

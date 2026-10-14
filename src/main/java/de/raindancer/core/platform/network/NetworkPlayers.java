@@ -74,7 +74,8 @@ public final class NetworkPlayers {
      * Says a message key, with its placeholder values in pairs as {@code Messages.send} takes them, to somebody
      * wherever they are on the network.
      *
-     * @return whether they are online somewhere it can reach — not whether they have read it
+     * @return whether they are online and visible somewhere it can reach — not whether they have read it;
+     *         a vanished player is not, here or elsewhere
      */
     public boolean tell(UUID player, String key, String... values) {
         if (player == null || key == null) {
@@ -83,7 +84,8 @@ public final class NetworkPlayers {
         if (here.tell(player, key, List.of(values))) {
             return true;
         }
-        Optional<Presence.Here> there = presence.where(player, true);
+        // Vanished players are offline to a message: a "said" would tell the sender they are on.
+        Optional<Presence.Here> there = presence.where(player, false);
         if (there.isEmpty() || there.get().server().equals(servers.self())) {
             return false;
         }
