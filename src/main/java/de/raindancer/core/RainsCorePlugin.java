@@ -1039,17 +1039,23 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new de.raindancer.core.moderation.chatlog.ChatLogListener(chatLog, messages,
                         () -> settings.current().chatLogRetention()), this);
         Scheduling.asyncTimer(this, AUDIT_FLUSH_PERIOD_SECONDS, AUDIT_FLUSH_PERIOD_SECONDS, task -> chatLog.flush());
+        // Throwing old rows away is done by one server of a network, with its settings: the tables are shared, and a
+        // group with a shorter retention must not cut everybody's history short.
+        if (network.isNetwork()) {
+            chores = new de.raindancer.core.platform.network.Chores(new de.raindancer.core.platform.network.NetworkRoles(
+                    databases.core(), network.serverId(), System::currentTimeMillis));
+            Scheduling.asyncTimer(this, 1, 5, task -> chores.tick());
+        }
         // The network's event log only has to reach servers that are up; an hour covers any restart.
         if (bus instanceof de.raindancer.core.platform.network.PostgresBus central) {
-            Scheduling.asyncTimer(this, 600, 600, task -> central.prune(java.time.Duration.ofHours(1)));
+            Scheduling.asyncTimer(this, 600, 600, task -> chores.ifMine(() -> central.prune(java.time.Duration.ofHours(1))));
         }
-        Scheduling.asyncTimer(this, AUDIT_PRUNE_PERIOD_SECONDS, AUDIT_PRUNE_PERIOD_SECONDS,
-                task -> chatLog.forgetOlderThan(Duration.ofDays(settings.current().chatLogRetention())));
+        Scheduling.asyncTimer(this, AUDIT_PRUNE_PERIOD_SECONDS, AUDIT_PRUNE_PERIOD_SECONDS, task -> chores.ifMine(
+                () -> chatLog.forgetOlderThan(Duration.ofDays(settings.current().chatLogRetention()))));
         auditFlushTask = Scheduling.asyncTimer(this, AUDIT_FLUSH_PERIOD_SECONDS,
                 AUDIT_FLUSH_PERIOD_SECONDS, task -> audit.flush());
-        Scheduling.asyncTimer(this, AUDIT_PRUNE_PERIOD_SECONDS, AUDIT_PRUNE_PERIOD_SECONDS,
-                task -> audit.forgetOlderThan(
-                        Duration.ofDays(settings.current().auditRetentionDays())));
+        Scheduling.asyncTimer(this, AUDIT_PRUNE_PERIOD_SECONDS, AUDIT_PRUNE_PERIOD_SECONDS, task -> chores.ifMine(
+                () -> audit.forgetOlderThan(Duration.ofDays(settings.current().auditRetentionDays()))));
         // On the ASYNC timer, not the global one. That was wrong until a review pointed it out: every
         // one of these writes a file or a database, and the global timer runs on the thread that ticks
         // the world. Two minutes between freezes is still a freeze.
@@ -1424,6 +1430,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Everybody still on, while the database is still open.
             inventoryCapture.saveEveryoneNow();
         }
+        chores.release();
         if (networkRoles != null) {
             // The bank's role goes at once, so another server running an economy takes it without waiting.
             networkRoles.release(de.raindancer.core.social.economy.NetworkEconomy.ROLE);
@@ -1866,6 +1873,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.network.NetworkRoles networkRoles;
     private volatile de.raindancer.core.social.economy.NetworkEconomy networkEconomy;
     private volatile boolean secondBankSaid;
+    private volatile de.raindancer.core.platform.network.Chores chores = de.raindancer.core.platform.network.Chores.ALONE;
     private int bankPruneTicks;
 
     /** This server's own economy, if it runs one — not the network's, which only asks the bank. */
@@ -2004,8 +2012,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 }
             }
         });
-        networkTravel = new de.raindancer.core.platform.network.NetworkTravel(this,
-                new de.raindancer.core.platform.network.Arrivals(databases.core()), network::serverId,
+        de.raindancer.core.platform.network.Arrivals arrivals = new de.raindancer.core.platform.network.Arrivals(databases.core());
+        // Arrivals nobody came for (the transfer failed, they went elsewhere) expire; thrown away now and then.
+        Scheduling.asyncTimer(this, 600, 600, task -> chores.ifMine(() -> arrivals.prune(System.currentTimeMillis())));
+        networkTravel = new de.raindancer.core.platform.network.NetworkTravel(this, arrivals, network::serverId,
                 System::currentTimeMillis, (player, key, server) -> messages.send(player, key, "server",
                         networkServers.byId(server).map(de.raindancer.core.platform.network.NetworkServers.Server::name)
                                 .orElse(server)));
