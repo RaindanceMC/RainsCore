@@ -324,7 +324,9 @@ public final class SettingsStore<T> {
                         ? SettingCodec.toYaml(groupOverrides.get(key)) : null));
             }
         });
-        boolean serverWritten = store.write(yaml -> writeOverrides(yaml, serverOverrides));
+        // An update, not a write: one file can hold several records' settings (a module with more than fit in one), and
+        // writing it whole from this record's overrides alone dropped every other record's.
+        boolean serverWritten = store.update(yaml -> writeOverrides(yaml, serverOverrides));
         if (!networkWritten) {
             networkChanged.addAll(network);
         }
@@ -342,6 +344,10 @@ public final class SettingsStore<T> {
             if (overrides.containsKey(setting.key())) {
                 yaml.set(setting.key(), SettingCodec.toYaml(overrides.get(setting.key())));
                 yaml.setComments(setting.key(), commentFor(setting));
+            } else {
+                // This record's own key without an override here: the network's value is in force. Any other key is
+                // another record's, and stays.
+                yaml.set(setting.key(), null);
             }
         }
     }

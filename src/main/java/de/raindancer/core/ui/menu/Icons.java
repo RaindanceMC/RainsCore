@@ -77,7 +77,23 @@ public final class Icons {
             meta.lore(lines);
             item.setItemMeta(meta);
         }
+        hideAttributes(item);
         return item;
+    }
+
+    /**
+     * A button is not a weapon: a pickaxe shown for "dig" must not explain its attack damage under the words. The game
+     * writes those lines for any tool, sword or armour, so they are hidden on every button.
+     */
+    private static void hideAttributes(ItemStack item) {
+        try {
+            item.setData(io.papermc.paper.datacomponent.DataComponentTypes.TOOLTIP_DISPLAY,
+                    io.papermc.paper.datacomponent.item.TooltipDisplay.tooltipDisplay()
+                            .addHiddenComponents(io.papermc.paper.datacomponent.DataComponentTypes.ATTRIBUTE_MODIFIERS)
+                            .build());
+        } catch (RuntimeException | LinkageError noServer) {
+            // Without a running server (a test) there are no data components to set, and nothing is shown anyway.
+        }
     }
 
     /**

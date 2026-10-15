@@ -33,6 +33,21 @@ class SettingsLayersTest {
 
     private static final SettingsSchema<ChatConfig> SCHEMA = SettingsSchema.of(ChatConfig.class, ChatConfig.DEFAULTS);
 
+    /** A second record in the same file — what a module with more settings than one record holds does. */
+    @Settings(id = "chat-extra", topics = @Topic(path = "config/extra", title = "Extra", icon = Material.PAPER))
+    record ExtraConfig(@In("config/extra") @Title("Loud") boolean loud) {
+        static final ExtraConfig DEFAULTS = new ExtraConfig(false);
+    }
+
+    private static final SettingsSchema<ExtraConfig> EXTRA = SettingsSchema.of(ExtraConfig.class, ExtraConfig.DEFAULTS);
+
+    private SettingsStore<ExtraConfig> extra(Documents documents, String server) {
+        SettingsStore<ExtraConfig> store = new SettingsStore<>(EXTRA,
+                plugins.resolve(server).resolve("RainsChat").resolve("config.yml"), documents, "");
+        store.load();
+        return store;
+    }
+
     @TempDir
     Path plugins;
 
@@ -206,5 +221,38 @@ class SettingsLayersTest {
         assertThat(lone.set("radius", "9", SettingsStore.Layer.GROUP)).isFalse();
         assertThat(lone.current().radius()).isEqualTo(50);
         assertThat(lone.layerOf("radius")).isEqualTo(SettingsStore.Layer.NETWORK);
+    }
+
+    @Test
+    @DisplayName("two records in one file each keep this server's own values: saving one does not drop the other's")
+    void twoRecordsShareAFile() throws Exception {
+        oldFile("smp", "radius: 50\n");
+        store(documents("smp", "smp"), "smp", "");
+        oldFile("arena", "\"~overrides\": true\nradius: 5\nloud: true\n");
+        Documents arenaDocuments = documents("arena", "arena");
+
+        SettingsStore<ChatConfig> chat = store(arenaDocuments, "arena", "");
+        SettingsStore<ExtraConfig> loud = extra(arenaDocuments, "arena");
+        assertThat(chat.current().radius()).isEqualTo(5);
+        assertThat(loud.current().loud()).as("read after the other record loaded and saved").isTrue();
+
+        assertThat(chat.set("radius", "7", SettingsStore.Layer.SERVER)).isTrue();
+        chat.save();
+        assertThat(extra(arenaDocuments, "arena").current().loud()).as("still there after the other saved").isTrue();
+        assertThat(loud.set("loud", "false", SettingsStore.Layer.SERVER)).isTrue();
+        loud.save();
+        assertThat(store(arenaDocuments, "arena", "").current().radius()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("a 1.x file with two records' settings brings both in, whichever loads first")
+    void twoRecordsFromAnOldFile() throws Exception {
+        oldFile("smp", "radius: 50\n");
+        store(documents("smp", "smp"), "smp", "");
+        oldFile("arena", "radius: 5\nloud: true\n");
+        Documents arenaDocuments = documents("arena", "arena");
+
+        store(arenaDocuments, "arena", "");
+        assertThat(extra(arenaDocuments, "arena").current().loud()).isTrue();
     }
 }
