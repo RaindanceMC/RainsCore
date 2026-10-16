@@ -211,4 +211,25 @@ class SchematicTest {
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("schematic");
     }
+
+    @org.junit.jupiter.api.Test
+    void aSchematicWrittenOutReadsBackTheSame(@org.junit.jupiter.api.io.TempDir java.nio.file.Path folder)
+            throws Exception {
+        String[] states = new String[2 * 3 * 2];
+        java.util.Arrays.fill(states, "minecraft:air");
+        states[0] = "minecraft:stone";
+        states[1 + 1 * 2 + 2 * 2 * 2] = "minecraft:oak_door[facing=north,half=lower,hinge=left,open=true,powered=false]";
+        Schematic made = Schematic.of(2, 3, 2, 4440, states);
+        java.nio.file.Path file = folder.resolve("edited.schem");
+        made.write(file);
+        Schematic back = Schematic.read(file);
+        org.junit.jupiter.api.Assertions.assertEquals(2, back.width());
+        org.junit.jupiter.api.Assertions.assertEquals(3, back.height());
+        org.junit.jupiter.api.Assertions.assertEquals(2, back.length());
+        org.junit.jupiter.api.Assertions.assertEquals(4440, back.dataVersion());
+        org.junit.jupiter.api.Assertions.assertEquals("minecraft:stone", back.stateAt(0, 0, 0));
+        org.junit.jupiter.api.Assertions.assertEquals(states[1 + 1 * 2 + 2 * 2 * 2], back.stateAt(1, 2, 1));
+        org.junit.jupiter.api.Assertions.assertEquals("minecraft:air", back.stateAt(1, 0, 0));
+        org.junit.jupiter.api.Assertions.assertEquals(3, back.palette().size(), "air, stone, the door: each once");
+    }
 }

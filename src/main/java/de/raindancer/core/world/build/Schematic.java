@@ -136,6 +136,56 @@ public record Schematic(int width, int height, int length, int dataVersion, List
                 blocks);
     }
 
+    /**
+     * A schematic from block states in Sponge order ({@code x + z * width + y * width * length}) — what
+     * {@link SchematicCapture} reads out of a world.
+     */
+    public static Schematic of(int width, int height, int length, int dataVersion, String[] states) {
+        if ((long) width * height * length != states.length) {
+            throw new IllegalArgumentException("states do not fill " + width + "x" + height + "x" + length);
+        }
+        Map<String, Integer> indexes = new java.util.LinkedHashMap<>();
+        int[] blocks = new int[states.length];
+        for (int index = 0; index < states.length; index++) {
+            String state = states[index] == null ? AIR : states[index];
+            blocks[index] = indexes.computeIfAbsent(state, added -> indexes.size());
+        }
+        return new Schematic(width, height, length, dataVersion, List.copyOf(indexes.keySet()), blocks);
+    }
+
+    /** As a Sponge schematic (version 2), the way WorldEdit and this class read it. */
+    public Tag.Compound toTag() {
+        Map<String, Tag> palette = new java.util.LinkedHashMap<>();
+        for (int index = 0; index < this.palette.size(); index++) {
+            palette.put(this.palette.get(index), new Tag.Int(index));
+        }
+        java.io.ByteArrayOutputStream data = new java.io.ByteArrayOutputStream(blocks.length);
+        for (int value : blocks) {
+            int rest = value;
+            while ((rest & ~0x7F) != 0) {
+                data.write((rest & 0x7F) | 0x80);
+                rest >>>= 7;
+            }
+            data.write(rest);
+        }
+        Map<String, Tag> root = new java.util.LinkedHashMap<>();
+        root.put("Version", new Tag.Int(2));
+        root.put("DataVersion", new Tag.Int(dataVersion));
+        root.put("Width", new Tag.Short((short) width));
+        root.put("Height", new Tag.Short((short) height));
+        root.put("Length", new Tag.Short((short) length));
+        root.put("Offset", new Tag.IntArray(new int[]{0, 0, 0}));
+        root.put("PaletteMax", new Tag.Int(palette.size()));
+        root.put("Palette", new Tag.Compound(palette));
+        root.put("BlockData", new Tag.ByteArray(data.toByteArray()));
+        return new Tag.Compound(root);
+    }
+
+    /** Written to {@code file} (gzipped NBT), atomically — beside it, then moved over it. */
+    public void write(Path file) throws IOException {
+        Nbt.write(file, toTag());
+    }
+
     public String stateAt(int x, int y, int z) {
         if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= length) {
             return AIR;
