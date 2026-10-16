@@ -28,8 +28,15 @@ public final class ProxyTransfer {
         }
     }
 
+    /** Server ids of the network to the names the proxy knows them by; anything else passes as it is. */
+    private static volatile java.util.function.UnaryOperator<String> names = java.util.function.UnaryOperator.identity();
+
+    public static void names(java.util.function.UnaryOperator<String> lookup) {
+        names = lookup == null ? java.util.function.UnaryOperator.identity() : lookup;
+    }
+
     public static void send(Plugin plugin, Player player, String server) {
-        player.sendPluginMessage(plugin, CHANNEL, connectPayload(server));
+        player.sendPluginMessage(plugin, CHANNEL, connectPayload(server == null ? null : names.apply(server)));
     }
 
     static byte[] connectPayload(String server) {

@@ -1475,6 +1475,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Off the list at once rather than when the heartbeat goes stale.
             presence.clearThisServer();
             networkServers.leave();
+            de.raindancer.core.social.friends.Socials.uninstall();
         }
         // Before the databases close: a plugin disabled after Core must not find a store on a closed database.
         de.raindancer.core.data.store.Documents.uninstall();
@@ -1899,6 +1900,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private volatile de.raindancer.core.platform.network.NetworkServers networkServers;
     private volatile de.raindancer.core.platform.network.Presence presence;
     private volatile de.raindancer.core.platform.network.NetworkPlayers networkPlayers;
+    private volatile de.raindancer.core.social.friends.Socials socials;
     private volatile de.raindancer.core.platform.network.NetworkCalls networkCalls;
     private volatile de.raindancer.core.platform.network.NetworkRoles networkRoles;
     private volatile de.raindancer.core.social.economy.NetworkEconomy networkEconomy;
@@ -2027,8 +2029,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      * the whole list read again every few seconds. Vanish follows staff from server to server.
      */
     private void startPresence() {
+        String proxyName = de.raindancer.core.platform.network.NetworkConfig.proxyName(getDataFolder().toPath(),
+                System.getenv(), network.serverId());
         networkServers = new de.raindancer.core.platform.network.NetworkServers(databases.core(), network.serverId(),
-                network.group(), System::currentTimeMillis);
+                network.group(), proxyName, System::currentTimeMillis);
+        // A server's id where its proxy name differs (smp vs lillyxoxo): every hop through the proxy uses the latter.
+        de.raindancer.core.platform.network.NetworkServers servers = networkServers;
+        de.raindancer.core.platform.proxy.ProxyTransfer.names(servers::proxyName);
         presence = new de.raindancer.core.platform.network.Presence(databases.core(), networkServers, System::currentTimeMillis);
         presence.connect(bus);
         // Every player's own switches follow them, whichever plugin they belong to.
@@ -2045,6 +2052,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     return true;
                 });
         vanish.onChange((who, vanished) -> Scheduling.async(this, () -> presence.vanished(who, vanished)));
+        socials = new de.raindancer.core.social.friends.Socials(this, databases.core(), presence, networkPlayers, bus,
+                network.serverId(), this::serverName, System::currentTimeMillis);
+        socials.install();
         networkCalls = new de.raindancer.core.platform.network.NetworkCalls(bus);
         networkRoles = new de.raindancer.core.platform.network.NetworkRoles(databases.core(), network.serverId(),
                 System::currentTimeMillis);
@@ -2537,6 +2547,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             boolean hidden = vanish.isVanished(id);
             String name = event.getPlayer().getName();
             Scheduling.async(this, () -> presence.joined(id, name, hidden));
+            de.raindancer.core.social.friends.Socials arrivedTo = socials;
+            if (arrivedTo != null && !hidden) {
+                Scheduling.async(this, () -> arrivedTo.arrived(id, name));
+            }
             isNewPlayer(event.getPlayer());
             de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> Scheduling.async(this,
                     () -> returns.arrived(id)));
@@ -2654,6 +2668,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             sharedArriving.remove(event.getPlayer().getUniqueId());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
+            de.raindancer.core.social.friends.Socials leftFrom = socials;
+            if (leftFrom != null) {
+                Scheduling.async(this, () -> leftFrom.left(leaving));
+            }
             newcomers.remove(leaving);
             // Where they stood is where /back takes them from the next server.
             de.raindancer.core.world.teleport.Returns.installed().ifPresent(returns -> returns.left(leaving,

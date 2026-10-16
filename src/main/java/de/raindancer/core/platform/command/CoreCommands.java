@@ -231,7 +231,8 @@ public final class CoreCommands {
 
     /**
      * {@code /network}: the network's servers and who is on them, and which server is the bank
-     * ({@code /network bank here} moves it). One per server, taken by the first plugin that asks.
+     * ({@code /network bank here} moves it) — and with it {@code /friend}, {@code /party} and {@code /pc}. One per
+     * server, taken by the first plugin that asks.
      */
     public static boolean network(Commands registrar) {
         if (!NETWORK_TAKEN.compareAndSet(false, true)) {
@@ -239,6 +240,13 @@ public final class CoreCommands {
         }
         registrar.register("network", "The network's servers, and which one keeps the money.",
                 List.of(), new de.raindancer.core.platform.network.NetworkCommand());
+        // Friends and parties are the network's too: whoever brings /network brings them, on every server alike.
+        registrar.register("friend", "Friends across the network: add, accept, list, join.",
+                List.of("friends", "f"), new de.raindancer.core.social.friends.FriendCommand());
+        registrar.register("party", "A party across the network that follows its leader.",
+                List.of("p"), new de.raindancer.core.social.party.PartyCommand(false));
+        registrar.register("pc", "Say something to your party.", List.of(),
+                new de.raindancer.core.social.party.PartyCommand(true));
         return true;
     }
 }

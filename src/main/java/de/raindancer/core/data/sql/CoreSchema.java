@@ -354,7 +354,58 @@ public final class CoreSchema {
                 player TEXT    PRIMARY KEY,
                 server TEXT    NOT NULL,
                 at     INTEGER NOT NULL
-            )""");
+            )""",
+
+            // Friends: two rows a friendship, one each way, so "my friends" is one index lookup.
+            """
+            CREATE TABLE friend (
+                player TEXT    NOT NULL,
+                friend TEXT    NOT NULL,
+                since  INTEGER NOT NULL,
+                PRIMARY KEY (player, friend)
+            )""",
+            """
+            CREATE TABLE friend_request (
+                asker  TEXT    NOT NULL,
+                asked  TEXT    NOT NULL,
+                at     INTEGER NOT NULL,
+                PRIMARY KEY (asker, asked)
+            )""",
+            "CREATE INDEX friend_request_asked ON friend_request (asked)",
+
+            // A party: one row a member, one party a player; the leader is the member marked so.
+            """
+            CREATE TABLE party_member (
+                player TEXT    PRIMARY KEY,
+                party  TEXT    NOT NULL,
+                leader INTEGER NOT NULL,
+                joined INTEGER NOT NULL
+            )""",
+            "CREATE INDEX party_member_party ON party_member (party)",
+            """
+            CREATE TABLE party_invite (
+                party   TEXT    NOT NULL,
+                player  TEXT    NOT NULL,
+                inviter TEXT    NOT NULL,
+                expires INTEGER NOT NULL,
+                PRIMARY KEY (party, player)
+            )""",
+
+            // Where somebody was last seen leaving, and when: arriving within moments of leaving another server is
+            // switching servers, not joining the network — what friends are told depends on it.
+            """
+            CREATE TABLE network_seen (
+                player     TEXT    PRIMARY KEY,
+                name       TEXT    NOT NULL,
+                name_lower TEXT    NOT NULL,
+                server     TEXT    NOT NULL,
+                at         INTEGER NOT NULL,
+                online     INTEGER NOT NULL
+            )""",
+            "CREATE INDEX network_seen_name ON network_seen (name_lower)",
+
+            // What the proxy calls a server, where that is not its id (Lilly's SMP: smp here, lillyxoxo there).
+            "ALTER TABLE network_server ADD COLUMN proxy TEXT");
 
     /**
      * What was done.

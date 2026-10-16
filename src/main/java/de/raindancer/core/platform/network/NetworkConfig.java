@@ -50,6 +50,32 @@ public record NetworkConfig(String serverId, String group, Dialect dialect, Post
      *
      * @param fallbackId the server's id when neither the file, the environment nor an old link.yml name one
      */
+    /**
+     * What the proxy calls this server, where it differs from its id — Lilly's SMP is {@code smp} on the network and
+     * {@code lillyxoxo} in velocity.toml. {@code server.proxy-name} in the file, or {@code RAINS_SERVER_PROXY}; else
+     * the id.
+     */
+    public static String proxyName(Path folder, Map<String, String> env, String serverId) {
+        String fromEnv = env.get("RAINS_SERVER_PROXY");
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.strip();
+        }
+        Path file = folder.resolve(FILE);
+        if (java.nio.file.Files.isRegularFile(file)) {
+            org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
+            try {
+                yaml.loadFromString(java.nio.file.Files.readString(file));
+                String named = yaml.getString("server.proxy-name", "");
+                if (!named.isBlank()) {
+                    return named.strip();
+                }
+            } catch (java.io.IOException | org.bukkit.configuration.InvalidConfigurationException unreadable) {
+                // the id it is, then; load() reports a broken file
+            }
+        }
+        return serverId;
+    }
+
     public static NetworkConfig load(Path folder, Map<String, String> env, Supplier<String> fallbackId) {
         Path file = folder.resolve(FILE);
         List<String> problems = new ArrayList<>();

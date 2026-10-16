@@ -21,20 +21,28 @@ public final class NetworkServers {
     public static final long ALIVE_MILLIS = 20_000;
 
     /** One server as the network sees it. */
-    public record Server(String id, String group, String name, long startedAt, long heartbeatAt, int players) {
+    /** @param proxy what the proxy calls it — its id unless network.yml says otherwise */
+    public record Server(String id, String group, String name, long startedAt, long heartbeatAt, int players,
+                         String proxy) {
     }
 
     private final Database database;
     private final String self;
     private final String group;
     private final LongSupplier clock;
+    private final String proxy;
     private final long startedAt;
     private volatile List<Server> online = List.of();
 
     public NetworkServers(Database database, String self, String group, LongSupplier clock) {
+        this(database, self, group, self, clock);
+    }
+
+    public NetworkServers(Database database, String self, String group, String proxy, LongSupplier clock) {
         this.database = database;
         this.self = self;
         this.group = group;
+        this.proxy = proxy == null || proxy.isBlank() ? self : proxy;
         this.clock = clock;
         this.startedAt = clock.getAsLong();
     }
@@ -48,15 +56,17 @@ public final class NetworkServers {
         long now = clock.getAsLong();
         database.write(connection -> {
             try (PreparedStatement upsert = connection.prepareStatement("""
-                    INSERT INTO network_server (id, grp, name, started_at, heartbeat_at, players) VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO network_server (id, grp, name, started_at, heartbeat_at, players, proxy) VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET grp = excluded.grp, name = excluded.name,
-                        started_at = excluded.started_at, heartbeat_at = excluded.heartbeat_at, players = excluded.players""")) {
+                        started_at = excluded.started_at, heartbeat_at = excluded.heartbeat_at, players = excluded.players,
+                        proxy = excluded.proxy""")) {
                 upsert.setString(1, self);
                 upsert.setString(2, group);
                 upsert.setString(3, displayName == null ? self : displayName);
                 upsert.setLong(4, startedAt);
                 upsert.setLong(5, now);
                 upsert.setInt(6, players);
+                upsert.setString(7, proxy);
                 upsert.executeUpdate();
             }
         });
@@ -69,12 +79,14 @@ public final class NetworkServers {
         database.read(connection -> {
             List<Server> found = new ArrayList<>();
             try (PreparedStatement select = connection.prepareStatement(
-                    "SELECT id, grp, name, started_at, heartbeat_at, players FROM network_server WHERE heartbeat_at >= ? ORDER BY id")) {
+                    "SELECT id, grp, name, started_at, heartbeat_at, players, proxy FROM network_server WHERE heartbeat_at >= ? ORDER BY id")) {
                 select.setLong(1, since);
                 try (ResultSet rows = select.executeQuery()) {
                     while (rows.next()) {
+                        String proxyName = rows.getString(7);
                         found.add(new Server(rows.getString(1), rows.getString(2), rows.getString(3), rows.getLong(4),
-                                rows.getLong(5), rows.getInt(6)));
+                                rows.getLong(5), rows.getInt(6),
+                                proxyName == null || proxyName.isBlank() ? rows.getString(1) : proxyName));
                     }
                 }
             }
@@ -89,6 +101,11 @@ public final class NetworkServers {
 
     public boolean isOnline(String id) {
         return online.stream().anyMatch(server -> server.id().equals(id));
+    }
+
+    /** What the proxy calls the server with this id; the id itself for one it does not know. */
+    public String proxyName(String id) {
+        return byId(id).map(Server::proxy).orElse(id);
     }
 
     public Optional<Server> byId(String id) {

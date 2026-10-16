@@ -136,4 +136,15 @@ class NetworkConfigTest {
                 "database:\n  type: postgresql\n  postgresql:\n    password: hunter2\n");
         assertThat(load(Map.of()).toString()).doesNotContain("hunter2");
     }
+
+    @org.junit.jupiter.api.Test
+    void theProxyMayKnowAServerByAnotherName() throws Exception {
+        java.nio.file.Files.writeString(folder.resolve(NetworkConfig.FILE), "server:\n  id: smp\n  proxy-name: lillyxoxo\n");
+        org.junit.jupiter.api.Assertions.assertEquals("lillyxoxo", NetworkConfig.proxyName(folder, java.util.Map.of(), "smp"));
+        org.junit.jupiter.api.Assertions.assertEquals("other",
+                NetworkConfig.proxyName(folder, java.util.Map.of("RAINS_SERVER_PROXY", "other"), "smp"));
+        java.nio.file.Files.writeString(folder.resolve(NetworkConfig.FILE), "server:\n  id: arena\n");
+        org.junit.jupiter.api.Assertions.assertEquals("arena", NetworkConfig.proxyName(folder, java.util.Map.of(), "arena"),
+                "without one, the proxy calls it by its id");
+    }
 }

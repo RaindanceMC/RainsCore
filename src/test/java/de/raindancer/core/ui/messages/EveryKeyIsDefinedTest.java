@@ -88,6 +88,13 @@ class EveryKeyIsDefinedTest {
             keys.add(action.nameKey());
             keys.add(action.descriptionKey());
         }
+        // FriendCommand and PartyCommand answer with "friends."/"party." + the outcome's name.
+        for (de.raindancer.core.social.friends.Friends.Outcome outcome : de.raindancer.core.social.friends.Friends.Outcome.values()) {
+            keys.add("friends." + outcome.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'));
+        }
+        for (de.raindancer.core.social.party.Parties.Outcome outcome : de.raindancer.core.social.party.Parties.Outcome.values()) {
+            keys.add("party." + outcome.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'));
+        }
         for (LandAudience audience : LandAudience.values()) {
             keys.add(audience.nameKey());
             keys.add(audience.descriptionKey());
