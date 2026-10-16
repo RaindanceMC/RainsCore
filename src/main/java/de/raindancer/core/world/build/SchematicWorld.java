@@ -93,6 +93,11 @@ public final class SchematicWorld {
         }
     }
 
+    /** Whether the record says this version of the schematic stands in this world. */
+    static boolean stands(org.bukkit.configuration.ConfigurationSection built, long version, String world) {
+        return built.getLong("version", -1) == version && world.equals(built.getString("world"));
+    }
+
     public String worldName() {
         return worldName;
     }
@@ -119,7 +124,7 @@ public final class SchematicWorld {
     public void ensure(Path schematicFile, Landing relative, boolean force, Consumer<Optional<Location>> done) {
         Scheduling.async(plugin, () -> {
             long version = version(schematicFile);
-            boolean standing = !force && builtFile.read().getLong("version", -1) == version;
+            boolean standing = !force && stands(builtFile.read(), version, worldName);
             Schematic schematic;
             try {
                 schematic = Schematic.read(schematicFile);
@@ -148,7 +153,10 @@ public final class SchematicWorld {
                 job.start(blocks -> {
                     building = false;
                     stands(world, landing);
-                    Scheduling.async(plugin, () -> builtFile.write(yaml -> yaml.set("version", version)));
+                    Scheduling.async(plugin, () -> builtFile.write(yaml -> {
+                        yaml.set("version", version);
+                        yaml.set("world", worldName);
+                    }));
                     log.info("{} is built into '{}': {} block(s).", schematicFile.getFileName(), worldName, blocks);
                     done.accept(Optional.of(landing));
                 });

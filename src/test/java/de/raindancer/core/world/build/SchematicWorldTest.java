@@ -41,4 +41,16 @@ class SchematicWorldTest {
         assertNotEquals(first, SchematicWorld.version(file));
         assertEquals(-2, SchematicWorld.version(folder.resolve("missing.schem")));
     }
+
+    @Test
+    void onlyTheSameVersionInTheSameWorldCountsAsStanding() {
+        org.bukkit.configuration.file.YamlConfiguration built = new org.bukkit.configuration.file.YamlConfiguration();
+        assertEquals(false, SchematicWorld.stands(built, 7, "ctf_lobby"));
+        built.set("version", 7L);
+        assertEquals(false, SchematicWorld.stands(built, 7, "ctf_lobby"), "a record without its world builds again");
+        built.set("world", "ctf_hub");
+        assertEquals(false, SchematicWorld.stands(built, 7, "ctf_lobby"), "another world is empty");
+        assertEquals(true, SchematicWorld.stands(built, 7, "ctf_hub"));
+        assertEquals(false, SchematicWorld.stands(built, 8, "ctf_hub"), "another version");
+    }
 }
