@@ -74,6 +74,19 @@ public final class Skins {
         return ID.matcher(id).matches() ? Optional.of(id) : Optional.empty();
     }
 
+    /**
+     * One of several skins written comma-separated ({@code "mineskin:a, mineskin:b"}), the same one every time for the
+     * same {@code who} — so a row of attendants is shared out between them; one skin, or none, as it is.
+     */
+    public static String pick(String skins, UUID who) {
+        if (skins == null || skins.isBlank()) {
+            return "";
+        }
+        List<String> each = java.util.Arrays.stream(skins.split(",")).map(String::strip).filter(s -> !s.isEmpty())
+                .toList();
+        return each.size() == 1 ? each.getFirst() : each.get(Math.floorMod(who.hashCode(), each.size()));
+    }
+
     /** The texture in MineSkin's answer to {@code GET /v2/skins/<id>}. */
     static Optional<Texture> parse(String answer) {
         try {

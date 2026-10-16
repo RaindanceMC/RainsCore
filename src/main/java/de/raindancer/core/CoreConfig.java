@@ -46,7 +46,7 @@ import org.bukkit.Material;
         @Topic(path = "moderation/chatlog", title = "Chat log", icon = Material.BOOK,
                 description = "What everybody said in chat, kept for staff for a while."),
         @Topic(path = "world/desks", title = "Attendants", icon = Material.ARMOR_STAND,
-                description = "People standing in the world who serve players: insurance agents."),
+                description = "People standing in the world who serve players: insurance agents and bankers."),
         @Topic(path = "moderation", title = "Moderation", icon = Material.IRON_AXE,
                 description = "Whether punishments are acted on, and what a punished player is "
                         + "told. The record is kept either way."),
@@ -364,6 +364,21 @@ public record CoreConfig(
                 + "/eco agent place or /insurance agent place.")
         boolean insuranceInPersonOnly,
 
+        @In("world/desks") @Title("The bank only at a banker")
+        @Describe("Players open the bank by talking to a banker standing in the world, not with /bank. Staff "
+                + "place bankers with /eco banker place.")
+        boolean bankInPersonOnly,
+
+        @In("world/desks") @Title("Insurance agents' skins")
+        @Describe("A player name, a MineSkin link (mineskin.org) or mineskin:<id>; several, comma-separated, are "
+                + "shared out between the agents. Empty: the black suit. Agents already standing keep theirs "
+                + "until they are placed again.")
+        String insuranceAgentSkins,
+
+        @In("world/desks") @Title("Bankers' skins")
+        @Describe("Like the insurance agents' skins.")
+        String bankerSkins,
+
         @In("appearance") @Title("Server name")
         @Describe("What this server is called wherever a plugin names it: the tablist header and logo, "
                 + "the hub, and the other servers of a network. Plain text. Empty: the MOTD's first line, "
@@ -423,6 +438,7 @@ public record CoreConfig(
             // A year: long enough to look into something reported months late, and a limit — never for ever.
             true, 365,
             false,
+            false, "", "",
             "",
             true,
             "hub");

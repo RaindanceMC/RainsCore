@@ -8,7 +8,8 @@ import java.util.Optional;
 /** A kind of attendant several plugins sell through: whatever each offers there is listed at every one. */
 public enum ServiceDesk {
 
-    INSURANCE("Insurance agent", "Insurance", Material.TOTEM_OF_UNDYING);
+    INSURANCE("Insurance agent", "Insurance", Material.TOTEM_OF_UNDYING),
+    BANK("Banker", "Bank", Material.GOLD_INGOT);
 
     private final String title;
     private final String menuTitle;

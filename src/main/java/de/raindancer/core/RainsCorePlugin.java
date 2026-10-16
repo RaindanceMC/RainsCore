@@ -1162,6 +1162,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private void applyNewSettings(CoreConfig config) {
         de.raindancer.core.social.desk.ServiceDesks.inPersonOnly(
                 de.raindancer.core.social.desk.ServiceDesk.INSURANCE, config.insuranceInPersonOnly());
+        de.raindancer.core.social.desk.ServiceDesks.inPersonOnly(
+                de.raindancer.core.social.desk.ServiceDesk.BANK, config.bankInPersonOnly());
+        de.raindancer.core.social.desk.ServiceDesks.skins(
+                de.raindancer.core.social.desk.ServiceDesk.INSURANCE, config.insuranceAgentSkins());
+        de.raindancer.core.social.desk.ServiceDesks.skins(
+                de.raindancer.core.social.desk.ServiceDesk.BANK, config.bankerSkins());
         if (chatLog != null) {
             chatLog.enabled(config.chatLogEnabled());
         }

@@ -43,4 +43,24 @@ class SkinsTest {
         assertNotEquals(Skins.profileId("355f8c81"), Skins.profileId("12345678"));
         assertNotEquals(Attendants.SUIT_ID, Skins.profileId("355f8c81"));
     }
+
+    @Test
+    void oneOfSeveralSkinsIsPickedTheSameEveryTimeForTheSameAttendant() {
+        java.util.UUID one = java.util.UUID.randomUUID();
+        String skins = "mineskin:5bf0f0b8, mineskin:01b7d65b";
+        assertEquals(Skins.pick(skins, one), Skins.pick(skins, one));
+        assertTrue(java.util.List.of("mineskin:5bf0f0b8", "mineskin:01b7d65b").contains(Skins.pick(skins, one)));
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (int i = 0; i < 64; i++) {
+            seen.add(Skins.pick(skins, java.util.UUID.randomUUID()));
+        }
+        assertEquals(2, seen.size(), "both are worn by somebody");
+    }
+
+    @Test
+    void aSingleSkinOrNoneIsTakenAsItIs() {
+        assertEquals("lillyyxoxo", Skins.pick("lillyyxoxo", java.util.UUID.randomUUID()));
+        assertEquals("", Skins.pick("  ", java.util.UUID.randomUUID()));
+        assertEquals("", Skins.pick(null, java.util.UUID.randomUUID()));
+    }
 }

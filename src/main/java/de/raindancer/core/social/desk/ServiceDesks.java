@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -33,6 +34,7 @@ public final class ServiceDesks {
 
     private static final List<Offered> offers = new CopyOnWriteArrayList<>();
     private static final Set<ServiceDesk> inPerson = EnumSet.noneOf(ServiceDesk.class);
+    private static final java.util.Map<ServiceDesk, String> skins = new java.util.concurrent.ConcurrentHashMap<>();
     private static volatile Messages messages;
     private static volatile Brand brand;
 
@@ -75,6 +77,20 @@ public final class ServiceDesks {
         return before - offers.size();
     }
 
+    /** The skins this desk's attendants wear (see {@link Attendants#look}; several, comma-separated, are shared out). */
+    public static String skins(ServiceDesk desk) {
+        return skins.getOrDefault(desk, "");
+    }
+
+    /** Core's settings decide it. */
+    public static void skins(ServiceDesk desk, String which) {
+        if (which == null || which.isBlank()) {
+            skins.remove(desk);
+        } else {
+            skins.put(desk, which.strip());
+        }
+    }
+
     /** Whether this desk's services are only to be had from one of its attendants. */
     public static boolean inPersonOnly(ServiceDesk desk) {
         synchronized (inPerson) {
@@ -111,7 +127,8 @@ public final class ServiceDesks {
     /** An attendant of this desk where the player stands, facing them. On the player's own region thread. */
     public static Mannequin place(Player player, ServiceDesk desk) {
         return Attendants.place(player, Component.text(desk.title(), NamedTextColor.GOLD),
-                Component.text("Right click to talk", NamedTextColor.GRAY), Attendants.look(null),
+                Component.text("Right click to talk", NamedTextColor.GRAY),
+                Attendants.look(de.raindancer.core.world.npc.Skins.pick(skins(desk), UUID.randomUUID())),
                 attendant -> attendant.getPersistentDataContainer().set(DESK, PersistentDataType.STRING, desk.name()));
     }
 
@@ -140,5 +157,6 @@ public final class ServiceDesks {
         synchronized (inPerson) {
             inPerson.clear();
         }
+        skins.clear();
     }
 }

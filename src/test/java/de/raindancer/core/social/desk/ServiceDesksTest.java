@@ -69,7 +69,20 @@ class ServiceDesksTest {
     void read() {
         assertThat(ServiceDesk.read("INSURANCE")).contains(ServiceDesk.INSURANCE);
         assertThat(ServiceDesk.read("insurance")).contains(ServiceDesk.INSURANCE);
-        assertThat(ServiceDesk.read("bank")).isEmpty();
+        assertThat(ServiceDesk.read("bank")).contains(ServiceDesk.BANK);
+        assertThat(ServiceDesk.read("casino")).isEmpty();
         assertThat(ServiceDesk.read(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("each desk wears the skins Core's settings give it, none set is the suit")
+    void skins() {
+        assertThat(ServiceDesks.skins(ServiceDesk.BANK)).isEmpty();
+        ServiceDesks.skins(ServiceDesk.BANK, "mineskin:d01b7d1a");
+        ServiceDesks.skins(ServiceDesk.INSURANCE, "mineskin:5bf0f0b8, mineskin:01b7d65b");
+        assertThat(ServiceDesks.skins(ServiceDesk.BANK)).isEqualTo("mineskin:d01b7d1a");
+        assertThat(ServiceDesks.skins(ServiceDesk.INSURANCE)).isEqualTo("mineskin:5bf0f0b8, mineskin:01b7d65b");
+        ServiceDesks.clear();
+        assertThat(ServiceDesks.skins(ServiceDesk.BANK)).isEmpty();
     }
 }
