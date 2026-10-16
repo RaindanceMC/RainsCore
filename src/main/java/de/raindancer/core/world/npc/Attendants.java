@@ -70,6 +70,16 @@ public final class Attendants {
     }
 
     /**
+     * Puts an attendant standing already into {@code skins} — one of them, the same one for this attendant every time
+     * (see {@link Skins#pick}); a MineSkin skin still on its way is put on when it arrives.
+     */
+    public static void dress(Mannequin attendant, String skins) {
+        ResolvableProfile look = look(Skins.pick(skins, attendant.getUniqueId()));
+        attendant.setProfile(look);
+        Skins.waitingFor(look).ifPresent(id -> Skins.dressWhenHere(id, attendant));
+    }
+
+    /**
      * An attendant where the player stands, looking the way they look. On the player's own region thread.
      *
      * @param tag marks it as whatever it is (a PDC entry), before it is added to the world
