@@ -85,16 +85,24 @@ public final class FloatingBoards {
         }
     }
 
+    /**
+     * Reads where the boards stand off the server thread — the file may be a row in Core's database — then finds
+     * their worlds on the global thread and starts the refreshing.
+     */
     public void start() {
-        for (String line : file.read().getStringList("boards")) {
-            parse(line).ifPresent(spot -> {
-                World world = server.getWorld(spot.world());
-                if (world != null) {
-                    boards.add(new Location(world, spot.x(), spot.y(), spot.z()));
+        Scheduling.async(plugin, () -> {
+            List<Spot> spots = file.read().getStringList("boards").stream().map(FloatingBoards::parse)
+                    .flatMap(Optional::stream).toList();
+            Scheduling.global(plugin, () -> {
+                for (Spot spot : spots) {
+                    World world = server.getWorld(spot.world());
+                    if (world != null) {
+                        boards.add(new Location(world, spot.x(), spot.y(), spot.z()));
+                    }
                 }
+                timer = Scheduling.asyncTimer(plugin, 5, seconds, task -> refresh());
             });
-        }
-        timer = Scheduling.asyncTimer(plugin, 5, seconds, task -> refresh());
+        });
     }
 
     public void stop() {
@@ -173,10 +181,11 @@ public final class FloatingBoards {
         return out;
     }
 
+    /** Written off the server thread, for the same reason it is read off it. */
     private void save() {
         List<String> lines = boards.stream()
                 .map(spot -> line(new Spot(spot.getWorld().getName(), spot.getX(), spot.getY(), spot.getZ())))
                 .toList();
-        file.write(yaml -> yaml.set("boards", lines));
+        Scheduling.async(plugin, () -> file.write(yaml -> yaml.set("boards", lines)));
     }
 }
