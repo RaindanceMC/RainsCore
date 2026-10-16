@@ -147,4 +147,15 @@ class NetworkConfigTest {
         org.junit.jupiter.api.Assertions.assertEquals("arena", NetworkConfig.proxyName(folder, java.util.Map.of(), "arena"),
                 "without one, the proxy calls it by its id");
     }
+
+    @org.junit.jupiter.api.Test
+    void aServerMayHaveAGameNameForTheNetwork() throws Exception {
+        java.nio.file.Files.writeString(folder.resolve(NetworkConfig.FILE),
+                "server:\n  id: ctf\n  display-name: Capture the Flag\n");
+        org.junit.jupiter.api.Assertions.assertEquals("Capture the Flag",
+                NetworkConfig.displayName(folder, java.util.Map.of(), "lillyyxoxo.net"));
+        java.nio.file.Files.writeString(folder.resolve(NetworkConfig.FILE), "server:\n  id: ctf\n");
+        org.junit.jupiter.api.Assertions.assertEquals("lillyyxoxo.net",
+                NetworkConfig.displayName(folder, java.util.Map.of(), "lillyyxoxo.net"), "without one: the server's name");
+    }
 }

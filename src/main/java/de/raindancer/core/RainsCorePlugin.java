@@ -2053,7 +2053,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 });
         vanish.onChange((who, vanished) -> Scheduling.async(this, () -> presence.vanished(who, vanished)));
         socials = new de.raindancer.core.social.friends.Socials(this, databases.core(), presence, networkPlayers, bus,
-                network.serverId(), this::serverName, System::currentTimeMillis);
+                network.serverId(), this::networkName, System::currentTimeMillis);
         socials.install();
         networkCalls = new de.raindancer.core.platform.network.NetworkCalls(bus);
         networkRoles = new de.raindancer.core.platform.network.NetworkRoles(databases.core(), network.serverId(),
@@ -2103,12 +2103,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         Scheduling.async(this, () -> {
             // Whatever a crash of this server left listed goes first.
             presence.clearThisServer();
-            networkServers.heartbeat(serverName(), 0);
+            networkServers.heartbeat(networkName(), 0);
             presence.refreshAll();
         });
         Scheduling.asyncTimer(this, 5, 5, task -> {
             // Visible players only: the count is shown on other servers, and vanished staff are not there to count.
-            networkServers.heartbeat(serverName(), (int) getServer().getOnlinePlayers().stream()
+            networkServers.heartbeat(networkName(), (int) getServer().getOnlinePlayers().stream()
                     .filter(online -> !vanish.isVanished(online.getUniqueId())).count());
             presence.refreshAll();
         });
@@ -2760,6 +2760,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     /** server-name in link.yml, read once at start; empty without one. */
     private volatile String linkServerName = "";
+
+    /** What the network calls this server — network.yml's display-name, else the server's name. */
+    String networkName() {
+        return de.raindancer.core.platform.network.NetworkConfig.displayName(getDataFolder().toPath(), System.getenv(),
+                serverName());
+    }
 
     @Override
     public String serverName() {

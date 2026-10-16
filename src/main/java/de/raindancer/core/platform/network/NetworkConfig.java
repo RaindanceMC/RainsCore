@@ -56,7 +56,19 @@ public record NetworkConfig(String serverId, String group, Dialect dialect, Post
      * the id.
      */
     public static String proxyName(Path folder, Map<String, String> env, String serverId) {
-        String fromEnv = env.get("RAINS_SERVER_PROXY");
+        return serverValue(folder, env, "server.proxy-name", "RAINS_SERVER_PROXY", serverId);
+    }
+
+    /**
+     * What players are told this server is ("Lilly is now playing <b>Capture the Flag</b>") — {@code server.display-name}
+     * or {@code RAINS_SERVER_DISPLAY}; else {@code fallback}, the server's name.
+     */
+    public static String displayName(Path folder, Map<String, String> env, String fallback) {
+        return serverValue(folder, env, "server.display-name", "RAINS_SERVER_DISPLAY", fallback);
+    }
+
+    private static String serverValue(Path folder, Map<String, String> env, String key, String envKey, String fallback) {
+        String fromEnv = env.get(envKey);
         if (fromEnv != null && !fromEnv.isBlank()) {
             return fromEnv.strip();
         }
@@ -65,15 +77,15 @@ public record NetworkConfig(String serverId, String group, Dialect dialect, Post
             org.bukkit.configuration.file.YamlConfiguration yaml = new org.bukkit.configuration.file.YamlConfiguration();
             try {
                 yaml.loadFromString(java.nio.file.Files.readString(file));
-                String named = yaml.getString("server.proxy-name", "");
+                String named = yaml.getString(key, "");
                 if (!named.isBlank()) {
                     return named.strip();
                 }
             } catch (java.io.IOException | org.bukkit.configuration.InvalidConfigurationException unreadable) {
-                // the id it is, then; load() reports a broken file
+                // the fallback it is, then; load() reports a broken file
             }
         }
-        return serverId;
+        return fallback;
     }
 
     public static NetworkConfig load(Path folder, Map<String, String> env, Supplier<String> fallbackId) {
