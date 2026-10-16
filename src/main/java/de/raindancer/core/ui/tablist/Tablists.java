@@ -225,16 +225,20 @@ public final class Tablists {
         String resolvedCustomFooter = footerNow;
 
         ServerLoad loadNow = currentLoad();
+        java.util.Map<String, java.util.Set<String>> awayNow = elsewhere.get();
+        int network = visibleEntries.size() + awayNow.values().stream().mapToInt(java.util.Set::size).sum();
         Component header = resolvedCustomHeader.isBlank()
-                ? model.header(visibleEntries, serverName)
-                : model.custom(resolvedCustomHeader, visibleEntries, serverName, loadNow);
+                ? model.header(visibleEntries, serverName, network)
+                : model.custom(resolvedCustomHeader.replace("<network>", String.valueOf(network)), visibleEntries,
+                        serverName, loadNow);
         Component footer = resolvedCustomFooter.isBlank()
                 ? model.footer(visibleEntries)
-                : model.custom(resolvedCustomFooter, visibleEntries, serverName, loadNow);
+                : model.custom(resolvedCustomFooter.replace("<network>", String.valueOf(network)), visibleEntries,
+                        serverName, loadNow);
         if (showPerformance && loadNow != null) {
             footer = footer.append(Component.newline()).append(model.performance(loadNow)).append(Component.newline());
         }
-        Component away = model.elsewhere(elsewhere.get());
+        Component away = model.elsewhere(awayNow);
         if (!away.equals(Component.empty())) {
             footer = footer.append(Component.newline()).append(away).append(Component.newline());
         }

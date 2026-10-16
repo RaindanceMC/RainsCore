@@ -329,6 +329,19 @@ class TablistRankingTest {
         }
 
         @Test
+        @DisplayName("on a network the header counts everybody on it, beside who is here")
+        void networkCount() {
+            TablistModel model = model();
+            assertThat(plain(model.header(List.of(PLAYER, MOD), "My Server", 12)))
+                    .contains("2 here").contains("12 on the network");
+            assertThat(plain(model.header(List.of(PLAYER, MOD), "My Server", 2)))
+                    .as("nobody elsewhere: as it always was").contains("2 players online")
+                    .doesNotContain("network");
+            assertThat(plain(model.custom("<players>/<network>", List.of(PLAYER), "My Server", 7)))
+                    .contains("1/7");
+        }
+
+        @Test
         @DisplayName("a title with a typo in its markup still shows the words")
         void brokenTitleMarkup() {
             TablistModel model = model();

@@ -248,6 +248,14 @@ public final class TablistModel {
 
     /** What sits above the list: the server, and how many are on. */
     public Component header(List<TablistEntry> online, String serverName) {
+        return header(online, serverName, 0);
+    }
+
+    /**
+     * {@link #header(List, String)}, and on a network everybody on it: "2 here · 12 on the network" — only when
+     * anybody is elsewhere, so a single server reads as it always did.
+     */
+    public Component header(List<TablistEntry> online, String serverName, int network) {
         int count = online == null ? 0 : online.size();
 
         StringBuilder built = new StringBuilder("\n");
@@ -267,8 +275,13 @@ public final class TablistModel {
         }
         // Kept whatever else is above it: how many people are on is the one thing anybody looks at
         // a tablist header for.
-        built.append("\n<gray>").append(count)
-                .append(count == 1 ? " player online" : " players online").append('\n');
+        if (network > count) {
+            built.append("\n<gray>").append(count).append(" here <dark_gray>·</dark_gray> <white>").append(network)
+                    .append("</white> on the network").append('\n');
+        } else {
+            built.append("\n<gray>").append(count)
+                    .append(count == 1 ? " player online" : " players online").append('\n');
+        }
 
         String markup = built.toString();
         try {
@@ -400,6 +413,12 @@ public final class TablistModel {
                 .replace("<mspt>", load == null ? "?" : load.msptText())
                 .replace("<ram>", load == null ? "?" : load.ramText());
         return custom(filled, online, serverName);
+    }
+
+    /** {@link #custom(String, List, String)} with {@code <network>}: everybody on the network. */
+    public Component custom(String miniMessage, List<TablistEntry> online, String serverName, int network) {
+        int count = online == null ? 0 : online.size();
+        return custom(miniMessage.replace("<network>", String.valueOf(Math.max(network, count))), online, serverName);
     }
 
     public Component custom(String miniMessage, List<TablistEntry> online, String serverName) {
