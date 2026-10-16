@@ -2,5 +2,5 @@ target/
 *.iml
 .idea/
 .serena/
-build/
+/build/
 dependency-reduced-pom.xml
