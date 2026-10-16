@@ -72,6 +72,28 @@ public final class DeskMenu extends Menu {
         }
     }
 
+    /** Talking to an attendant: their one offer straight away, or the desk when there is more (or nothing). */
+    static void talk(Player viewer, ServiceDesk desk) {
+        java.util.Optional<DeskOffer> only = ServiceDesks.soleOffer(desk, offer -> available(offer) && shows(offer, viewer));
+        if (only.isEmpty()) {
+            new DeskMenu(viewer, desk).open();
+            return;
+        }
+        try {
+            only.get().use(viewer, () -> new DeskMenu(viewer, desk).open());
+        } catch (RuntimeException broken) {
+            log.error(broken, "An offer at the {} failed when talked to.", desk.title());
+        }
+    }
+
+    private static boolean shows(DeskOffer offer, Player viewer) {
+        try {
+            return offer.icon(viewer) != null;
+        } catch (RuntimeException broken) {
+            return false;
+        }
+    }
+
     private static boolean available(DeskOffer offer) {
         try {
             return offer.available();

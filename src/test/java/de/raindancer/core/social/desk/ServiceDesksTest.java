@@ -85,4 +85,24 @@ class ServiceDesksTest {
         ServiceDesks.clear();
         assertThat(ServiceDesks.skins(ServiceDesk.BANK)).isEmpty();
     }
+
+    @Test
+    @DisplayName("a desk with one thing on offer for this player opens it straight away; with more, the desk")
+    void soleOffer() {
+        Offer bank = new Offer("bank");
+        ServiceDesks.offer(ServiceDesk.GUILD_BANK, bank);
+        assertThat(ServiceDesks.soleOffer(ServiceDesk.GUILD_BANK, offer -> true)).contains(bank);
+        assertThat(ServiceDesks.soleOffer(ServiceDesk.GUILD_BANK, offer -> false)).isEmpty();
+        ServiceDesks.offer(ServiceDesk.GUILD_BANK, new Offer("loans"));
+        assertThat(ServiceDesks.soleOffer(ServiceDesk.GUILD_BANK, offer -> true)).isEmpty();
+        assertThat(ServiceDesks.soleOffer(ServiceDesk.GUILD_VAULT, offer -> true)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the guild's desks are desks like any other")
+    void guildDesks() {
+        assertThat(ServiceDesk.read("guild_bank")).contains(ServiceDesk.GUILD_BANK);
+        assertThat(ServiceDesk.read("guild-vault")).contains(ServiceDesk.GUILD_VAULT);
+        assertThat(ServiceDesk.read("GUILD_ENCHANTS")).contains(ServiceDesk.GUILD_ENCHANTS);
+    }
 }

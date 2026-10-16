@@ -66,6 +66,15 @@ public final class ServiceDesks {
         offers.removeIf(each -> each.offer() == offer);
     }
 
+    /**
+     * The one offer at this desk that is {@code shown} to somebody, if there is exactly one — talking to the attendant
+     * then opens it directly instead of a desk with a single button.
+     */
+    public static Optional<DeskOffer> soleOffer(ServiceDesk desk, java.util.function.Predicate<DeskOffer> shown) {
+        List<DeskOffer> open = offers(desk).stream().filter(shown).limit(2).toList();
+        return open.size() == 1 ? Optional.of(open.getFirst()) : Optional.empty();
+    }
+
     /** Everything offered at this desk, in the order it was offered. */
     public static List<DeskOffer> offers(ServiceDesk desk) {
         return offers.stream().filter(each -> each.desk() == desk).map(Offered::offer).toList();

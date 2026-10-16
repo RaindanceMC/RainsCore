@@ -9,7 +9,10 @@ import java.util.Optional;
 public enum ServiceDesk {
 
     INSURANCE("Insurance agent", "Insurance", Material.TOTEM_OF_UNDYING),
-    BANK("Banker", "Bank", Material.GOLD_INGOT);
+    BANK("Banker", "Bank", Material.GOLD_INGOT),
+    GUILD_BANK("Guild banker", "Guild bank", Material.GOLD_BLOCK),
+    GUILD_VAULT("Vault keeper", "Guild vault", Material.ENDER_CHEST),
+    GUILD_ENCHANTS("Guild enchanter", "Guild enchantments", Material.ENCHANTING_TABLE);
 
     private final String title;
     private final String menuTitle;

@@ -18,7 +18,7 @@ public final class DeskListener implements Listener {
         }
         ServiceDesks.deskOf(event.getRightClicked()).ifPresent(desk -> {
             event.setCancelled(true);
-            new DeskMenu(event.getPlayer(), desk).open();
+            DeskMenu.talk(event.getPlayer(), desk);
         });
     }
 
