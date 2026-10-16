@@ -48,9 +48,19 @@ public final class Attendants {
     private Attendants() {
     }
 
-    /** The suit, or the skin of the player named — a name the server looks up with Mojang. */
+    /**
+     * The suit, the skin of the player named — a name the server looks up with Mojang — or a MineSkin skin
+     * ({@code mineskin:<id>} or its link, see {@link Skins}). A MineSkin skin not fetched yet is the suit for now; an
+     * attendant {@link #place placed} in it is dressed once it arrives.
+     */
     public static ResolvableProfile look(String skinOf) {
         ResolvableProfile.Builder profile = ResolvableProfile.resolvableProfile();
+        Optional<String> mineSkin = Skins.mineSkinId(skinOf);
+        if (mineSkin.isPresent()) {
+            return Skins.profile(mineSkin.get()).orElseGet(() -> Skins.placeholder(mineSkin.get(),
+                    ResolvableProfile.resolvableProfile().uuid(Skins.profileId(mineSkin.get())).name("Attendant")
+                            .addProperty(new ProfileProperty("textures", SUIT_VALUE, SUIT_SIGNATURE)).build()));
+        }
         if (skinOf != null && !skinOf.isBlank()) {
             return profile.name(skinOf.strip()).build();
         }
@@ -75,7 +85,7 @@ public final class Attendants {
      */
     public static Mannequin place(Location at, Component name, Component description, ResolvableProfile look,
                                   Consumer<Mannequin> tag) {
-        return at.getWorld().spawn(standing(at), Mannequin.class, attendant -> {
+        Mannequin placed = at.getWorld().spawn(standing(at), Mannequin.class, attendant -> {
             attendant.setImmovable(true);
             attendant.setInvulnerable(true);
             attendant.setSilent(true);
@@ -87,6 +97,8 @@ public final class Attendants {
             attendant.setProfile(look);
             tag.accept(attendant);
         });
+        Skins.waitingFor(look).ifPresent(id -> Skins.dressWhenHere(id, placed));
+        return placed;
     }
 
     /**
