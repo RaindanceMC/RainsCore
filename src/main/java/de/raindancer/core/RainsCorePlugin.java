@@ -2595,6 +2595,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.ui.scoreboard.SidebarSections.forgetFrom(loader)
                 + de.raindancer.core.platform.command.PlayerGroups.forgetFrom(loader)
                 + de.raindancer.core.social.team.Groups.forgetFrom(loader)
+                + de.raindancer.core.social.voice.VoiceGroups.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Economies.forgetFrom(loader)
                 + de.raindancer.core.social.economy.ItemValues.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceModifiers.forgetFrom(loader)
