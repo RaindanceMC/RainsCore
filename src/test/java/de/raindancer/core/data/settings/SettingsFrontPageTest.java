@@ -223,4 +223,18 @@ class SettingsFrontPageTest {
     private static String stripped(String miniMessage) {
         return miniMessage.replaceAll("<[^>]+>", "");
     }
+
+    @Test
+    @DisplayName("a value that is one long word (an address, a key) is drawn whole on its own line, never cut")
+    void longWordValue() {
+        String address = "https://packs.example.org/lilly/resourcepack-2026-10-18-final.zip";
+        registry.set("server-name", address);
+
+        List<String> lore = navigation.describe(setting("server-name"));
+
+        assertThat(lore).anySatisfy(line -> assertThat(line).startsWith("<gray>Now: "));
+        assertThat(String.join("", lore)).contains(address);
+        String door = String.join("\n", navigation.describe(navigation.page(null).subtopics().get(2)));
+        assertThat(door).contains("Inside: ");
+    }
 }

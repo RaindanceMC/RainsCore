@@ -544,13 +544,7 @@ public final class SettingsNavigation {
             now = listed.isEmpty() ? "nothing" : String.join(", ", listed.stream()
                     .map(SettingsNavigation::readableEntry).toList());
         }
-        List<String> nowLines = wrap(label + ": " + now, LORE_WIDTH);
-        for (int index = 0; index < nowLines.size(); index++) {
-            String line = nowLines.get(index);
-            lines.add(index == 0
-                    ? "<gray>" + label + ": <white>" + Text.literal(line.substring(label.length() + 2))
-                    : "<white>" + Text.literal(line));
-        }
+        lines.addAll(labelled(label, now));
         if (changed) {
             lines.add("<gray>Default: <white>" + Text.literal(defaultText(setting)));
         }
@@ -559,11 +553,7 @@ public final class SettingsNavigation {
         }
         // A handful of answers is worth listing; a material's hundreds or a list's switches are picked on their page.
         if (hasOptions(setting) && setting.type() != NamedTextColor.class && setting.choices().size() <= 12) {
-            List<String> options = wrap("One of: " + String.join(", ", setting.choices()), LORE_WIDTH);
-            for (int index = 0; index < options.size(); index++) {
-                lines.add(index == 0 ? "<gray>One of: <white>" + Text.literal(options.get(0).substring(8))
-                        : "<white>" + Text.literal(options.get(index)));
-            }
+            lines.addAll(labelled("One of", String.join(", ", setting.choices())));
         }
         String plugin = pluginNameOf(setting);
         lines.add("<dark_gray>" + (plugin.isEmpty() ? "" : Text.literal(plugin) + " · ") + setting.key());
@@ -571,6 +561,20 @@ public final class SettingsNavigation {
         lines.add("<yellow>" + Symbols.ARROW + " " + clickHint(setting));
         if (changed) {
             lines.add("<yellow>" + Symbols.ARROW + " Right-click to put back the default");
+        }
+        return lines;
+    }
+
+    /**
+     * "Label: value", the value wrapped and the label never: wrapping the two together put a long one-word value (an
+     * address) on the next line and left the label alone on the first.
+     */
+    private static List<String> labelled(String label, String value) {
+        List<String> wrapped = wrap(value, Math.max(12, LORE_WIDTH - label.length() - 2));
+        List<String> lines = new ArrayList<>();
+        lines.add("<gray>" + label + ": <white>" + Text.literal(wrapped.isEmpty() ? "" : wrapped.getFirst()));
+        for (String rest : wrapped.subList(Math.min(1, wrapped.size()), wrapped.size())) {
+            lines.add("<white>" + Text.literal(rest));
         }
         return lines;
     }
@@ -630,11 +634,7 @@ public final class SettingsNavigation {
         if (!inside.isEmpty()) {
             String shown = String.join(", ", inside.subList(0, Math.min(5, inside.size())))
                     + (inside.size() > 5 ? " and " + (inside.size() - 5) + " more" : "");
-            List<String> wrapped = wrap("Inside: " + shown, LORE_WIDTH);
-            for (int index = 0; index < wrapped.size(); index++) {
-                lines.add(index == 0 ? "<gray>Inside: <white>" + Text.literal(wrapped.get(0).substring(8))
-                        : "<white>" + Text.literal(wrapped.get(index)));
-            }
+            lines.addAll(labelled("Inside", shown));
         }
         List<Setting<?>> all = topic.allSettings();
         long changed = all.stream().filter(this::isChanged).count();
