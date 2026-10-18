@@ -139,4 +139,24 @@ class LuckPermsLedgerTest {
         assertThat(slowSave).isDone();
         assertThat((System.nanoTime() - started) / 1_000_000).isGreaterThanOrEqualTo(250);
     }
+
+    @Test
+    @DisplayName("flushing writes only when something changed since the last write or read — no ping-pong between servers")
+    void flushOnlyWhenChanged() throws Exception {
+        DataMutateResult ok = result(true);
+        when(data.add(any(Node.class))).thenReturn(ok);
+        LuckPermsGrantStore store = new LuckPermsGrantStore(folder, luckPerms);
+        java.nio.file.Path ledger = store.file();
+
+        store.flush();
+        assertThat(ledger).doesNotExist();
+
+        store.grant(ALEX, "claims.admin");
+        store.flush();
+        assertThat(ledger).exists();
+
+        java.nio.file.Files.delete(ledger);
+        store.flush();
+        assertThat(ledger).as("nothing new, nothing written").doesNotExist();
+    }
 }

@@ -71,6 +71,7 @@ final class LuckPermsGrantStore implements GrantStore {
 
     /** Which nodes were granted to each person directly, one at a time, rather than through a preset. */
     private final Map<UUID, Set<String>> ownedNodes = new ConcurrentHashMap<>();
+    private volatile Map<String, Object> lastKnown = Map.of("preset", Map.of(), "owned", Map.of());
 
     LuckPermsGrantStore(Path folder, LuckPerms luckPerms) {
         this.luckPerms = luckPerms;
@@ -346,7 +347,7 @@ final class LuckPermsGrantStore implements GrantStore {
     // ---------------------------------------------------------------------------- the ledger
 
     @Override
-    public void load() {
+    public synchronized void load() {
         // Read first, replace after: a ledger that cannot be read right now is kept, not forgotten.
         var fresh = ledgerStore.readIfReadable();
         if (fresh.isEmpty()) {
@@ -381,11 +382,18 @@ final class LuckPermsGrantStore implements GrantStore {
                 }
             }
         }
+        lastKnown = snapshot();
     }
 
     @Override
-    public boolean flush() {
-        return ledgerStore.write(yaml -> {
+    public synchronized boolean flush() {
+        // Only what is new is written. Every server flushes when another one wrote; writing an unchanged
+        // ledger back made each write answer the last, for ever (seen live with five LuckPerms servers).
+        Map<String, Object> now = snapshot();
+        if (now.equals(lastKnown)) {
+            return true;
+        }
+        boolean written = ledgerStore.write(yaml -> {
             presetOf.forEach((who, presetId) -> yaml.set("preset." + who, presetId));
             ownedNodes.forEach((who, nodes) -> {
                 if (!nodes.isEmpty()) {
@@ -393,6 +401,21 @@ final class LuckPermsGrantStore implements GrantStore {
                 }
             });
         });
+        if (written) {
+            lastKnown = now;
+        }
+        return written;
+    }
+
+    /** What the ledger holds, comparable: the last one written or read is {@link #lastKnown}. */
+    private Map<String, Object> snapshot() {
+        Map<UUID, Set<String>> owned = new java.util.HashMap<>();
+        ownedNodes.forEach((who, nodes) -> {
+            if (!nodes.isEmpty()) {
+                owned.put(who, Set.copyOf(nodes));
+            }
+        });
+        return Map.of("preset", Map.copyOf(presetOf), "owned", Map.copyOf(owned));
     }
 
     // ---------------------------------------------------------------------------- the one-time import
