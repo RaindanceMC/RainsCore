@@ -19,8 +19,17 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface Settings {
 
-    /** The plugin this belongs to, e.g. {@code "claims"}. Names its section of the combined GUI. */
+    /**
+     * The plugin this belongs to, e.g. {@code "claims"}. Ids sharing what comes before the first dash
+     * ({@code guilds}, {@code guilds-npcs}) are one plugin's door on the front page of the menu.
+     */
     String id();
+
+    /** What its door on the front page says; empty for its own topic's title, else the id read out. */
+    String name() default "";
+
+    /** Its door's icon; air for its own topic's icon. */
+    org.bukkit.Material icon() default org.bukkit.Material.AIR;
 
     /**
      * The topics its settings are filed under.

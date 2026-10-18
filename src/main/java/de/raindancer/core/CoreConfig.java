@@ -16,7 +16,7 @@ import org.bukkit.Material;
  * <p>The palette lives here rather than in each plugin because a player cannot tell which of nine
  * jars drew the window in front of them and should not be able to. What stays per plugin is its tag.
  */
-@Settings(id = "core", topics = {
+@Settings(id = "core", name = "Server basics", icon = Material.COMMAND_BLOCK, topics = {
         @Topic(path = "appearance", title = "Appearance", icon = Material.PAINTING,
                 description = "What every window and message from every one of Rain's plugins is "
                         + "drawn in."),

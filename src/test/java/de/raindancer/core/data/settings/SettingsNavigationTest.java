@@ -68,11 +68,12 @@ class SettingsNavigationTest {
     class Pages {
 
         @Test
-        @DisplayName("at the root shows the top-level categories, and nothing else")
+        @DisplayName("at the root shows a door per plugin — here the one — and nothing else")
         void rootShowsCategories() {
             SettingsPage root = navigation.page(null);
             assertThat(root.isRoot()).isTrue();
-            assertThat(root.subtopics()).extracting(SettingsTopic::path)
+            assertThat(root.subtopics()).extracting(root::pathTo).containsExactly("claims:");
+            assertThat(navigation.page("claims:").subtopics()).extracting(SettingsTopic::path)
                     .containsExactlyInAnyOrder("config", "management");
             assertThat(root.settings()).isEmpty();
         }
@@ -286,7 +287,7 @@ class SettingsNavigationTest {
             assertThat(lore).anySatisfy(line -> assertThat(line).contains("40000"));
             assertThat(lore).anySatisfy(line -> assertThat(line).contains("0"));
             assertThat(lore).anySatisfy(line -> assertThat(line).contains("100000"));
-            assertThat(lore).anySatisfy(line -> assertThat(line).containsIgnoringCase("choose"));
+            assertThat(lore).anySatisfy(line -> assertThat(line).containsIgnoringCase("pick a number"));
         }
 
         @Test
@@ -323,7 +324,7 @@ class SettingsNavigationTest {
         @DisplayName("which plugin owns it, so a shared page is not confusing")
         void namesTheOwningPlugin() {
             assertThat(navigation.describe(setting("blocks-per-player")))
-                    .anySatisfy(line -> assertThat(line).contains("claims"));
+                    .anySatisfy(line -> assertThat(line).contains("Claims · blocks-per-player"));
         }
     }
 

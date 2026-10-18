@@ -201,7 +201,8 @@ public final class SettingsSchema<T> {
         return build(yamlKey, boxed, topicPath,
                 title != null ? title.value() : SettingsTopics.readable(name),
                 describe != null ? describe.value() : "",
-                icon != null ? icon.value() : topics.at(topicPath).orElseThrow().icon(),
+                // None of its own: the menu draws one for what kind of setting it is.
+                icon != null ? icon.value() : Material.AIR,
                 min, max, defaultValue, named != null ? choicesOf(named, owner, name) : choicesOf(boxed),
                 named != null && named.listedMeansOff(), component);
     }
@@ -371,6 +372,18 @@ public final class SettingsSchema<T> {
     /** The plugin this belongs to. */
     public String id() {
         return id;
+    }
+
+    /** What the plugin's door is called, if it says: {@link Settings#name()}. */
+    public String name() {
+        Settings declared = type.getAnnotation(Settings.class);
+        return declared == null ? "" : declared.name();
+    }
+
+    /** The plugin's door icon, if it says: {@link Settings#icon()}. */
+    public Material icon() {
+        Settings declared = type.getAnnotation(Settings.class);
+        return declared == null ? Material.AIR : declared.icon();
     }
 
     /** The instance every default is read from. */

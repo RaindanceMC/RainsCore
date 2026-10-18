@@ -63,10 +63,18 @@ public final class SettingsNavigation {
      *             window that will not open is worse than one that opens somewhere sensible
      */
     public SettingsPage page(String path) {
-        SettingsTopics topics = registry.topics();
         if (path == null || path.isBlank()) {
-            return new SettingsPage(null, "Settings", topics.visibleRoots(), List.of(), List.of());
+            return frontPage();
         }
+        if (path.equals(CHANGED)) {
+            return new SettingsPage(CHANGED, "Changed settings", List.of(), changed(), List.of("Changed settings"),
+                    null, null);
+        }
+        int colon = path.indexOf(':');
+        if (colon > 0) {
+            return pluginPage(path.substring(0, colon), path.substring(colon + 1));
+        }
+        SettingsTopics topics = registry.topics();
         Optional<SettingsTopic> found = topics.at(path);
         if (found.isEmpty()) {
             return page(null);
@@ -74,6 +82,330 @@ public final class SettingsNavigation {
         SettingsTopic topic = found.get();
         return new SettingsPage(topic.path(), topic.title(), topic.visibleChildren(),
                 topic.settings(), trailTo(topic));
+    }
+
+    // ---------------------------------------------------------------------------- by plugin
+
+    /** The page of every setting that differs from what its plugin shipped with. */
+    public static final String CHANGED = "changed";
+
+    /** How wide a line of a tooltip may get before it is wrapped. */
+    private static final int LORE_WIDTH = 38;
+
+    /**
+     * One plugin, as its door on the front page. Every record whose id is the plugin's or starts with it and a dash
+     * ({@code guilds-npcs}) belongs to it, so a plugin with three records is still one door.
+     */
+    public record Plugin(String id, String name, Material icon, String description, List<SettingsStore<?>> stores) {
+
+        /** Its own sections, and nobody else's. */
+        public SettingsTopics tree() {
+            return SettingsRegistry.topics(stores);
+        }
+    }
+
+    /**
+     * The plugins with anything to set, by name.
+     *
+     * <p>The front page used to be the tree every plugin's categories were merged into. Claims filed under
+     * "management", two plugins shared "appearance", one plugin was spread over three doors — and only seven doors
+     * fitted on a page. Nobody found anything without already knowing where it was filed.
+     */
+    public List<Plugin> plugins() {
+        Map<String, List<SettingsStore<?>>> families = new java.util.LinkedHashMap<>();
+        for (SettingsStore<?> store : registry.stores()) {
+            families.computeIfAbsent(familyOf(store.schema().id()), family -> new ArrayList<>()).add(store);
+        }
+        List<Plugin> plugins = new ArrayList<>();
+        families.forEach((family, stores) -> {
+            SettingsTopics tree = SettingsRegistry.topics(stores);
+            if (tree.visibleRoots().isEmpty()) {
+                return;
+            }
+            Optional<SettingsTopic> own = tree.at(family);
+            String name = stores.stream().map(store -> store.schema().name()).filter(named -> !named.isBlank())
+                    .findFirst().orElse(own.map(SettingsTopic::title).orElse(SettingsTopics.readable(family)));
+            Material icon = stores.stream().map(store -> store.schema().icon()).filter(SettingsNavigation::drawn)
+                    .findFirst().orElse(own.map(SettingsTopic::icon).filter(SettingsNavigation::drawn)
+                            .orElse(tree.visibleRoots().stream().map(SettingsTopic::icon)
+                                    .filter(SettingsNavigation::drawn).findFirst().orElse(Material.BOOK)));
+            plugins.add(new Plugin(family, name, icon, own.map(SettingsTopic::description).orElse(""),
+                    List.copyOf(stores)));
+        });
+        plugins.sort(Comparator.comparing(plugin -> plugin.name().toLowerCase(Locale.ROOT)));
+        return plugins;
+    }
+
+    /** A plugin by its id, any of its records' ids, or its name as the door says it. */
+    public Optional<Plugin> plugin(String typed) {
+        String wanted = squash(typed);
+        if (wanted.isEmpty()) {
+            return Optional.empty();
+        }
+        return plugins().stream().filter(plugin -> squash(plugin.id()).equals(wanted)
+                || squash(familyOf(typed == null ? "" : typed.strip().toLowerCase(Locale.ROOT))).equals(squash(plugin.id()))
+                || squash(plugin.name()).equals(wanted)).findFirst();
+    }
+
+    private static boolean drawn(Material icon) {
+        return icon != null && icon != Material.AIR;
+    }
+
+    static String familyOf(String id) {
+        int dash = id.indexOf('-');
+        return dash > 0 ? id.substring(0, dash) : id;
+    }
+
+    private static String squash(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private SettingsPage frontPage() {
+        List<SettingsTopic> doors = new ArrayList<>();
+        for (Plugin plugin : plugins()) {
+            SettingsTopic door = new SettingsTopic(plugin.id() + ":", plugin.name(), plugin.icon(),
+                    plugin.description(), null, true);
+            plugin.tree().visibleRoots().forEach(door::addChild);
+            doors.add(door);
+        }
+        return new SettingsPage(null, "Settings", doors, List.of(), List.of(), null, null);
+    }
+
+    /** {@code enchants:} is a plugin's own front; {@code enchants:enchants/shards} one of its sections. */
+    private SettingsPage pluginPage(String id, String topicPath) {
+        Optional<Plugin> found = plugin(id);
+        if (found.isEmpty()) {
+            return frontPage();
+        }
+        Plugin plugin = found.get();
+        SettingsTopics tree = plugin.tree();
+        List<SettingsTopic> roots = tree.visibleRoots();
+        // One section only: it is the plugin's front, rather than a door to click through for nothing.
+        boolean single = roots.size() == 1;
+        if (topicPath.isBlank()) {
+            return single ? topicPage(plugin, roots.getFirst(), null, true)
+                    : new SettingsPage(plugin.id() + ":", plugin.name(), roots, List.of(), List.of(plugin.name()),
+                    plugin.id(), null);
+        }
+        Optional<SettingsTopic> topic = tree.at(topicPath);
+        if (topic.isEmpty()) {
+            return pluginPage(id, "");
+        }
+        SettingsTopic at = topic.get();
+        String parent;
+        if (at.parent() == null) {
+            parent = single ? null : plugin.id() + ":";
+        } else if (at.parent().parent() == null && single) {
+            parent = plugin.id() + ":";
+        } else {
+            parent = plugin.id() + ":" + at.parent().path();
+        }
+        return topicPage(plugin, at, parent, single && at.parent() == null);
+    }
+
+    private static SettingsPage topicPage(Plugin plugin, SettingsTopic topic, String parent, boolean front) {
+        List<String> trail = new ArrayList<>();
+        trail.add(plugin.name());
+        List<String> titles = new ArrayList<>();
+        for (SettingsTopic above = topic; above != null; above = above.parent()) {
+            titles.addFirst(above.title());
+        }
+        for (String title : titles) {
+            if (!title.equals(trail.getLast())) {
+                trail.add(title);
+            }
+        }
+        return new SettingsPage(front ? plugin.id() + ":" : plugin.id() + ":" + topic.path(),
+                front ? plugin.name() : topic.title(), topic.visibleChildren(), topic.settings(),
+                SettingsPage.shortenTrail(trail, TRAIL_LENGTH), plugin.id(), parent);
+    }
+
+    /** Where a setting lives, as a path {@link #page} opens. */
+    public String pathOf(Setting<?> setting) {
+        return storeHolding(setting).map(store -> familyOf(store.schema().id()) + ":" + setting.topicPath())
+                .orElse(setting.topicPath());
+    }
+
+    /** Where a setting lives, as somebody reads it: Enchantments ▸ Shards. */
+    public List<String> trailOf(Setting<?> setting) {
+        return page(pathOf(setting)).trail();
+    }
+
+    /** The id of the plugin whose door it is behind. */
+    public String pluginOf(Setting<?> setting) {
+        return storeHolding(setting).map(store -> familyOf(store.schema().id())).orElse("");
+    }
+
+    /** Which plugin's door it is behind. */
+    public String pluginNameOf(Setting<?> setting) {
+        return storeHolding(setting).flatMap(store -> plugin(familyOf(store.schema().id())))
+                .map(Plugin::name).orElse("");
+    }
+
+    private Optional<SettingsStore<?>> storeHolding(Setting<?> setting) {
+        for (SettingsStore<?> store : registry.stores()) {
+            if (store.schema().settings().contains(setting)) {
+                return Optional.of(store);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** What it is now, as the menu shows it. */
+    public String now(Setting<?> setting) {
+        return storeHolding(setting).map(store -> store.display(setting.key())).orElse("");
+    }
+
+    // ---------------------------------------------------------------------------- what changed
+
+    /** Every setting that is not what its plugin shipped with, in the order the plugins came. */
+    public List<Setting<?>> changed() {
+        List<Setting<?>> found = new ArrayList<>();
+        for (SettingsStore<?> store : registry.stores()) {
+            for (Setting<?> setting : store.schema().settings()) {
+                if (!store.display(setting.key()).equals(SettingCodec.display(setting.defaultValue()))) {
+                    found.add(setting);
+                }
+            }
+        }
+        return found;
+    }
+
+    public boolean isChanged(Setting<?> setting) {
+        return storeHolding(setting)
+                .map(store -> !store.display(setting.key()).equals(SettingCodec.display(setting.defaultValue())))
+                .orElse(false);
+    }
+
+    // ---------------------------------------------------------------------------- a typed word
+
+    public enum Word { PLUGIN, SETTING, UNKNOWN }
+
+    /**
+     * @param target  the plugin's id or the setting's key; the word itself when unknown
+     * @param closest what it was probably meant to be, when unknown
+     */
+    public record Resolved(Word kind, String target, List<String> closest) {
+    }
+
+    /** What a word typed after {@code /settings} is: a plugin, a setting, or neither. */
+    public Resolved resolve(String typed) {
+        String word = typed == null ? "" : typed.strip();
+        Optional<Plugin> plugin = plugin(word);
+        if (plugin.isPresent()) {
+            return new Resolved(Word.PLUGIN, plugin.get().id(), List.of());
+        }
+        if (registry.setting(word).isPresent()) {
+            return new Resolved(Word.SETTING, word, List.of());
+        }
+        List<String> candidates = new ArrayList<>(registry.keys());
+        plugins().forEach(each -> candidates.add(each.id()));
+        return new Resolved(Word.UNKNOWN, word, Closest.to(word, candidates, 3));
+    }
+
+    // ---------------------------------------------------------------------------- how a setting looks
+
+    /**
+     * A setting's icon, saying what kind it is at a glance: a lit or grey dye for a flag, the block itself, a colour's
+     * wool, a sign for one of a list, a chest for several switched on and off, a name tag for text, a comparator for a
+     * number. One the setting declares wins, except for a flag, whose dye is its value.
+     */
+    public Material iconFor(Setting<?> setting) {
+        String now = now(setting);
+        Class<?> type = setting.type();
+        if (type == Boolean.class) {
+            return "on".equals(now) ? Material.LIME_DYE : Material.GRAY_DYE;
+        }
+        if (drawn(setting.icon())) {
+            return setting.icon();
+        }
+        if (type == Material.class) {
+            Material block = Material.matchMaterial(now);
+            return block != null && isItem(block) ? block : Material.GRASS_BLOCK;
+        }
+        if (type == NamedTextColor.class) {
+            return woolOf(now);
+        }
+        if (type == List.class) {
+            return hasToggles(setting) ? Material.CHEST : Material.WRITABLE_BOOK;
+        }
+        if (type.isEnum()) {
+            return Material.OAK_SIGN;
+        }
+        if (type == String.class) {
+            return Material.NAME_TAG;
+        }
+        return Material.COMPARATOR;
+    }
+
+    /** A small whole number shows as the stack's count, so a page of numbers can be read without hovering. */
+    public int countFor(Setting<?> setting) {
+        if (setting.type() != Integer.class && setting.type() != Long.class) {
+            return 1;
+        }
+        try {
+            long value = Long.parseLong(now(setting).trim());
+            return value >= 1 && value <= 64 ? (int) value : 1;
+        } catch (NumberFormatException notANumber) {
+            return 1;
+        }
+    }
+
+    private static boolean isItem(Material material) {
+        try {
+            return material.isItem();
+        } catch (RuntimeException | LinkageError noServer) {
+            return true;
+        }
+    }
+
+    private static Material woolOf(String colour) {
+        return switch (colour == null ? "" : colour) {
+            case "black" -> Material.BLACK_WOOL;
+            case "dark_blue", "blue" -> Material.BLUE_WOOL;
+            case "dark_green" -> Material.GREEN_WOOL;
+            case "dark_aqua" -> Material.CYAN_WOOL;
+            case "dark_red", "red" -> Material.RED_WOOL;
+            case "dark_purple" -> Material.PURPLE_WOOL;
+            case "gold" -> Material.ORANGE_WOOL;
+            case "gray" -> Material.LIGHT_GRAY_WOOL;
+            case "dark_gray" -> Material.GRAY_WOOL;
+            case "green" -> Material.LIME_WOOL;
+            case "aqua" -> Material.LIGHT_BLUE_WOOL;
+            case "light_purple" -> Material.MAGENTA_WOOL;
+            case "yellow" -> Material.YELLOW_WOOL;
+            default -> Material.WHITE_WOOL;
+        };
+    }
+
+    /** {@code rainsenchants:double_jump} → "Double jump": a list entry as somebody reads it. */
+    static String readableEntry(String entry) {
+        String bare = entry == null ? "" : entry.substring(entry.indexOf(':') + 1);
+        String spaced = bare.replace('_', ' ').replace('-', ' ').trim();
+        return spaced.isEmpty() ? spaced : Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+    }
+
+    /** Words wrapped into lines no longer than {@code width}, broken only at spaces. */
+    public static List<String> wrap(String text, int width) {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isBlank()) {
+            return lines;
+        }
+        StringBuilder line = new StringBuilder();
+        for (String word : text.strip().split("\\s+")) {
+            if (!line.isEmpty() && line.length() + 1 + word.length() > width) {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+            if (!line.isEmpty()) {
+                line.append(' ');
+            }
+            line.append(word);
+        }
+        if (!line.isEmpty()) {
+            lines.add(line.toString());
+        }
+        return lines;
     }
 
     /** The names from the root inwards, shortened to what a window title can hold. */
@@ -199,50 +531,116 @@ public final class SettingsNavigation {
         if (setting == null) {
             return lines;
         }
-        if (!setting.description().isBlank()) {
-            lines.add("<gray>" + setting.description());
+        wrap(setting.description(), LORE_WIDTH).forEach(line -> lines.add("<gray>" + line));
+        if (!lines.isEmpty()) {
+            lines.add("");
         }
-        lines.add("");
-        lines.add("<gray>Now: <white>" + Text.literal(registry.display(setting.key())));
-
-        // Every material name this server has is hundreds of entries — useful in a hand-edited
-        // config.yml, where it says what is valid, and unreadable as a line of lore on a button whose
-        // whole point is now "click it and pick one visually" instead.
-        if (!setting.choices().isEmpty() && setting.type() != Material.class) {
-            lines.add("<gray>One of: <white>" + String.join(", ", setting.choices()));
+        boolean changed = isChanged(setting);
+        String label = "Now";
+        String now = now(setting);
+        if (hasToggles(setting)) {
+            List<String> listed = listed(setting);
+            label = setting.listedMeansOff() ? "Switched off" : "Chosen";
+            now = listed.isEmpty() ? "nothing" : String.join(", ", listed.stream()
+                    .map(SettingsNavigation::readableEntry).toList());
+        }
+        List<String> nowLines = wrap(label + ": " + now, LORE_WIDTH);
+        for (int index = 0; index < nowLines.size(); index++) {
+            String line = nowLines.get(index);
+            lines.add(index == 0
+                    ? "<gray>" + label + ": <white>" + Text.literal(line.substring(label.length() + 2))
+                    : "<white>" + Text.literal(line));
+        }
+        if (changed) {
+            lines.add("<gray>Default: <white>" + Text.literal(defaultText(setting)));
         }
         if (setting.min() != null) {
             lines.add("<gray>From <white>" + setting.min() + "<gray> to <white>" + setting.max());
         }
-
-        registry.storeOf(setting.key()).ifPresent(store ->
-                lines.add("<dark_gray>from " + store.schema().id()));
-
+        // A handful of answers is worth listing; a material's hundreds or a list's switches are picked on their page.
+        if (hasOptions(setting) && setting.type() != NamedTextColor.class && setting.choices().size() <= 12) {
+            List<String> options = wrap("One of: " + String.join(", ", setting.choices()), LORE_WIDTH);
+            for (int index = 0; index < options.size(); index++) {
+                lines.add(index == 0 ? "<gray>One of: <white>" + Text.literal(options.get(0).substring(8))
+                        : "<white>" + Text.literal(options.get(index)));
+            }
+        }
+        String plugin = pluginNameOf(setting);
+        lines.add("<dark_gray>" + (plugin.isEmpty() ? "" : Text.literal(plugin) + " · ") + setting.key());
         lines.add("");
-        // "Type" is the last resort now, and it says so only where it is true: free text, and a
-        // number with no range to draw a picker from.
-        boolean picked = hasOptions(setting) || hasRange(setting)
-                || setting.type() == Material.class || setting.type() == NamedTextColor.class;
-        lines.add(canCycle(setting)
-                ? "<yellow>" + Symbols.ARROW + " Click to change"
-                : picked
-                        ? "<yellow>" + Symbols.ARROW + " Click to choose"
-                        : "<yellow>" + Symbols.ARROW + " Click to type a new value");
+        lines.add("<yellow>" + Symbols.ARROW + " " + clickHint(setting));
+        if (changed) {
+            lines.add("<yellow>" + Symbols.ARROW + " Right-click to put back the default");
+        }
         return lines;
     }
 
-    /** What a category's button says. */
+    private String clickHint(Setting<?> setting) {
+        if (canCycle(setting)) {
+            return "Click to switch " + ("on".equals(now(setting)) ? "off" : "on");
+        }
+        if (hasToggles(setting)) {
+            return "Click to switch them on and off";
+        }
+        if (hasRange(setting)) {
+            return "Click to pick a number";
+        }
+        if (hasOptions(setting) || setting.type() == Material.class || setting.type() == NamedTextColor.class) {
+            return "Click to choose";
+        }
+        return "Click to type a new value";
+    }
+
+    private List<String> listed(Setting<?> setting) {
+        List<String> entries = new ArrayList<>();
+        for (String piece : now(setting).split(",")) {
+            if (!piece.isBlank()) {
+                entries.add(piece.trim());
+            }
+        }
+        return entries;
+    }
+
+    private static String defaultText(Setting<?> setting) {
+        String shipped = SettingCodec.display(setting.defaultValue());
+        if (setting.type() == List.class && !setting.choices().isEmpty()) {
+            List<String> entries = java.util.Arrays.stream(shipped.split(",")).map(String::trim)
+                    .filter(entry -> !entry.isEmpty()).map(SettingsNavigation::readableEntry).toList();
+            return entries.isEmpty() ? "nothing" : String.join(", ", entries);
+        }
+        return shipped.isEmpty() ? "nothing" : shipped;
+    }
+
+    /** What a door says: what is behind it, how much, and how much of that was changed. */
     public List<String> describe(SettingsTopic topic) {
         List<String> lines = new ArrayList<>();
         if (topic == null) {
             return lines;
         }
-        if (!topic.description().isBlank()) {
-            lines.add("<gray>" + topic.description());
+        wrap(topic.description(), LORE_WIDTH).forEach(line -> lines.add("<gray>" + line));
+        if (!lines.isEmpty()) {
+            lines.add("");
         }
-        int settings = topic.allSettings().size();
+        List<SettingsTopic> children = topic.visibleChildren();
+        // A plugin whose one section has its own name: say what is inside that, not the name again.
+        if (children.size() == 1 && children.getFirst().title().equals(topic.title())) {
+            children = children.getFirst().visibleChildren();
+        }
+        List<String> inside = children.stream().map(SettingsTopic::title).toList();
+        if (!inside.isEmpty()) {
+            String shown = String.join(", ", inside.subList(0, Math.min(5, inside.size())))
+                    + (inside.size() > 5 ? " and " + (inside.size() - 5) + " more" : "");
+            List<String> wrapped = wrap("Inside: " + shown, LORE_WIDTH);
+            for (int index = 0; index < wrapped.size(); index++) {
+                lines.add(index == 0 ? "<gray>Inside: <white>" + Text.literal(wrapped.get(0).substring(8))
+                        : "<white>" + Text.literal(wrapped.get(index)));
+            }
+        }
+        List<Setting<?>> all = topic.allSettings();
+        long changed = all.stream().filter(this::isChanged).count();
+        lines.add("<gray>" + all.size() + (all.size() == 1 ? " setting" : " settings")
+                + (changed > 0 ? "<dark_gray> · <yellow>" + changed + " changed" : ""));
         lines.add("");
-        lines.add("<gray>" + settings + (settings == 1 ? " setting" : " settings"));
         lines.add("<yellow>" + Symbols.ARROW + " Click to open");
         return lines;
     }

@@ -14,14 +14,36 @@ import java.util.List;
  * @param subtopics the categories on it, already filtered to the ones with something in them
  * @param settings  the settings on it, in the order their plugin declared them
  * @param trail     the names from the root inwards, for the window title
+ * @param scope     the plugin a page belongs to ({@code "enchants"}), so its sections' paths can be made; null
+ *                  for the front page and the old combined tree
+ * @param parent    where Back goes, or null for the front page
  */
 public record SettingsPage(String path, String title, List<SettingsTopic> subtopics,
-                           List<Setting<?>> settings, List<String> trail) {
+                           List<Setting<?>> settings, List<String> trail, String scope, String parent) {
 
     public SettingsPage {
         subtopics = subtopics == null ? List.of() : List.copyOf(subtopics);
         settings = settings == null ? List.of() : List.copyOf(settings);
         trail = trail == null ? List.of() : List.copyOf(trail);
+    }
+
+    /** A page of the combined tree, its parent read off its path. */
+    public SettingsPage(String path, String title, List<SettingsTopic> subtopics, List<Setting<?>> settings,
+                        List<String> trail) {
+        this(path, title, subtopics, settings, trail, null, slashParent(path));
+    }
+
+    private static String slashParent(String path) {
+        if (path == null) {
+            return null;
+        }
+        int slash = path.lastIndexOf('/');
+        return slash < 0 ? null : path.substring(0, slash);
+    }
+
+    /** The path that opens one of this page's sections. */
+    public String pathTo(SettingsTopic topic) {
+        return scope == null ? topic.path() : scope + ":" + topic.path();
     }
 
     /** Whether this is the front page — the list of every plugin's categories. */
@@ -61,13 +83,9 @@ public record SettingsPage(String path, String title, List<SettingsTopic> subtop
         return from >= all.size() ? List.of() : all.subList(from, Math.min(all.size(), from + perPage));
     }
 
-    /** Where Back goes: the page above, or null when this is the root or a top-level category. */
+    /** Where Back goes: the page above, or null when that is the front page. */
     public String parentPath() {
-        if (path == null) {
-            return null;
-        }
-        int slash = path.lastIndexOf('/');
-        return slash < 0 ? null : path.substring(0, slash);
+        return parent;
     }
 
     /**

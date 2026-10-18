@@ -99,6 +99,11 @@ public final class SettingsRegistry {
      * waiting to happen for no measurable gain.
      */
     public SettingsTopics topics() {
+        return topics(stores);
+    }
+
+    /** The tree of these stores alone — one plugin's records, merged as {@link #topics()} merges all. */
+    public static SettingsTopics topics(java.util.Collection<? extends SettingsStore<?>> stores) {
         List<Topic> declared = new ArrayList<>();
         for (SettingsStore<?> store : stores) {
             for (SettingsTopic topic : store.schema().topics().all()) {

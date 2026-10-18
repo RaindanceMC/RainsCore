@@ -92,17 +92,16 @@ public final class SettingsSearchMenu extends PaginatedMenu<Setting<?>> {
             lore.add("<dark_gray>in " + Text.literal(where));
         }
         lore.add("<yellow>" + Symbols.ARROW + " Click to go there");
-        return Icons.of(SettingsMenu.materialFor(navigation, setting), "<white>" + Text.literal(setting.title()), lore);
+        return SettingsMenu.settingIcon(navigation, setting, lore);
     }
 
     private String whereIs(Setting<?> setting) {
-        SettingsPage page = navigation.page(setting.topicPath());
-        return String.join(" " + Symbols.ARROW + " ", page.trail());
+        return String.join(" " + Symbols.ARROW + " ", navigation.trailOf(setting));
     }
 
     @Override
     protected void onClick(Setting<?> setting, InventoryClickEvent event) {
-        new SettingsMenu(viewer, brand(), chat, navigation, setting.topicPath(), this).open();
+        new SettingsMenu(viewer, brand(), chat, navigation, navigation.pathOf(setting), this).open();
     }
 
     @Override

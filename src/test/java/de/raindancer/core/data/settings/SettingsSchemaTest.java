@@ -278,11 +278,11 @@ class SettingsSchemaTest {
         }
 
         @Test
-        @DisplayName("an icon falls back to the topic's icon rather than to nothing")
+        @DisplayName("an icon of its own is kept; without one the menu draws one for its kind, not its topic's")
         void inheritsTheTopicIcon() {
             assertThat(setting("fences-enabled").icon()).isEqualTo(Material.OAK_FENCE);
-            // No @Icon of its own: it borrows the one its topic was given.
-            assertThat(setting("blocks-per-player").icon()).isEqualTo(Material.BARRIER);
+            // A page of settings all borrowing their topic's icon was a row of identical buttons.
+            assertThat(setting("blocks-per-player").icon()).isEqualTo(Material.AIR);
         }
 
         @Test

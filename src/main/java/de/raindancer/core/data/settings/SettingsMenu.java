@@ -4,6 +4,7 @@ import de.raindancer.core.ui.chat.Brand;
 import de.raindancer.core.ui.chat.Chat;
 import de.raindancer.core.ui.messages.Messages;
 import de.raindancer.core.ui.menu.Icons;
+import de.raindancer.core.ui.text.Text;
 import de.raindancer.core.ui.menu.Menu;
 import de.raindancer.core.ui.menu.MenuLayout;
 import net.kyori.adventure.text.Component;
@@ -84,12 +85,15 @@ public final class SettingsMenu extends Menu {
                 .render();
     }
 
-    /** How many category buttons fit in the band — the seven columns between the frame panes. */
-    private static final int TOPICS_PER_PAGE = 7;
-
-    /** Settings go in the rows between the category band and the toolbar. */
-    private static final int FIRST_SETTINGS_ROW = MenuLayout.RULES;
-    private static final int SETTINGS_PER_PAGE = (MenuLayout.LAND - FIRST_SETTINGS_ROW + 1) * 9;
+    /** The inner seven columns of a row: the frame keeps the outer two. */
+    private static final int COLUMNS = 7;
+    /** The front page: a door per plugin, three rows of seven. */
+    private static final int DOORS_PER_PAGE = 3 * COLUMNS;
+    /** A page with sections: those in the top row, settings in the two below. */
+    private static final int SECTIONS_PER_PAGE = COLUMNS;
+    private static final int SETTINGS_BELOW_SECTIONS = 2 * COLUMNS;
+    /** A page with settings alone: all three rows. */
+    private static final int SETTINGS_ALONE = 3 * COLUMNS;
 
     private final String path;
     private final SettingsPage page;
@@ -153,26 +157,58 @@ public final class SettingsMenu extends Menu {
     @Override
     protected List<String> helpLines() {
         return page.isRoot()
-                ? List.of("Everything every plugin on this server can be told to do.",
-                        "Click a category to go in.")
-                : List.of("Click a setting to change it.",
-                        "Only free text is typed in chat.");
+                ? List.of("A door for every plugin with something to set.",
+                        "Search finds a setting by what it does.",
+                        "Glowing settings differ from their default.")
+                : List.of("Click a setting to change it; right-click",
+                        "a glowing one to put back its default.",
+                        "Its name for /settings is under its tooltip.");
+    }
+
+    private boolean sections() {
+        return page.isRoot() || !page.subtopics().isEmpty();
+    }
+
+    private int doorsPerWindow() {
+        return page.isRoot() ? DOORS_PER_PAGE : SECTIONS_PER_PAGE;
+    }
+
+    private int settingsPerWindow() {
+        return page.subtopics().isEmpty() ? SETTINGS_ALONE : SETTINGS_BELOW_SECTIONS;
     }
 
     @Override
     protected void render() {
         window = MenuLayout.clampPage(window, windows());
-        int column = 1;
-        for (SettingsTopic topic : page.topicsOn(window, TOPICS_PER_PAGE)) {
-            band(MenuLayout.WHO, column++, categoryIcon(topic), event -> open(topic.path()));
-        }
-
         int index = 0;
-        for (Setting<?> setting : page.settingsOn(window, SETTINGS_PER_PAGE)) {
-            cell(FIRST_SETTINGS_ROW + index / 9, index % 9, settingIcon(setting), event -> onClick(setting));
+        for (SettingsTopic topic : page.topicsOn(window, doorsPerWindow())) {
+            int row = MenuLayout.WHO + index / COLUMNS;
+            cell(row, 1 + index % COLUMNS, categoryIcon(topic), event -> open(page.pathTo(topic)));
+            index++;
+        }
+        int firstRow = sections() ? MenuLayout.RULES : MenuLayout.WHO;
+        index = 0;
+        for (Setting<?> setting : page.settingsOn(window, settingsPerWindow())) {
+            cell(firstRow + index / COLUMNS, 1 + index % COLUMNS, settingIcon(setting),
+                    event -> onClick(setting, event));
             index++;
         }
 
+        if (page.isRoot()) {
+            int changed = navigation.changed().size();
+            toolbar(2, Icons.of(Material.WRITABLE_BOOK, "<white>Changed settings",
+                            changed == 0 ? List.of("<gray>Everything is at its default.")
+                                    : List.of("<gray>" + changed + " differ from their default.", "",
+                                    "<yellow>" + de.raindancer.core.ui.identity.Symbols.ARROW + " Click to see them")),
+                    event -> open(SettingsNavigation.CHANGED));
+            toolbar(6, Icons.of(Material.COMMAND_BLOCK, "<white>By command",
+                            "<gray>Everything here works as /settings too.",
+                            "", "<yellow>" + de.raindancer.core.ui.identity.Symbols.ARROW + " Click for how"),
+                    event -> {
+                        viewer.closeInventory();
+                        viewer.performCommand("settings help");
+                    });
+        }
         toolbar(4, Icons.of(Material.SPYGLASS, "<white>Search",
                         "<gray>Find a setting by a word in its name",
                         "<gray>or what it does, from every plugin."),
@@ -202,7 +238,7 @@ public final class SettingsMenu extends Menu {
     }
 
     private int windows() {
-        return page.pageCount(TOPICS_PER_PAGE, SETTINGS_PER_PAGE);
+        return page.pageCount(doorsPerWindow(), settingsPerWindow());
     }
 
     private Consumer<InventoryClickEvent> turnTo(int newPage) {
@@ -222,19 +258,32 @@ public final class SettingsMenu extends Menu {
         return Icons.of(material, "<white>" + topic.title(), navigation.describe(topic));
     }
 
+    /**
+     * A setting: an icon for its kind, its value in the name where that is short, a small number as the stack's
+     * count, and a glow when it is not what the plugin shipped with.
+     */
     private ItemStack settingIcon(Setting<?> setting) {
-        return Icons.of(materialFor(navigation, setting), "<white>" + setting.title(), navigation.describe(setting));
+        return settingIcon(navigation, setting, navigation.describe(setting));
     }
 
-    /** A setting's icon: its own, or for a flag a green or grey dye, so on and off show at a glance. */
-    static Material materialFor(SettingsNavigation navigation, Setting<?> setting) {
-        Material material = setting.icon() == null || setting.icon() == Material.AIR
-                ? Material.PAPER : setting.icon();
-        if (setting.type() == Boolean.class) {
-            boolean on = "on".equals(navigation.registry().display(setting.key()));
-            material = on ? Material.LIME_DYE : Material.GRAY_DYE;
+    static ItemStack settingIcon(SettingsNavigation navigation, Setting<?> setting, List<String> lore) {
+        String now = navigation.now(setting);
+        String name = "<white>" + Text.literal(setting.title());
+        if (setting.type() != List.class && !now.isBlank() && now.length() <= 20) {
+            name += " <dark_gray>» " + ("on".equals(now) ? "<green>" : "off".equals(now) ? "<red>" : "<aqua>")
+                    + Text.literal(now);
         }
-        return material;
+        ItemStack icon = Icons.of(navigation.iconFor(setting), name, lore);
+        icon.setAmount(navigation.countFor(setting));
+        if (navigation.isChanged(setting)) {
+            icon.editMeta(meta -> meta.setEnchantmentGlintOverride(true));
+        }
+        return icon;
+    }
+
+    /** Kept for the search page's older callers: the kind's icon. */
+    static Material materialFor(SettingsNavigation navigation, Setting<?> setting) {
+        return navigation.iconFor(setting);
     }
 
     /** Asked again when a choice lands: where the value comes from may have changed while the chooser was open. */
@@ -246,7 +295,16 @@ public final class SettingsMenu extends Menu {
         return false;
     }
 
-    private void onClick(Setting<?> setting) {
+    private void onClick(Setting<?> setting, InventoryClickEvent event) {
+        if (event.isRightClick() && navigation.isChanged(setting)) {
+            if (!mayStill(setting)) {
+                return;
+            }
+            navigation.registry().reset(setting.key());
+            SettingsSaving.saveThenTell(navigation.registry(), viewer);
+            refresh();
+            return;
+        }
         if (!navigation.registry().mayChange(viewer, setting.key())) {
             chat.raw(viewer, chat.prefixed("<red>That is set for the whole network or a group of servers; changing it "
                     + "there needs more than changing this server. <gray>/settings sethere <white><key></white> <value> "
