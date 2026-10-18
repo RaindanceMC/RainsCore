@@ -167,4 +167,12 @@ class GearTest {
             org.assertj.core.api.Assertions.assertThat(Gear.SEEKING.matches(other)).as(other).isFalse();
         }
     }
+
+    @Test
+    @DisplayName("Reinforced and XP Siphon have keys of their own, beside Unbreaking and Telekinesis")
+    void durabilityAndExperience() {
+        assertThat(RainsEnchants.REINFORCED).isEqualTo("rainsenchants:reinforced");
+        assertThat(RainsEnchants.XP_SIPHON).isEqualTo("rainsenchants:xp_siphon");
+        assertThat(RainsEnchants.XP_SIPHON).isNotEqualTo(RainsEnchants.TELEKINESIS);
+    }
 }

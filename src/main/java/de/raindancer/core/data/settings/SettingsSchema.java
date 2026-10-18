@@ -187,6 +187,11 @@ public final class SettingsSchema<T> {
         Describe describe = component.getAnnotation(Describe.class);
         Icon icon = component.getAnnotation(Icon.class);
         Range range = component.getAnnotation(Range.class);
+        Choices named = component.getAnnotation(Choices.class);
+        if (named != null && boxed != List.class) {
+            throw new IllegalArgumentException(owner + " puts @Choices on '" + name + "', which is not a List<String>: "
+                    + "only a list has entries to switch on and off.");
+        }
 
         Object defaultValue = defaultOf(component, defaults, owner, name);
         Integer min = range != null && isNumeric(boxed) ? range.min() : null;
@@ -197,7 +202,17 @@ public final class SettingsSchema<T> {
                 title != null ? title.value() : SettingsTopics.readable(name),
                 describe != null ? describe.value() : "",
                 icon != null ? icon.value() : topics.at(topicPath).orElseThrow().icon(),
-                min, max, defaultValue, choicesOf(boxed), component);
+                min, max, defaultValue, named != null ? choicesOf(named, owner, name) : choicesOf(boxed),
+                named != null && named.listedMeansOff(), component);
+    }
+
+    private static List<String> choicesOf(Choices named, String owner, String name) {
+        try {
+            return List.copyOf(named.value().getDeclaredConstructor().newInstance().get());
+        } catch (ReflectiveOperationException unmade) {
+            throw new IllegalArgumentException(owner + "'s @Choices on '" + name + "' names "
+                    + named.value().getName() + ", which has no public no-argument constructor.", unmade);
+        }
     }
 
     /**
@@ -209,10 +224,10 @@ public final class SettingsSchema<T> {
     @SuppressWarnings("unchecked")
     private static <V> Setting<V> build(String key, Class<?> boxed, String topicPath, String title,
                                         String description, Material icon, Integer min, Integer max,
-                                        Object defaultValue, List<String> choices,
+                                        Object defaultValue, List<String> choices, boolean listedMeansOff,
                                         RecordComponent component) {
         return new Setting<>(key, (Class<V>) boxed, topicPath, title, description, icon, min, max,
-                (V) defaultValue, choices, component.getAccessor());
+                (V) defaultValue, choices, listedMeansOff, component.getAccessor());
     }
 
     private static Object defaultOf(RecordComponent component, Object defaults, String owner,

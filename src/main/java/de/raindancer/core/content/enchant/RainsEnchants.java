@@ -38,6 +38,10 @@ public final class RainsEnchants {
     public static final String UNDYING = "rainsenchants:undying";
     public static final String FUSION = "rainsenchants:fusion";
     public static final String AUTOPILOT = "rainsenchants:autopilot";
+    /** Wears more slowly; on top of Unbreaking, not instead of it. */
+    public static final String REINFORCED = "rainsenchants:reinforced";
+    /** Experience goes straight to the player, as Telekinesis does with drops. */
+    public static final String XP_SIPHON = "rainsenchants:xp_siphon";
 
     private RainsEnchants() {
     }

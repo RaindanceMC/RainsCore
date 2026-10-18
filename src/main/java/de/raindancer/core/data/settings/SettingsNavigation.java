@@ -44,6 +44,8 @@ public final class SettingsNavigation {
         NEEDS_MATERIAL_CHOICE,
         /** It needs a colour picked from Core's swatch grid, rather than cycled or typed. */
         NEEDS_COLOR_CHOICE,
+        /** A list with named entries ({@link Choices}): a page with a button per entry, each switched on its own. */
+        NEEDS_TOGGLES,
         /** Nothing answers to that key. */
         UNKNOWN
     }
@@ -106,8 +108,39 @@ public final class SettingsNavigation {
     public boolean hasOptions(Setting<?> setting) {
         return setting != null && !setting.choices().isEmpty()
                 && setting.type() != Boolean.class
+                && setting.type() != List.class
                 && setting.type() != Material.class
                 && setting.type() != NamedTextColor.class;
+    }
+
+    /** Whether this is a list whose entries are named, each switched on its own. */
+    public boolean hasToggles(Setting<?> setting) {
+        return setting != null && setting.type() == List.class && !setting.choices().isEmpty();
+    }
+
+    /** Puts {@code entry} into the list, or takes it out if it is there. Nothing else changes. */
+    public void toggle(String key, String entry) {
+        registry.set(key, String.join(",", toggled(listed(key), entry)));
+    }
+
+    /** What the list holds now. */
+    public List<String> listed(String key) {
+        List<String> entries = new java.util.ArrayList<>();
+        for (String piece : registry.display(key).split(",")) {
+            if (!piece.isBlank()) {
+                entries.add(piece.trim());
+            }
+        }
+        return entries;
+    }
+
+    /** {@code current} with {@code entry} taken out if it is in, or added at the end if it is not. */
+    public static List<String> toggled(List<String> current, String entry) {
+        List<String> next = new java.util.ArrayList<>(current);
+        if (!next.remove(entry)) {
+            next.add(entry);
+        }
+        return List.copyOf(next);
     }
 
     /** Whether this is a number with both ends of its range known, so it can be picked rather than typed. */
@@ -129,6 +162,9 @@ public final class SettingsNavigation {
         // A named set is picked out of a list, never advanced one click at a time. Cycling made the
         // lore the only place that said where you had landed, and overshooting the answer you wanted
         // meant going all the way round again — on a five-value enum that is four clicks to undo one.
+        if (hasToggles(setting.get())) {
+            return Click.NEEDS_TOGGLES;
+        }
         if (hasOptions(setting.get())) {
             return Click.NEEDS_OPTION_CHOICE;
         }

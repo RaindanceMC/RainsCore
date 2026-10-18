@@ -34,7 +34,20 @@ import java.util.Optional;
  */
 public final class CustomEnchantments {
 
+    /** Switched off by the server's owner: still registered, so items keep them, but read as absent. */
+    private static volatile java.util.Set<String> switchedOff = java.util.Set.of();
+
     private CustomEnchantments() {
+    }
+
+    /** Replaces the switched-off enchantments, by full key. */
+    public static void switchOff(java.util.Collection<String> keys) {
+        switchedOff = keys == null ? java.util.Set.of() : keys.stream()
+                .map(key -> key.toLowerCase(java.util.Locale.ROOT)).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    public static boolean isSwitchedOff(String key) {
+        return key != null && switchedOff.contains(key.toLowerCase(java.util.Locale.ROOT));
     }
 
     public static void register(BootstrapContext context, List<EnchantDef> definitions) {
@@ -86,9 +99,9 @@ public final class CustomEnchantments {
         return parsed == null ? Optional.empty() : Optional.ofNullable(Registry.ENCHANTMENT.get(parsed));
     }
 
-    /** The level of this enchantment on the item, 0 if it has none, is air, or the enchantment is unknown. */
+    /** The level of this enchantment on the item, 0 if it has none, is air, or the enchantment is unknown or switched off. */
     public static int levelOn(ItemStack item, String key) {
-        if (item == null || item.getType().isAir()) {
+        if (item == null || isSwitchedOff(key) || item.getType().isAir()) {
             return 0;
         }
         return find(key).map(item::getEnchantmentLevel).orElse(0);

@@ -27,11 +27,18 @@ public final class Setting<T> {
     private final Integer max;
     private final T defaultValue;
     private final List<String> choices;
+    private final boolean listedMeansOff;
     private final Method accessor;
 
     Setting(String key, Class<T> type, String topicPath, String title, String description,
             Material icon, Integer min, Integer max, T defaultValue, List<String> choices,
             Method accessor) {
+        this(key, type, topicPath, title, description, icon, min, max, defaultValue, choices, false, accessor);
+    }
+
+    Setting(String key, Class<T> type, String topicPath, String title, String description,
+            Material icon, Integer min, Integer max, T defaultValue, List<String> choices,
+            boolean listedMeansOff, Method accessor) {
         this.key = key;
         this.type = type;
         this.topicPath = topicPath;
@@ -42,6 +49,7 @@ public final class Setting<T> {
         this.max = max;
         this.defaultValue = defaultValue;
         this.choices = List.copyOf(choices);
+        this.listedMeansOff = listedMeansOff;
         this.accessor = accessor;
     }
 
@@ -89,11 +97,16 @@ public final class Setting<T> {
 
     /**
      * What this may be set to, lower case, when the answer is a fixed list — the constants of an
-     * enum. Empty for everything else, which is what a GUI checks to decide between cycling and
-     * asking.
+     * enum, or for a list the entries its {@link Choices} names. Empty for everything else, which is
+     * what a GUI checks to decide between cycling and asking.
      */
     public List<String> choices() {
         return choices;
+    }
+
+    /** For a list with {@link Choices}: whether being listed means switched off. */
+    public boolean listedMeansOff() {
+        return listedMeansOff;
     }
 
     /**

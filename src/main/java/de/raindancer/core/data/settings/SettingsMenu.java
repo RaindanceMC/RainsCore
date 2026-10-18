@@ -312,6 +312,16 @@ public final class SettingsMenu extends Menu {
                         SettingsSaving.saveThenTell(navigation.registry(), viewer);
                         refresh();
                     }).open();
+            case NEEDS_TOGGLES -> new de.raindancer.core.ui.choose.ToggleChooser(viewer, brand(), this,
+                    setting.title(), setting.choices(), () -> navigation.listed(setting.key()),
+                    setting.listedMeansOff(),
+                    entry -> {
+                        if (!mayStill(setting)) {
+                            return;
+                        }
+                        navigation.toggle(setting.key(), entry);
+                        SettingsSaving.saveThenTell(navigation.registry(), viewer);
+                    }).open();
             case NEEDS_NUMBER_CHOICE -> new AmountChooser(viewer, brand(),
                     this, setting.title(), currentNumber(setting), setting.min(), setting.max(),
                     chosen -> {
