@@ -136,4 +136,14 @@ class LocalGroupsTest {
                 .containsExactly("rains.moderation.ban");
         assertThat(grants.nodesFor(ALEX)).containsExactly("something.personal");
     }
+
+    @Test
+    @DisplayName("on-duty nodes apply without LuckPerms (there is no off duty there); dev mode's do not")
+    void dutyNodes() {
+        groups.seed(GroupSeed.named("helper").grantingIn("rains.moderation.mute", Duty.POWERS, Duty.ON)
+                .grantingIn("*", Duty.DEV, Duty.ON));
+        groups.join(ALEX, "helper");
+
+        assertThat(grants.nodesFor(ALEX)).contains("rains.moderation.mute").doesNotContain("*");
+    }
 }

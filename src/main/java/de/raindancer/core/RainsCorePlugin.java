@@ -804,6 +804,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         changelog.problems().forEach(problem -> log.warn("{}", problem));
         getServer().getPluginManager().registerEvents(
                 new de.raindancer.core.ui.changelog.ChangelogListener(this, changelog), this);
+        startNetworkWhitelist();
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
                 getDataFolder().toPath().resolve("maintenance.yml"), System::currentTimeMillis);
         maintenance.load();
@@ -1284,6 +1285,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public void onDisable() {
         groupsFollowing.close();
+        de.raindancer.core.platform.permission.Duty.clear();
         if (grants != null && grants.usesLuckPerms()) {
             de.raindancer.core.platform.permission.LuckPermsGroups.stop(groups);
         }
@@ -1768,7 +1770,26 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return groups;
     }
 
+    private void startNetworkWhitelist() {
+        var whitelistSettings = settingsFor(SettingsSchema.of(
+                de.raindancer.core.moderation.whitelist.WhitelistSettings.class,
+                de.raindancer.core.moderation.whitelist.WhitelistSettings.DEFAULTS),
+                getDataFolder().toPath().resolve("config.yml"));
+        var listener = new de.raindancer.core.moderation.whitelist.WhitelistListener(this);
+        var shared = de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("whitelist.yml"));
+        var whitelist = new de.raindancer.core.moderation.whitelist.NetworkWhitelist(shared, network.serverId(), listener);
+        listener.feeding(whitelist);
+        getServer().getPluginManager().registerEvents(listener, this);
+        whitelist.taking(false);
+        // Another server changed the list.
+        shared.onChange(whitelist::reload);
+        whitelistSettings.onChange(now -> Scheduling.async(this, () -> whitelist.taking(now.shared())));
+        Scheduling.async(this, () -> whitelist.taking(whitelistSettings.current().shared()));
+    }
+
     private void startGroups() {
+        de.raindancer.core.moderation.players.AdminModes.listen(
+                (player, on) -> de.raindancer.core.platform.permission.Duty.adminModeSwitched(player));
         if (grants.usesLuckPerms()) {
             // Through a static entry point so no LuckPerms type is ever resolved here: a server
             // without LuckPerms must be able to load this class.

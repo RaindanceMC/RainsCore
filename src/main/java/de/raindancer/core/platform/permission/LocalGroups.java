@@ -166,7 +166,11 @@ public final class LocalGroups implements PermissionGroups {
                 continue;
             }
             for (GroupSeed.Node node : seed.nodes()) {
-                if (node.everywhere()) {
+                // No contexts without LuckPerms: on-duty powers simply always apply, dev mode's wildcard never.
+                if (!node.value()) {
+                    continue;   // a denial only means something next to LuckPerms' wildcards
+                }
+                if (node.everywhere() || node.context().keySet().equals(Set.of(Duty.POWERS))) {
                     due.add(node.permission());
                 } else if (warnedContextual.add(group + " " + node.permission())) {
                     log.info("{} in group {} only applies in {} — without LuckPerms it is not granted "

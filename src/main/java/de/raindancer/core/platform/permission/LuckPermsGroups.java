@@ -44,6 +44,7 @@ public final class LuckPermsGroups implements PermissionGroups {
     private final LuckPerms luckPerms;
     private final List<Consumer<UUID>> watchers = new CopyOnWriteArrayList<>();
     private final List<EventSubscription<?>> subscriptions = new CopyOnWriteArrayList<>();
+    private NetworkBus.Subscription dutyFollowing = () -> { };
 
     public LuckPermsGroups(LuckPerms luckPerms) {
         this.luckPerms = luckPerms;
@@ -59,6 +60,31 @@ public final class LuckPermsGroups implements PermissionGroups {
         groups.listen(plugin);
         // Only taken up where LuckPerms' config says messaging-service: custom.
         luckPerms.registerMessengerProvider(new LuckPermsBusMessenger(bus));
+        var contexts = luckPerms.getContextManager();
+        contexts.registerCalculator(new net.luckperms.api.context.ContextCalculator<org.bukkit.entity.Player>() {
+            @Override
+            public void calculate(org.bukkit.entity.Player target, net.luckperms.api.context.ContextConsumer consumer) {
+                Duty.contextsOf(target.getUniqueId()).forEach(consumer::accept);
+            }
+
+            @Override
+            public net.luckperms.api.context.ContextSet estimatePotentialContexts() {
+                return net.luckperms.api.context.ImmutableContextSet.builder()
+                        .add(Duty.POWERS, Duty.ON).add(Duty.POWERS, Duty.OFF)
+                        .add(Duty.DEV, Duty.ON).add(Duty.DEV, Duty.OFF).build();
+            }
+        });
+        groups.dutyFollowing = Duty.onChange(who -> {
+            var server = plugin.getServer();
+            if (who == null) {
+                server.getOnlinePlayers().forEach(contexts::signalContextUpdate);
+                return;
+            }
+            var player = server.getPlayer(who);
+            if (player != null) {
+                contexts.signalContextUpdate(player);
+            }
+        });
         return groups;
     }
 
@@ -85,6 +111,7 @@ public final class LuckPermsGroups implements PermissionGroups {
     }
 
     public void close() {
+        dutyFollowing.close();
         subscriptions.forEach(EventSubscription::close);
         subscriptions.clear();
     }
@@ -102,7 +129,7 @@ public final class LuckPermsGroups implements PermissionGroups {
         GroupManager groups = luckPerms.getGroupManager();
         Group group = groups.createAndLoadGroup(seed.name()).join();
         for (GroupSeed.Node node : seed.nodes()) {
-            PermissionNode.Builder built = PermissionNode.builder(node.permission());
+            PermissionNode.Builder built = PermissionNode.builder(node.permission()).value(node.value());
             for (Map.Entry<String, String> context : node.context().entrySet()) {
                 built = built.withContext(context.getKey(), context.getValue());
             }

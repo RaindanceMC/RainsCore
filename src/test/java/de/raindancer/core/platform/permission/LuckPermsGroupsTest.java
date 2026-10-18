@@ -39,11 +39,12 @@ class LuckPermsGroupsTest {
     private final LuckPerms luckPerms = mock(LuckPerms.class);
     private final GroupManager groupManager = mock(GroupManager.class);
     private MockedStatic<LuckPermsProvider> provider;
+    private PermissionNode.Builder permission;
 
     @BeforeEach
     void setUp() {
         NodeBuilderRegistry registry = mock(NodeBuilderRegistry.class);
-        PermissionNode.Builder permission = mock(PermissionNode.Builder.class, Mockito.RETURNS_SELF);
+        permission = mock(PermissionNode.Builder.class, Mockito.RETURNS_SELF);
         when(permission.build()).thenReturn(mock(PermissionNode.class));
         InheritanceNode.Builder inheritance = mock(InheritanceNode.Builder.class, Mockito.RETURNS_SELF);
         when(inheritance.build()).thenReturn(mock(InheritanceNode.class));
@@ -122,5 +123,22 @@ class LuckPermsGroupsTest {
     @DisplayName("LuckPerms groups are editable")
     void editable() {
         assertThat(new LuckPermsGroups(luckPerms).editable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a denied node reaches LuckPerms as false")
+    void denial() {
+        Group fresh = mock(Group.class);
+        NodeMap data = mock(NodeMap.class);
+        DataMutateResult ok = mock(DataMutateResult.class);
+        when(data.add(any(Node.class))).thenReturn(ok);
+        when(fresh.data()).thenReturn(data);
+        when(groupManager.loadGroup("dev")).thenReturn(CompletableFuture.completedFuture(java.util.Optional.empty()));
+        when(groupManager.createAndLoadGroup("dev")).thenReturn(CompletableFuture.completedFuture(fresh));
+
+        new LuckPermsGroups(luckPerms).seed(GroupSeed.named("dev").denyingIn("worldedit.*", Duty.DEV, Duty.ON));
+
+        verify(permission).value(false);
+        verify(permission).withContext(Duty.DEV, Duty.ON);
     }
 }

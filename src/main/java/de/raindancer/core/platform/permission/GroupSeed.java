@@ -20,11 +20,15 @@ import java.util.Map;
  */
 public record GroupSeed(String name, String displayName, int weight, List<String> parents, List<Node> nodes) {
 
-    /** One permission, optionally only where every context matches (e.g. {@code world=build}). */
-    public record Node(String permission, Map<String, String> context) {
+    /** One permission, optionally only where every context matches (e.g. {@code world=build}); false denies it. */
+    public record Node(String permission, Map<String, String> context, boolean value) {
 
         public Node {
             context = context == null ? Map.of() : Map.copyOf(context);
+        }
+
+        public Node(String permission, Map<String, String> context) {
+            this(permission, context, true);
         }
 
         public boolean everywhere() {
@@ -68,6 +72,13 @@ public record GroupSeed(String name, String displayName, int weight, List<String
     public GroupSeed granting(Iterable<String> permissions) {
         List<Node> more = new ArrayList<>(nodes);
         permissions.forEach(permission -> more.add(new Node(permission, Map.of())));
+        return new GroupSeed(name, displayName, weight, parents, more);
+    }
+
+    /** Denies a permission where {@code key=value} — e.g. to keep one plugin out of a wildcard. */
+    public GroupSeed denyingIn(String permission, String key, String value) {
+        List<Node> more = new ArrayList<>(nodes);
+        more.add(new Node(permission, Map.of(key, value), false));
         return new GroupSeed(name, displayName, weight, parents, more);
     }
 
