@@ -110,4 +110,33 @@ class LuckPermsLedgerTest {
         assertThat(store.revoke(ALEX, "claims.admin")).isTrue();
         verify(data).remove(any(Node.class));
     }
+
+    @Test
+    @DisplayName("clearing returns only once LuckPerms has saved, so the next change cannot read the nodes back")
+    void clearWaitsForTheSave() {
+        DataMutateResult ok = result(true);
+        when(data.add(any(Node.class))).thenReturn(ok);
+        when(data.remove(any(Node.class))).thenReturn(ok);
+        User user = luckPerms.getUserManager().getUser(ALEX);
+        PermissionNode held = mock(PermissionNode.class);
+        when(held.getPermission()).thenReturn("claims.admin");
+        when(user.getNodes()).thenReturn(java.util.List.of(held));
+        LuckPermsGrantStore store = new LuckPermsGrantStore(folder, luckPerms);
+        store.grant(ALEX, "claims.admin");
+        CompletableFuture<Void> slowSave = new CompletableFuture<>();
+        when(luckPerms.getUserManager().saveUser(any())).thenReturn(slowSave);
+        new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException ignored) {
+            }
+            slowSave.complete(null);
+        }).start();
+
+        long started = System.nanoTime();
+        store.clear(ALEX);
+
+        assertThat(slowSave).isDone();
+        assertThat((System.nanoTime() - started) / 1_000_000).isGreaterThanOrEqualTo(250);
+    }
 }

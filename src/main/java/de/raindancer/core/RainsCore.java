@@ -231,6 +231,14 @@ public interface RainsCore {
     void reapplyGrants(Player player);
 
     /**
+     * Permission groups — staff ranks — and who is in them. LuckPerms groups when LuckPerms is installed
+     * (seeded once, then edited there); the seeded defaults as plain grants otherwise.
+     */
+    default de.raindancer.core.platform.permission.PermissionGroups groups() {
+        return de.raindancer.core.platform.permission.PermissionGroups.NONE;
+    }
+
+    /**
      * Bans, mutes, freezes and the record of who did what — for any plugin that needs to refuse
      * somebody something and remember that it did.
      */

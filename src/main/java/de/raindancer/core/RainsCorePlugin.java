@@ -237,6 +237,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.ui.chat.PrefixService prefixes;
     private de.raindancer.core.ui.identity.Nametags nametags;
     private Grants grants;
+    private de.raindancer.core.platform.permission.PermissionGroups groups =
+            de.raindancer.core.platform.permission.PermissionGroups.NONE;
+    private de.raindancer.core.platform.network.NetworkBus.Subscription groupsFollowing = () -> { };
     /**
      * Who can still see a vanished moderator.
      *
@@ -535,6 +538,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 : "Permissions granted through moderation and elsewhere use the built-in local store — "
                         + "install LuckPerms for groups, inheritance and contexts.");
         grantListener = new GrantListener(this, grants);
+        startGroups();
         // What makes a promotion or a demotion take effect while the player is standing there. Without
         // it the grant sat in grants.yml doing nothing until they reconnected — and the revocation case
         // is the sharp one: somebody stripped of their powers kept them for the rest of the session.
@@ -1279,6 +1283,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public void onDisable() {
+        groupsFollowing.close();
+        if (grants != null && grants.usesLuckPerms()) {
+            de.raindancer.core.platform.permission.LuckPermsGroups.stop(groups);
+        }
         // The logfile last: everything above may want to say something on the way out.
         instance = null;
         if (vaultBridge != null) {
@@ -1753,6 +1761,26 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public Grants grants() {
         return grants;
+    }
+
+    @Override
+    public de.raindancer.core.platform.permission.PermissionGroups groups() {
+        return groups;
+    }
+
+    private void startGroups() {
+        if (grants.usesLuckPerms()) {
+            // Through a static entry point so no LuckPerms type is ever resolved here: a server
+            // without LuckPerms must be able to load this class.
+            groups = de.raindancer.core.platform.permission.LuckPermsGroups.startOn(this, bus());
+            return;
+        }
+        var local = new de.raindancer.core.platform.permission.LocalGroups(
+                de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("groups.yml")),
+                grants);
+        local.load();
+        groupsFollowing = local.follow();
+        groups = local;
     }
 
     @Override

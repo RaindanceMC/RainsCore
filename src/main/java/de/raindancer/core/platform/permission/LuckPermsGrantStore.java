@@ -293,7 +293,9 @@ final class LuckPermsGrantStore implements GrantStore {
                 }
             }
             if (changed) {
-                luckPerms.getUserManager().saveUser(user);
+                // Waited for: whatever changes this user next loads them from storage, and would
+                // otherwise read the nodes back before this save lands and write them again.
+                luckPerms.getUserManager().saveUser(user).join();
             }
         }
         presetOf.remove(who);
