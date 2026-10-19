@@ -6,6 +6,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,5 +69,37 @@ class EnchantShardsTest {
         assertThat(EnchantShards.take(inventory, RainsEnchants.BOOST, 4)).isTrue();
         verify(inventory).setItem(eq(1), eq(null));
         assertThat(first.getAmount()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("a shard is dressed with its enchantment's key, which the resource pack picks its look by")
+    void dressesWithTheKey() {
+        ItemStack stack = shards(RainsEnchants.THOR, 2);
+        ItemMeta meta = stack.getItemMeta();
+        CustomModelDataComponent model = mock(CustomModelDataComponent.class);
+        when(model.getStrings()).thenReturn(java.util.List.of());
+        when(meta.getCustomModelDataComponent()).thenReturn(model);
+
+        assertThat(EnchantShards.dress(stack)).isTrue();
+
+        verify(model).setStrings(java.util.List.of(RainsEnchants.THOR));
+        verify(meta).setCustomModelDataComponent(model);
+        verify(stack).setItemMeta(meta);
+    }
+
+    @Test
+    @DisplayName("a shard already dressed, a plain echo shard and nothing at all are left alone")
+    void dressesOnlyWhatNeedsIt() {
+        ItemStack dressed = shards(RainsEnchants.THOR, 1);
+        CustomModelDataComponent model = mock(CustomModelDataComponent.class);
+        when(model.getStrings()).thenReturn(java.util.List.of(RainsEnchants.THOR));
+        when(dressed.getItemMeta().getCustomModelDataComponent()).thenReturn(model);
+        ItemStack plain = mock(ItemStack.class);
+        when(plain.getType()).thenReturn(Material.ECHO_SHARD);
+
+        assertThat(EnchantShards.dress(dressed)).isFalse();
+        assertThat(EnchantShards.dress(plain)).isFalse();
+        assertThat(EnchantShards.dress(null)).isFalse();
+        verify(dressed, never()).setItemMeta(org.mockito.ArgumentMatchers.any());
     }
 }

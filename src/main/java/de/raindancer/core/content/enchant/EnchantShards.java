@@ -8,6 +8,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.List;
@@ -17,6 +19,9 @@ import java.util.Optional;
  * Shards of Rain's enchantments: one kind per enchantment, the stack carrying the enchantment's key. Dropped
  * by the enchants module, paid into a guild to unlock the enchantment, spent at the shop for its book, and
  * otherwise an item like any other — traded, sold, auctioned. Echo shards to look at, never one to craft with.
+ *
+ * <p>The enchantment's key is also the first custom_model_data string: a resource pack picks each shard's own
+ * model by it, and without one it stays a plain echo shard.
  */
 public final class EnchantShards {
 
@@ -41,6 +46,9 @@ public final class EnchantShards {
                     Component.text("for its book.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
             meta.setEnchantmentGlintOverride(true);
             meta.getPersistentDataContainer().set(KEY, PersistentDataType.STRING, enchantment);
+            CustomModelDataComponent model = meta.getCustomModelDataComponent();
+            model.setStrings(List.of(enchantment));
+            meta.setCustomModelDataComponent(model);
         });
         return NonIngredients.mark(stack);
     }
@@ -51,6 +59,27 @@ public final class EnchantShards {
             return Optional.empty();
         }
         return Optional.ofNullable(stack.getItemMeta().getPersistentDataContainer().get(KEY, PersistentDataType.STRING));
+    }
+
+    /**
+     * Gives a shard made before shards had their own looks the key its model is picked by.
+     *
+     * @return whether the stack was changed
+     */
+    public static boolean dress(ItemStack stack) {
+        Optional<String> enchantment = enchantmentOf(stack);
+        if (enchantment.isEmpty()) {
+            return false;
+        }
+        ItemMeta meta = stack.getItemMeta();
+        CustomModelDataComponent model = meta.getCustomModelDataComponent();
+        if (model.getStrings().equals(List.of(enchantment.get()))) {
+            return false;
+        }
+        model.setStrings(List.of(enchantment.get()));
+        meta.setCustomModelDataComponent(model);
+        stack.setItemMeta(meta);
+        return true;
     }
 
     /** How many shards of this enchantment the inventory holds. */
