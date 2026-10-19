@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 
 /**
@@ -28,6 +29,9 @@ import java.util.function.Function;
  * <p>{@link #register} badges show in chat and the tablist only — what they always did. A badge that should
  * also float above the head, or be left out of one place, is {@link #registerPlaced} and asked per
  * {@link Place}.
+ *
+ * <p>A badge registered with a label is <em>wearable</em>: the one {@link #wardrobe} (Cosmetics' Tags page) may
+ * take it off for a player who does not want it. Badges without a label (a server's mode, say) always show.
  */
 public final class NameBadges {
 
@@ -37,8 +41,16 @@ public final class NameBadges {
     public enum Place { CHAT, TABLIST, NAMETAG }
 
     /** {@code source} is the caller's own function — what {@link #forgetFrom} judges the plugin by. */
-    private record Entry(String owner, BiFunction<UUID, Place, Optional<Component>> badge, Object source) {
+    private record Entry(String owner, String label, BiFunction<UUID, Place, Optional<Component>> badge,
+                         Object source) {
     }
+
+    /** A badge a player may choose to wear, as a menu names it. */
+    public record Wearable(String owner, String label) {
+    }
+
+    /** Whether {@code player} wears the wearable badge of {@code owner}; asked as often as badges are. */
+    private static volatile BiPredicate<UUID, String> wardrobe;
 
     private static final List<Entry> entries = new CopyOnWriteArrayList<>();
     private static final Map<String, Boolean> complainedAbout = new ConcurrentHashMap<>();
@@ -48,11 +60,16 @@ public final class NameBadges {
 
     /** Adds a badge under {@code owner}; registering again under the same owner replaces it in place. */
     public static void register(String owner, Function<UUID, Optional<Component>> badge) {
+        register(owner, null, badge);
+    }
+
+    /** As {@link #register(String, Function)}, wearable under {@code label} (null: always worn). */
+    public static void register(String owner, String label, Function<UUID, Optional<Component>> badge) {
         if (badge == null) {
             return;
         }
-        put(new Entry(owner, (player, place) -> place == Place.NAMETAG ? Optional.empty() : badge.apply(player),
-                badge));
+        put(new Entry(owner, blankToNull(label),
+                (player, place) -> place == Place.NAMETAG ? Optional.empty() : badge.apply(player), badge));
     }
 
     /**
@@ -60,10 +77,65 @@ public final class NameBadges {
      * namespace as {@link #register}: either replaces the other.
      */
     public static void registerPlaced(String owner, BiFunction<UUID, Place, Optional<Component>> badge) {
+        registerPlaced(owner, null, badge);
+    }
+
+    /** As {@link #registerPlaced(String, BiFunction)}, wearable under {@code label} (null: always worn). */
+    public static void registerPlaced(String owner, String label, BiFunction<UUID, Place, Optional<Component>> badge) {
         if (badge == null) {
             return;
         }
-        put(new Entry(owner, badge, badge));
+        put(new Entry(owner, blankToNull(label), badge, badge));
+    }
+
+    private static String blankToNull(String label) {
+        return label == null || label.isBlank() ? null : label.strip();
+    }
+
+    /** Sets the one wardrobe deciding who wears which wearable badge; null puts everything back on. */
+    public static void wardrobe(BiPredicate<UUID, String> wears) {
+        wardrobe = wears;
+    }
+
+    public static boolean hasWardrobe() {
+        return wardrobe != null;
+    }
+
+    /** The wearable badges, in the order they are drawn. */
+    public static List<Wearable> wearables() {
+        return entries.stream().filter(entry -> entry.label() != null)
+                .map(entry -> new Wearable(entry.owner(), entry.label())).toList();
+    }
+
+    /** Whether the wardrobe lets {@code player} wear {@code owner}'s badge; true without a wardrobe or when it fails. */
+    public static boolean wears(UUID player, String owner) {
+        BiPredicate<UUID, String> current = wardrobe;
+        if (current == null) {
+            return true;
+        }
+        try {
+            return current.test(player, owner);
+        } catch (RuntimeException failed) {
+            if (complainedAbout.putIfAbsent("wardrobe", Boolean.TRUE) == null) {
+                log.error(failed, "The name badge wardrobe failed; every badge is worn until it works.");
+            }
+            return true;
+        }
+    }
+
+    /** {@code owner}'s badge for {@code player} whether they wear it or not — for a menu to show it. */
+    public static Optional<Component> preview(UUID player, String owner, Place place) {
+        for (Entry entry : entries) {
+            if (entry.owner().equals(owner)) {
+                try {
+                    Optional<Component> badge = entry.badge().apply(player, place);
+                    return badge == null ? Optional.empty() : badge;
+                } catch (RuntimeException failed) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     private static synchronized void put(Entry entry) {
@@ -102,6 +174,9 @@ public final class NameBadges {
         }
         List<Component> found = new ArrayList<>(2);
         for (Entry entry : entries) {
+            if (entry.label() != null && !wears(player, entry.owner())) {
+                continue;
+            }
             try {
                 Optional<Component> badge = entry.badge().apply(player, place);
                 if (badge != null && badge.isPresent()) {
@@ -131,6 +206,12 @@ public final class NameBadges {
                 .toList();
         entries.removeAll(gone);
         gone.forEach(entry -> complainedAbout.remove(entry.owner()));
+        BiPredicate<UUID, String> current = wardrobe;
+        if (current != null && current.getClass().getClassLoader() == loader) {
+            wardrobe = null;
+            complainedAbout.remove("wardrobe");
+            return gone.size() + 1;
+        }
         return gone.size();
     }
 
@@ -138,5 +219,6 @@ public final class NameBadges {
     public static synchronized void clear() {
         entries.clear();
         complainedAbout.clear();
+        wardrobe = null;
     }
 }
