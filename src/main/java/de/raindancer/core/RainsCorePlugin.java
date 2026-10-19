@@ -290,6 +290,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.moderation.maintenance.Maintenance maintenance;
     private de.raindancer.core.ui.chat.MentionCompletions mentionCompletions;
     private PlayerPowers powers;
+    private de.raindancer.core.world.movement.Flight flight;
     private PlayerAdmin players;
     private de.raindancer.core.moderation.players.PlayerBody bodies;
     private InventoryViews inventoryViews;
@@ -757,6 +758,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // see Combat's own class note. Neither survives a restart; see PlayerPowers.
         powers = new PlayerPowers();
         getServer().getPluginManager().registerEvents(new PlayerPowerListener(powers), this);
+        flight = new de.raindancer.core.world.movement.Flight(this, System::currentTimeMillis);
+        getServer().getPluginManager().registerEvents(flight, this);
 
         vanish = new Vanish(new BukkitVanishSink(this));
         playtime = new de.raindancer.core.social.presence.Playtime(databases.core());
@@ -2453,6 +2456,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public PlayerPowers powers() {
         return powers;
+    }
+
+    @Override
+    public de.raindancer.core.world.movement.Flight flight() {
+        return flight;
     }
 
     @Override

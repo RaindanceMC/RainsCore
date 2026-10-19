@@ -491,6 +491,13 @@ public interface RainsCore {
     PlayerPowers powers();
 
     /**
+     * Flight several things hand out at once: each source takes a named lease, and flight goes only with the
+     * last one — never when the player could already fly. Use this rather than {@code setAllowFlight}, or a
+     * claim's flight ends somebody's {@code /fly}.
+     */
+    de.raindancer.core.world.movement.Flight flight();
+
+    /**
      * Who is looking inside whose inventory, and what they may touch there.
      *
      * <p>One editor at a time, whatever else is watching: two people dragging in the same inventory
