@@ -151,6 +151,37 @@ public final class LuckPermsGroups implements PermissionGroups {
     }
 
     @Override
+    public boolean ensure(String groupName, String permission) {
+        String name = key(groupName);
+        if (name.isEmpty() || permission == null || permission.isBlank()) {
+            return false;
+        }
+        GroupManager groups = luckPerms.getGroupManager();
+        Group group = groups.getGroup(name);
+        if (group == null) {
+            group = groups.loadGroup(name).join().orElse(null);
+        }
+        if (group == null) {
+            return false;
+        }
+        java.util.List<PermissionNode> denials = new java.util.ArrayList<>();
+        for (PermissionNode held : group.getNodes(NodeType.PERMISSION)) {
+            if (held.getPermission().equalsIgnoreCase(permission) && held.getContexts().isEmpty()) {
+                if (held.getValue()) {
+                    return false;
+                }
+                denials.add(held);
+            }
+        }
+        Group changing = group;
+        denials.forEach(denial -> changing.data().remove(denial));
+        group.data().add(PermissionNode.builder(permission).value(true).build());
+        groups.saveGroup(group).join();
+        log.info("The LuckPerms group {} holds {} again — it always has to.", name, permission);
+        return true;
+    }
+
+    @Override
     public boolean exists(String group) {
         String name = key(group);
         if (name.isEmpty()) {

@@ -158,6 +158,28 @@ public final class LocalGroups implements PermissionGroups {
     }
 
     /** Grants exactly what their groups give now, takes back what they gave before and no longer do. */
+    @Override
+    public boolean ensure(String group, String permission) {
+        if (group == null || permission == null || permission.isBlank()) {
+            return false;
+        }
+        boolean[] changed = new boolean[1];
+        seeds.computeIfPresent(group, (name, seed) -> {
+            boolean held = seed.nodes().stream()
+                    .anyMatch(node -> node.everywhere() && node.value() && node.permission().equals(permission));
+            changed[0] = !held;
+            return held ? seed : seed.granting(permission);
+        });
+        if (changed[0]) {
+            members.forEach((who, groups) -> {
+                if (groups.contains(group)) {
+                    apply(who);
+                }
+            });
+        }
+        return changed[0];
+    }
+
     private void apply(UUID who) {
         Set<String> due = new LinkedHashSet<>();
         for (String group : groupsOf(who)) {

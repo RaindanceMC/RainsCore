@@ -146,4 +146,17 @@ class LocalGroupsTest {
 
         assertThat(grants.nodesFor(ALEX)).contains("rains.moderation.mute").doesNotContain("*");
     }
+
+    @Test
+    @DisplayName("ensure adds a node to a seeded group and its members get it at once")
+    void ensureLocal() {
+        groups.join(ALEX, "builder");
+        assertThat(grants.nodesFor(ALEX)).doesNotContain("rains.moderation.dev");
+
+        assertThat(groups.ensure("builder", "rains.moderation.dev")).isTrue();
+        assertThat(groups.ensure("builder", "rains.moderation.dev")).isFalse();
+        assertThat(groups.ensure("nobody", "rains.moderation.dev")).isFalse();
+
+        assertThat(grants.nodesFor(ALEX)).contains("rains.moderation.dev");
+    }
 }

@@ -83,6 +83,17 @@ public interface PermissionGroups {
      */
     boolean seed(GroupSeed seed);
 
+    /**
+     * Makes an existing group hold {@code permission} everywhere — for the one node a group must never lose
+     * (the dev group's /dev), unlike {@link #seed}'s defaults. A denial of it is turned into the grant; a group
+     * that does not exist is not created. Blocks: never on the server thread.
+     *
+     * @return whether the group changed
+     */
+    default boolean ensure(String group, String permission) {
+        return false;
+    }
+
     boolean exists(String group);
 
     /** Puts them directly in the group. @return whether that changed anything */
