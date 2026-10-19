@@ -230,6 +230,12 @@ public final class LuckPermsGroups implements PermissionGroups {
     }
 
     @Override
+    public java.util.Optional<String> primaryGroup(UUID who) {
+        User user = user(who);
+        return user == null ? java.util.Optional.empty() : java.util.Optional.ofNullable(user.getPrimaryGroup());
+    }
+
+    @Override
     public Set<String> groupsOf(UUID who) {
         User user = user(who);
         if (user == null) {

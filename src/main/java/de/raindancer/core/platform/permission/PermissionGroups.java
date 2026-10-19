@@ -97,6 +97,14 @@ public interface PermissionGroups {
     /** Every group they hold, inherited ones included. */
     Set<String> groupsOf(UUID who);
 
+    /**
+     * LuckPerms' primary group for them — what a "rank" line shows. May load an offline player: never on the server
+     * thread. Empty without LuckPerms.
+     */
+    default java.util.Optional<String> primaryGroup(UUID who) {
+        return java.util.Optional.empty();
+    }
+
     /** Everybody directly in the group. */
     Set<UUID> membersOf(String group);
 

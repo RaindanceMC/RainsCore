@@ -635,6 +635,14 @@ public interface RainsCore {
         return java.util.Optional.empty();
     }
 
+    /**
+     * When the network last and first saw a player, also offline, and on which server. Empty on a server of its own
+     * (Bukkit's {@code getLastSeen}/{@code getFirstPlayed} still answer there, for that server).
+     */
+    default java.util.Optional<de.raindancer.core.platform.network.PlayerHistory> playerHistory() {
+        return java.util.Optional.empty();
+    }
+
     /** Asking another server of the network a question and getting its answer. Empty on a server of its own. */
     default java.util.Optional<de.raindancer.core.platform.network.NetworkCalls> networkCalls() {
         return java.util.Optional.empty();

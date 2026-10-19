@@ -1983,6 +1983,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private volatile de.raindancer.core.platform.network.FirstSeen firstSeen;
+    private volatile de.raindancer.core.platform.network.PlayerHistory playerHistory;
     private final java.util.Map<java.util.UUID, java.util.concurrent.CompletableFuture<Boolean>> newcomers =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -2090,6 +2091,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // Every player's own switches follow them, whichever plugin they belong to.
         sharedNamespaces.add(de.raindancer.core.ui.profile.PlayerSwitch.NAMESPACE);
         firstSeen = new de.raindancer.core.platform.network.FirstSeen(databases.core(), System::currentTimeMillis);
+        playerHistory = new de.raindancer.core.platform.network.PlayerHistory(databases.core());
         networkPlayers = new de.raindancer.core.platform.network.NetworkPlayers(presence, networkServers, bus,
                 (player, key, values) -> {
                     Player online = getServer().getPlayer(player);
@@ -2194,6 +2196,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public java.util.Optional<de.raindancer.core.platform.network.NetworkPlayers> networkPlayers() {
         return java.util.Optional.ofNullable(networkPlayers);
+    }
+
+    @Override
+    public java.util.Optional<de.raindancer.core.platform.network.PlayerHistory> playerHistory() {
+        return java.util.Optional.ofNullable(playerHistory);
     }
 
     @Override
