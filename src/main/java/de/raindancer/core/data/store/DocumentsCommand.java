@@ -53,8 +53,8 @@ public final class DocumentsCommand implements BasicCommand {
                         return;
                     }
                     editing.export(args[1], args[2]).ifPresentOrElse(
-                            path -> say(sender, "<green>Written to <white>" + core.getDataFolder().toPath().getParent()
-                                    .relativize(path) + "</white>.</green> <gray>Edit it, then /documents import."),
+                            path -> say(sender, "<green>Written to <white>" + shown(core.getDataFolder().toPath(), path)
+                                    + "</white>.</green> <gray>Edit it, then /documents import."),
                             () -> say(sender, "<red>There is no document " + args[1] + "/" + args[2] + "."));
                 }
                 case "import" -> {
@@ -68,6 +68,16 @@ public final class DocumentsCommand implements BasicCommand {
                 default -> say(sender, USAGE);
             }
         });
+    }
+
+    /**
+     * Where an exported file is, from the plugins folder. Both made absolute first: the data folder is relative on a
+     * server started from its own folder, the written file absolute, and relativizing one against the other throws.
+     */
+    static java.nio.file.Path shown(java.nio.file.Path dataFolder, java.nio.file.Path written) {
+        java.nio.file.Path folder = dataFolder.toAbsolutePath().normalize();
+        java.nio.file.Path plugins = folder.getParent() == null ? folder : folder.getParent();
+        return plugins.relativize(written.toAbsolutePath().normalize());
     }
 
     private static void list(CommandSender sender, DocumentEditing editing, String onlyOwner) {
