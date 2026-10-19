@@ -82,6 +82,36 @@ public final class Icons {
     }
 
     /**
+     * A button that is a real item — the thing on sale, an auction lot: its look, enchantments and own lore kept,
+     * the menu's lines added after a gap.
+     *
+     * @param name replaces the item's own name when given; null keeps it
+     */
+    public static ItemStack showing(ItemStack item, String name, List<String> lore) {
+        if (item == null || item.getType().isAir()) {
+            return of(Material.STONE, name == null ? "" : name, lore);
+        }
+        ItemStack icon = item.clone();
+        ItemMeta meta = icon.getItemMeta();
+        if (meta != null) {
+            if (name != null) {
+                meta.displayName(text(name, Style.itemName()));
+            }
+            List<Component> lines = meta.lore() == null ? new ArrayList<>() : new ArrayList<>(meta.lore());
+            if (!lines.isEmpty() && !lore.isEmpty()) {
+                lines.add(Component.empty());
+            }
+            for (String line : lore) {
+                lines.add(text(line, Style.itemLore()));
+            }
+            meta.lore(lines);
+            icon.setItemMeta(meta);
+        }
+        hideAttributes(icon);
+        return icon;
+    }
+
+    /**
      * A button is not a weapon: a pickaxe shown for "dig" must not explain its attack damage under the words. The game
      * writes those lines for any tool, sword or armour, so they are hidden on every button.
      */
