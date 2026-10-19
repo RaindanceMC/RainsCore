@@ -13,6 +13,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +33,9 @@ import java.util.function.LongSupplier;
  * <ul>
  *   <li>Creative and spectator own their flight; leases are kept but the switch is not touched, and put back
  *       when the player returns to survival or adventure (the game drops it on the change).</li>
- *   <li>Taken away mid-air, the landing is spared, once, within {@link #SOFT_LANDING_MILLIS}.</li>
+ *   <li>Taken away mid-air, they float down on Slow Falling, which comes off once they land — unless they had
+ *       their own. The next fall within {@link #SOFT_LANDING_MILLIS} is spared too, in case milk or a totem
+ *       cleared the effect on the way down.</li>
  *   <li>Leases do not survive logging out: the game saves {@code mayfly} with the player, and a grant nobody
  *       holds any more would come back with them. Sources re-grant after the join as they see fit.</li>
  * </ul>
@@ -43,17 +47,22 @@ public final class Flight implements Listener {
 
     /** A minute of falling is plenty — from build height it takes a few seconds. */
     public static final long SOFT_LANDING_MILLIS = 60_000L;
+    private static final long LANDING_CHECK_TICKS = 5L;
 
     private final Plugin plugin;
     private final SoftLandings landings;
     private final Map<UUID, Set<String>> leases = new ConcurrentHashMap<>();
     /** Could fly before the first lease, so the last one leaves it on. */
     private final Set<UUID> foundFlying = ConcurrentHashMap.newKeySet();
+    /** Floating down on Slow Falling this put on them, since when — taken off once they land. */
+    private final Map<UUID, Long> slowed = new ConcurrentHashMap<>();
+    private final LongSupplier clock;
     /** Logged out in the air under a lease; their next landing is spared. */
     private final Set<UUID> returningAirborne = ConcurrentHashMap.newKeySet();
 
     public Flight(Plugin plugin, LongSupplier clock) {
         this.plugin = plugin;
+        this.clock = clock;
         this.landings = new SoftLandings(clock, SOFT_LANDING_MILLIS);
     }
 
@@ -73,6 +82,7 @@ public final class Flight implements Listener {
             return ConcurrentHashMap.newKeySet();
         });
         boolean added = held.add(source);
+        endSlowFall(player);
         if (!ownedByMode && !player.getAllowFlight()) {
             player.setAllowFlight(true);
         }
@@ -98,12 +108,43 @@ public final class Flight implements Listener {
         if (foundFlying.remove(id) || gameModeOwnsFlight(player) || !player.getAllowFlight()) {
             return false;
         }
-        if (!Footing.grounded(player)) {
-            landings.launched(id);
-        }
         player.setFlying(false);
         player.setAllowFlight(false);
+        if (!Footing.grounded(player)) {
+            landings.launched(id);
+            slowFall(player);
+        }
         return true;
+    }
+
+    private void slowFall(Player player) {
+        if (player.hasPotionEffect(PotionEffectType.SLOW_FALLING)) {
+            return;
+        }
+        int ticks = (int) (SOFT_LANDING_MILLIS / 50);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, ticks, 0, true, false, true));
+        slowed.put(player.getUniqueId(), clock.getAsLong());
+        watchLanding(player);
+    }
+
+    private void watchLanding(Player player) {
+        Scheduling.entityLater(plugin, player, LANDING_CHECK_TICKS, () -> {
+            Long since = slowed.get(player.getUniqueId());
+            if (since == null) {
+                return;
+            }
+            if (Footing.grounded(player) || player.isFlying() || clock.getAsLong() - since > SOFT_LANDING_MILLIS) {
+                endSlowFall(player);
+                return;
+            }
+            watchLanding(player);
+        });
+    }
+
+    private void endSlowFall(Player player) {
+        if (slowed.remove(player.getUniqueId()) != null) {
+            player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+        }
     }
 
     public boolean holds(UUID player, String source) {
@@ -169,6 +210,7 @@ public final class Flight implements Listener {
         Set<String> held = leases.remove(id);
         boolean wasFound = foundFlying.remove(id);
         landings.forget(id);
+        endSlowFall(player);
         if (held == null || held.isEmpty() || wasFound || gameModeOwnsFlight(player)) {
             return;
         }

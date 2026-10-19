@@ -9,6 +9,8 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BoundingBox;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +42,8 @@ class FlightTest {
     private Player player;
     private boolean allowFlight;
     private boolean flying;
+    private boolean slowFalling;
+    private final java.util.List<java.util.function.Consumer<Object>> queued = new java.util.ArrayList<>();
     private Flight flight;
 
     @BeforeEach
@@ -65,17 +69,37 @@ class FlightTest {
         }).when(player).setFlying(anyBoolean());
         EntityScheduler scheduler = mock(EntityScheduler.class);
         when(player.getScheduler()).thenReturn(scheduler);
-        // Runs "a tick later" at once, so the test reads straight through.
+        // Queued, and run when the test says a few ticks have passed.
         when(scheduler.runDelayed(any(), any(), any(), anyLong())).thenAnswer(call -> {
-            ((java.util.function.Consumer<Object>) call.getArgument(1)).accept(null);
+            queued.add(call.getArgument(1));
             return null;
         });
+        when(player.hasPotionEffect(PotionEffectType.SLOW_FALLING)).thenAnswer(call -> slowFalling);
+        when(player.addPotionEffect(any(PotionEffect.class))).thenAnswer(call -> {
+            if (((PotionEffect) call.getArgument(0)).getType() == PotionEffectType.SLOW_FALLING) {
+                slowFalling = true;
+            }
+            return true;
+        });
+        doAnswer(call -> {
+            if (call.getArgument(0) == PotionEffectType.SLOW_FALLING) {
+                slowFalling = false;
+            }
+            return null;
+        }).when(player).removePotionEffect(any(PotionEffectType.class));
         grounded(true);
         flight = new Flight(plugin, now::get);
     }
 
     private void grounded(boolean onGround) {
         when(world.hasCollisionsIn(any())).thenReturn(onGround);
+    }
+
+    /** A few ticks pass: everything scheduled so far runs, and whatever it schedules waits for the next call. */
+    private void ticks() {
+        var due = new java.util.ArrayList<>(queued);
+        queued.clear();
+        due.forEach(task -> task.accept(null));
     }
 
     @Test
@@ -153,6 +177,7 @@ class FlightTest {
         allowFlight = false; // what the game does on the switch
         flight.onGameModeChange(new PlayerGameModeChangeEvent(player, GameMode.SURVIVAL,
                 PlayerGameModeChangeEvent.Cause.COMMAND, null));
+        ticks();
         assertThat(allowFlight).isTrue();
     }
 
@@ -240,6 +265,80 @@ class FlightTest {
         flight.grant(player, "vanish");
         assertThat(flight.sources(id)).containsExactlyInAnyOrder("claims", "vanish");
         assertThat(flight.sources(UUID.randomUUID())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("dropped mid-air, they float down on Slow Falling, which goes once they land")
+    void slowFallingUntilTheyLand() {
+        flight.grant(player, "claims");
+        flying = true;
+        grounded(false);
+        flight.revoke(player, "claims");
+        assertThat(slowFalling).isTrue();
+
+        ticks();
+        assertThat(slowFalling).as("still in the air").isTrue();
+
+        grounded(true);
+        ticks();
+        assertThat(slowFalling).isFalse();
+        assertThat(queued).as("nothing left watching").isEmpty();
+    }
+
+    @Test
+    @DisplayName("dropped on the ground, no Slow Falling")
+    void noSlowFallingOnTheGround() {
+        flight.grant(player, "claims");
+        flight.revoke(player, "claims");
+        assertThat(slowFalling).isFalse();
+        verify(player, never()).addPotionEffect(any(PotionEffect.class));
+    }
+
+    @Test
+    @DisplayName("Slow Falling they had of their own is neither replaced nor taken away")
+    void ownSlowFallingIsLeftAlone() {
+        slowFalling = true;
+        flight.grant(player, "claims");
+        grounded(false);
+        flight.revoke(player, "claims");
+        grounded(true);
+        ticks();
+        verify(player, never()).addPotionEffect(any(PotionEffect.class));
+        verify(player, never()).removePotionEffect(any(PotionEffectType.class));
+        assertThat(slowFalling).isTrue();
+    }
+
+    @Test
+    @DisplayName("given flight again on the way down, the Slow Falling goes at once")
+    void regrantEndsSlowFalling() {
+        flight.grant(player, "claims");
+        grounded(false);
+        flight.revoke(player, "claims");
+        flight.grant(player, "claims");
+        assertThat(slowFalling).isFalse();
+    }
+
+    @Test
+    @DisplayName("somebody who never lands loses it when the soft landing runs out")
+    void slowFallingRunsOut() {
+        flight.grant(player, "claims");
+        grounded(false);
+        flight.revoke(player, "claims");
+        now.addAndGet(Flight.SOFT_LANDING_MILLIS + 1);
+        ticks();
+        assertThat(slowFalling).isFalse();
+        assertThat(queued).isEmpty();
+    }
+
+    @Test
+    @DisplayName("logging out on the way down takes it with them rather than saving it")
+    void quitEndsSlowFalling() {
+        flight.grant(player, "claims");
+        grounded(false);
+        flight.revoke(player, "claims");
+        flight.onQuit(new PlayerQuitEvent(player, (net.kyori.adventure.text.Component) null,
+                PlayerQuitEvent.QuitReason.DISCONNECTED));
+        assertThat(slowFalling).isFalse();
     }
 
     /** A fall, mocked: a real damage event needs the server's damage-type registry. */
