@@ -137,7 +137,16 @@ public final class BuyableSlots {
         return Optional.empty();
     }
 
-    /** Buys one slot: charged, then written down; refunded when it cannot be written. */
+    /**
+     * {@link #buy} on {@code offThread}: it reads and writes the database (and on a network that is another
+     * machine), so a click on a menu should hand it there and answer the player when the future completes.
+     */
+    public java.util.concurrent.CompletableFuture<Purchase> buyOffThread(UUID player, Terms terms,
+                                                                         java.util.concurrent.Executor offThread) {
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> buy(player, terms), offThread);
+    }
+
+    /** Buys one slot: charged, then written down; refunded when it cannot be written. Not on a server thread. */
     public synchronized Purchase buy(UUID player, Terms terms) {
         // What other servers sold them counts for the ceiling and the price.
         refresh(player);

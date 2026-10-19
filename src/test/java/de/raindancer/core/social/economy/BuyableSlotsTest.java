@@ -158,4 +158,21 @@ class BuyableSlotsTest {
             return EconomyResult.done(amount, balance(from));
         }
     }
+
+    @Test
+    @DisplayName("bought off the server's threads: the purchase runs where it is handed, and nowhere before")
+    void offThread() {
+        Economies.provide(owner, new Recorder(10_000));
+        BuyableSlots slots = slots();
+        java.util.List<Runnable> queued = new java.util.ArrayList<>();
+
+        java.util.concurrent.CompletableFuture<BuyableSlots.Purchase> bought =
+                slots.buyOffThread(ada, terms(true, 1000, 0, 0), queued::add);
+
+        assertThat(bought).isNotDone();
+        assertThat(slots.bought(ada)).as("nothing happened on the calling thread").isZero();
+        queued.forEach(Runnable::run);
+        assertThat(bought.join().outcome()).isEqualTo(BuyableSlots.Outcome.BOUGHT);
+        assertThat(slots.bought(ada)).isEqualTo(1);
+    }
 }
