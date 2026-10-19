@@ -4,6 +4,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -34,14 +35,41 @@ public final class Stash {
                            long version) {
     }
 
-    private final int capacity;
+    private final boolean stands;
+    private int capacity;
     private final List<ItemStack> items = new ArrayList<>();
     private final Map<ArmourPiece, ItemStack> armour = new EnumMap<>(ArmourPiece.class);
     private final List<String> kept = new ArrayList<>();
     private long version;
 
     public Stash(int capacity) {
+        this(capacity, true);
+    }
+
+    private Stash(int capacity, boolean stands) {
         this.capacity = Math.max(1, capacity);
+        this.stands = stands;
+    }
+
+    /** A stash with no armour stands: a helmet is an item like any other. */
+    public static Stash withoutStands(int capacity) {
+        return new Stash(capacity, false);
+    }
+
+    /**
+     * {@link #restored(int, List, Map, List, long)} for a stash without stands. Anything the file still has on a
+     * stand comes back as an item, so switching a stash to no stands never loses a piece.
+     */
+    public static Stash restoredWithoutStands(int capacity, List<ItemStack> items, Map<ArmourPiece, ItemStack> armour,
+                                              List<String> kept, long version) {
+        Stash stash = new Stash(capacity, false);
+        stash.fill(items, Map.of(), kept, version);
+        armour.values().forEach(item -> {
+            if (!isNothing(item)) {
+                stash.items.add(item.clone());
+            }
+        });
+        return stash;
     }
 
     /** Rebuilds a stash from what was on disk, without counting as a change. */
@@ -57,21 +85,25 @@ public final class Stash {
     public static Stash restored(int capacity, List<ItemStack> items, Map<ArmourPiece, ItemStack> armour,
                                  List<String> kept, long version) {
         Stash stash = new Stash(capacity);
-        stash.version = Math.max(0, version);
+        stash.fill(items, armour, kept, version);
+        return stash;
+    }
+
+    private void fill(List<ItemStack> items, Map<ArmourPiece, ItemStack> armour, List<String> kept, long version) {
+        this.version = Math.max(0, version);
         for (ItemStack item : items) {
             if (!isNothing(item)) {
                 // Not deposit(): a stash saved under a bigger capacity keeps everything, and stacks are
                 // left as the owner arranged them.
-                stash.items.add(item.clone());
+                this.items.add(item.clone());
             }
         }
         armour.forEach((piece, item) -> {
             if (!isNothing(item)) {
-                stash.armour.put(piece, item.clone());
+                this.armour.put(piece, item.clone());
             }
         });
-        stash.kept.addAll(kept);
-        return stash;
+        this.kept.addAll(kept);
     }
 
     /**
@@ -88,7 +120,7 @@ public final class Stash {
         int max = Math.max(1, item.getMaxStackSize());
 
         Optional<ArmourPiece> piece = ArmourPiece.of(item.getType());
-        if (piece.isPresent() && !armour.containsKey(piece.get())) {
+        if (stands && piece.isPresent() && !armour.containsKey(piece.get())) {
             int placed = Math.min(left, max);
             armour.put(piece.get(), item.asQuantity(placed));
             left -= placed;
@@ -202,8 +234,69 @@ public final class Stash {
         return items.size();
     }
 
-    public int capacity() {
+    public synchronized int capacity() {
         return capacity;
+    }
+
+    /**
+     * How many stacks fit from now on — for a vault that gains pages. A smaller capacity takes nothing away: what is
+     * in stays in, and only a deposit is refused until it is under the limit again.
+     */
+    public synchronized void capacity(int stacks) {
+        capacity = Math.max(1, stacks);
+    }
+
+    public boolean hasStands() {
+        return stands;
+    }
+
+    /**
+     * Tops up every part stack from the similar ones after it, then puts the entries in this order (stable, so equal
+     * ones keep theirs).
+     *
+     * @return whether anything moved; nothing moved is no change and nothing to write
+     */
+    public synchronized boolean sort(Comparator<ItemStack> order) {
+        List<ItemStack> merged = new ArrayList<>(items.size());
+        for (ItemStack item : items) {
+            ItemStack left = item.clone();
+            int max = Math.max(1, left.getMaxStackSize());
+            for (ItemStack into : merged) {
+                if (left.getAmount() <= 0) {
+                    break;
+                }
+                if (into.getAmount() < max && into.isSimilar(left)) {
+                    int moved = Math.min(left.getAmount(), max - into.getAmount());
+                    into.setAmount(into.getAmount() + moved);
+                    left.setAmount(left.getAmount() - moved);
+                }
+            }
+            if (left.getAmount() > 0) {
+                merged.add(left);
+            }
+        }
+        merged.sort(order);
+        if (sameAs(merged)) {
+            return false;
+        }
+        items.clear();
+        items.addAll(merged);
+        version++;
+        return true;
+    }
+
+    private boolean sameAs(List<ItemStack> other) {
+        if (other.size() != items.size()) {
+            return false;
+        }
+        for (int index = 0; index < other.size(); index++) {
+            ItemStack mine = items.get(index);
+            ItemStack theirs = other.get(index);
+            if (mine.getAmount() != theirs.getAmount() || !mine.isSimilar(theirs)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public synchronized Contents contents() {

@@ -41,6 +41,15 @@ public final class StashStore {
     }
 
     public Stash load(UUID owner, int capacity) {
+        return load(owner, capacity, true);
+    }
+
+    /** {@link #load} for a stash kept without armour stands — see {@link Stash#withoutStands}. */
+    public Stash loadWithoutStands(UUID owner, int capacity) {
+        return load(owner, capacity, false);
+    }
+
+    private Stash load(UUID owner, int capacity, boolean stands) {
         YamlConfiguration yaml = file(owner).read();
         List<String> kept = new ArrayList<>(yaml.getStringList("kept"));
 
@@ -71,7 +80,9 @@ public final class StashStore {
                     + "the file untouched and will come back once they can be read.",
                     kept.size() - yaml.getStringList("kept").size(), owner);
         }
-        return Stash.restored(capacity, items, armour, kept, written.getOrDefault(owner, 0L));
+        long version = written.getOrDefault(owner, 0L);
+        return stands ? Stash.restored(capacity, items, armour, kept, version)
+                : Stash.restoredWithoutStands(capacity, items, armour, kept, version);
     }
 
     /**

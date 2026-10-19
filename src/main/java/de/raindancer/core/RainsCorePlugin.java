@@ -1299,6 +1299,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         de.raindancer.core.social.economy.Economies.clear();
         de.raindancer.core.social.economy.ItemValues.clear();
+        de.raindancer.core.social.economy.ItemSales.clear();
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
@@ -2682,6 +2683,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.voice.VoiceGroups.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Economies.forgetFrom(loader)
                 + de.raindancer.core.social.economy.ItemValues.forgetFrom(loader)
+                + de.raindancer.core.social.economy.ItemSales.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceModifiers.forgetFrom(loader)
                 + de.raindancer.core.social.economy.SaleStops.forgetFrom(loader)
                 + de.raindancer.core.social.roles.PlayerRoles.forgetFrom(loader)
