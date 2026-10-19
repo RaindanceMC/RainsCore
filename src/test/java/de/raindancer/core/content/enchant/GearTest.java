@@ -34,6 +34,18 @@ class GearTest {
     }
 
     @Test
+    @DisplayName("what sells is every hand tool and the chest Auto Sell turns into a selling chest, but no other chest")
+    void selling() {
+        for (String item : new String[]{"chest", "iron_pickaxe", "diamond_sword", "bow", "shears"}) {
+            assertThat(Gear.SELLING.matches(item)).as(item).isTrue();
+        }
+        for (String other : new String[]{"trapped_chest", "ender_chest", "chest_minecart", "barrel", "iron_helmet"}) {
+            assertThat(Gear.SELLING.matches(other)).as(other).isFalse();
+        }
+        assertThat(Gear.SELLING.slot()).isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.MAINHAND);
+    }
+
+    @Test
     @DisplayName("digging, excavating, hoes, leggings, and any gear at all")
     void theRest() {
         assertThat(Gear.DIGGING_TOOLS.matches("iron_hoe")).isTrue();

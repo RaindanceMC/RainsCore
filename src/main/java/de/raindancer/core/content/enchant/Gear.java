@@ -21,6 +21,8 @@ public enum Gear {
     EXCAVATING_TOOLS(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_pickaxe") || path.endsWith("_shovel")),
     /** Whatever breaks blocks or kills mobs from the main hand. */
     HAND_TOOLS(EquipmentSlotGroup.MAINHAND, Gear::handTool),
+    /** Hand tools, and the plain chest — Auto Sell on a chest makes a chest that sells what is put in it. */
+    SELLING(EquipmentSlotGroup.MAINHAND, path -> handTool(path) || "chest".equals(path)),
     /** What Thor goes on: axes and the mace, thrown like a hammer, and the trident. */
     THUNDER(EquipmentSlotGroup.MAINHAND, path -> path.endsWith("_axe") && !path.endsWith("_pickaxe")
             || "mace".equals(path) || "trident".equals(path)),

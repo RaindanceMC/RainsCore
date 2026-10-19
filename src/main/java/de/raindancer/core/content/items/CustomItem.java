@@ -43,6 +43,15 @@ public record CustomItem(String plugin, String id, Material material, String dis
     /** Set on an item that must not be crafted away as the block it is made of — see {@link #isIngredient}. */
     public static final String TAG_NOT_AN_INGREDIENT = "core:not-an-ingredient";
 
+    /**
+     * The item model a resource pack defines for it ({@code rainseconomy:sell_wand}) — the 1.21.4 way, which
+     * needs no override of the base item's own model the way custom model data does. A tag rather than a
+     * component so definitions and plugins built against the older record keep working.
+     */
+    public static final String TAG_ITEM_MODEL = "core:item-model";
+
+    private static final Pattern MODEL_KEY = Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
+
     /** Something shaped like a tag, surviving into the rendered text — i.e. one nothing knows. */
     private static final Pattern UNPARSED_TAG = Pattern.compile("<[a-zA-Z_][a-zA-Z0-9_:#-]*>");
 
@@ -68,6 +77,11 @@ public record CustomItem(String plugin, String id, Material material, String dis
         lore = lore == null ? List.of() : List.copyOf(lore);
         recipeRows = recipeRows == null ? List.of() : List.copyOf(recipeRows);
         tags = tags == null ? Map.of() : Map.copyOf(tags);
+        String model = tags.get(TAG_ITEM_MODEL);
+        if (model != null && !MODEL_KEY.matcher(model).matches()) {
+            throw new IllegalArgumentException("'" + model + "' is not an item model key — write it in full, "
+                    + "namespace:path, lowercase.");
+        }
     }
 
     /**
@@ -163,6 +177,11 @@ public record CustomItem(String plugin, String id, Material material, String dis
      */
     public boolean isIngredient() {
         return tag(TAG_NOT_AN_INGREDIENT).isEmpty();
+    }
+
+    /** The resource pack's item model it wears, if any — see {@link #TAG_ITEM_MODEL}. */
+    public Optional<String> itemModel() {
+        return tag(TAG_ITEM_MODEL);
     }
 
     public boolean isGlowing() {
@@ -302,6 +321,11 @@ public record CustomItem(String plugin, String id, Material material, String dis
                 tags.put(key, value);
             }
             return this;
+        }
+
+        /** The item model a resource pack defines, in full: {@code rainseconomy:sell_wand}. */
+        public Builder itemModel(String key) {
+            return tag(TAG_ITEM_MODEL, key);
         }
 
         /** Never accepted by a crafting grid — see {@link CustomItem#isIngredient}. */

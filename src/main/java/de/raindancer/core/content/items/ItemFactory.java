@@ -88,6 +88,7 @@ public final class ItemFactory {
             model.setFloats(List.of(number.floatValue()));
             meta.setCustomModelDataComponent(model);
         });
+        definition.itemModel().map(org.bukkit.NamespacedKey::fromString).ifPresent(meta::setItemModel);
         if (definition.isGlowing()) {
             // An enchantment nobody can see, purely for the shimmer — the usual way of doing this,
             // and the flag is what stops "Unbreaking I" appearing in the tooltip.
