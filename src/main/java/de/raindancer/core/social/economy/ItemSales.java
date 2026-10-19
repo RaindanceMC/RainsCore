@@ -101,7 +101,9 @@ public final class ItemSales {
                 log.error(failed, "Items could not be sold.");
                 return none;
             }
-            if (bought == null || bought.size() != stacks.size() || bought.contains(null)) {
+            // Not contains(null): an immutable list throws on that question instead of answering it.
+            if (bought == null || bought.size() != stacks.size()
+                    || bought.stream().anyMatch(java.util.Objects::isNull)) {
                 log.warn("The shop answered a sale of {} stack(s) with {} answer(s); nothing counts as sold.",
                         stacks.size(), bought == null ? 0 : bought.size());
                 return none;

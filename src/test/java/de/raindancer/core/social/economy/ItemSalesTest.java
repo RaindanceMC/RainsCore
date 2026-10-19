@@ -108,6 +108,23 @@ class ItemSalesTest {
     }
 
     @Test
+    @DisplayName("an answer in an immutable list is read, not choked on")
+    void immutableAnswer() {
+        ItemSales.provide(owner, new ItemBuyer() {
+            @Override
+            public boolean buys(ItemStack stack) {
+                return true;
+            }
+
+            @Override
+            public CompletableFuture<List<Boolean>> sell(Player who, List<ItemStack> stacks) {
+                return CompletableFuture.completedFuture(List.of(true, false));
+            }
+        });
+        assertThat(ItemSales.sell(seller, List.of(dirt, sword)).join()).containsExactly(true, false);
+    }
+
+    @Test
     @DisplayName("an empty sale asks nobody")
     void emptySale() {
         ItemSales.provide(owner, buyingOnly(dirt));
