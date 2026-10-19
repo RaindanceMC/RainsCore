@@ -1986,6 +1986,23 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     private final java.util.Set<String> sharedNamespaces = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** The last minute's TPS for the network status; NaN where the server can't say (Folia has no single tick). */
+    private double ticksPerSecond() {
+        try {
+            return Math.min(20.0, getServer().getTPS()[0]);
+        } catch (RuntimeException | LinkageError unsupported) {
+            return Double.NaN;
+        }
+    }
+
+    private double millisPerTick() {
+        try {
+            return getServer().getAverageTickTime();
+        } catch (RuntimeException | LinkageError unsupported) {
+            return Double.NaN;
+        }
+    }
+
     private volatile de.raindancer.core.platform.network.FirstSeen firstSeen;
     private volatile de.raindancer.core.platform.network.PlayerHistory playerHistory;
     private final java.util.Map<java.util.UUID, java.util.concurrent.CompletableFuture<Boolean>> newcomers =
@@ -2164,7 +2181,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         Scheduling.asyncTimer(this, 5, 5, task -> {
             // Visible players only: the count is shown on other servers, and vanished staff are not there to count.
             networkServers.heartbeat(networkName(), (int) getServer().getOnlinePlayers().stream()
-                    .filter(online -> !vanish.isVanished(online.getUniqueId())).count());
+                    .filter(online -> !vanish.isVanished(online.getUniqueId())).count(), ticksPerSecond(), millisPerTick());
             presence.refreshAll();
         });
         tablists.elsewhere(this::playersByServer);

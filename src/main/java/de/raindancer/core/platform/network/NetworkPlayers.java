@@ -65,6 +65,11 @@ public final class NetworkPlayers {
         return servers.online();
     }
 
+    /** Every server heard of in the last week, up or down, with how it runs — for a status page. */
+    public List<NetworkServers.Known> knownServers() {
+        return servers.known();
+    }
+
     /** This server's id. */
     public String self() {
         return servers.self();

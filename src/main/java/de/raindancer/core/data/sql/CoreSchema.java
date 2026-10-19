@@ -405,7 +405,13 @@ public final class CoreSchema {
             "CREATE INDEX network_seen_name ON network_seen (name_lower)",
 
             // What the proxy calls a server, where that is not its id (Lilly's SMP: smp here, lillyxoxo there).
-            "ALTER TABLE network_server ADD COLUMN proxy TEXT");
+            "ALTER TABLE network_server ADD COLUMN proxy TEXT",
+
+            // How each server runs, for a network status page; and when one stopped cleanly — it stays listed as
+            // offline instead of vanishing (NULL while it runs).
+            "ALTER TABLE network_server ADD COLUMN tps REAL",
+            "ALTER TABLE network_server ADD COLUMN mspt REAL",
+            "ALTER TABLE network_server ADD COLUMN stopped_at INTEGER");
 
     /**
      * What was done.
