@@ -41,8 +41,16 @@ class VanishTest {
     /** The pretend leave and join lines — see the nested "looking like a real departure" tests. */
     private final List<String> faked = new ArrayList<>();
 
+    /** Whether the pretend sink lends flight through Core's leases. */
+    private boolean leasing;
+
     private Vanish vanish() {
         return new Vanish(new VanishSink() {
+            @Override
+            public boolean leasesFlight() {
+                return leasing;
+            }
+
             @Override
             public void hide(UUID who, java.util.Set<UUID> mayStillSee) {
                 did.add(new Did("hide", who));
@@ -386,6 +394,20 @@ class VanishTest {
                     .as("a creative-mode builder who vanished must not land in the void when "
                             + "they come back")
                     .doesNotContain("flight:false");
+        }
+
+        @Test
+        @DisplayName("through leases, its own lease is taken even when they could already fly — a claim's flight may end first")
+        void leasedFlightIsTakenAnyway() {
+            leasing = true;
+            Vanish vanish = vanish();
+            vanish.flightWhileVanished(true);
+            vanish.vanish(MOD, true);
+            assertThat(did).extracting(Did::what).contains("flight:true");
+
+            did.clear();
+            vanish.reveal(MOD);
+            assertThat(did).extracting(Did::what).contains("flight:false");
         }
     }
 

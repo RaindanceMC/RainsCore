@@ -26,10 +26,20 @@ public final class BukkitVanishSink implements VanishSink {
 
     private static final LogChannel log = Log.of("vanish");
 
-    private final Plugin plugin;
+    /** Vanish's lease on {@link de.raindancer.core.world.movement.Flight}. */
+    public static final String FLIGHT_SOURCE = "vanish";
 
+    private final Plugin plugin;
+    private final de.raindancer.core.world.movement.Flight flight;
+
+    /** Flips the switch itself — revealing then ends a claim's or {@code /fly}'s flight too. */
     public BukkitVanishSink(Plugin plugin) {
+        this(plugin, null);
+    }
+
+    public BukkitVanishSink(Plugin plugin, de.raindancer.core.world.movement.Flight flight) {
         this.plugin = plugin;
+        this.flight = flight;
     }
 
     @Override
@@ -85,7 +95,22 @@ public final class BukkitVanishSink implements VanishSink {
         }
     }
 
-    private static void reconcileFlight(Player target, boolean allowed) {
+    @Override
+    public boolean leasesFlight() {
+        return flight != null;
+    }
+
+    private void reconcileFlight(Player target, boolean allowed) {
+        if (flight != null) {
+            // A lease, so revealing inside a flying claim or under /fly leaves that flight on. Flight itself
+            // keeps its hands off creative and spectator, for the reasons below.
+            if (allowed) {
+                flight.grant(target, FLIGHT_SOURCE);
+            } else {
+                flight.revoke(target, FLIGHT_SOURCE);
+            }
+            return;
+        }
         if (target.getGameMode().isInvulnerable()) {
             // Creative and Spectator (see GameMode#isInvulnerable) each own flight for reasons of
             // their own that have nothing to do with whatever this class granted or is taking back.

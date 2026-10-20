@@ -35,6 +35,15 @@ public interface VanishSink {
     /** Turns flight on or off. */
     void allowFlight(UUID who, boolean allowed);
 
+    /**
+     * Whether {@link #allowFlight} takes and gives back a lease of its own rather than flipping the switch. Then
+     * flight they had already is no reason to skip it: that may be a claim's, ending while they are still hidden,
+     * and the lease never takes away what was there before it.
+     */
+    default boolean leasesFlight() {
+        return false;
+    }
+
     /** Whether other players bump into them. */
     void collidable(UUID who, boolean collides);
 

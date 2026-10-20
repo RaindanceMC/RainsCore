@@ -1,6 +1,7 @@
 package de.raindancer.core.data.loadout;
 
 import de.raindancer.core.data.nbt.ItemText;
+import de.raindancer.core.world.movement.Flight;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -24,13 +25,28 @@ import java.util.Locale;
 public final class Loadouts {
 
     private final ItemText codec;
+    private final Flight flight;
 
+    /** Saves and restores the flight switch as it is — a claim's lent flight included. */
     public Loadouts(ItemText codec) {
+        this(codec, null);
+    }
+
+    /**
+     * Flight {@code flight}'s leases lend is not the side's own: it is neither captured nor switched off by
+     * {@link #apply} — the lease ends it, not a side put back after the claim let go.
+     */
+    public Loadouts(ItemText codec, Flight flight) {
         this.codec = codec;
+        this.flight = flight;
     }
 
     public static Loadouts ofTheServer() {
         return new Loadouts(ItemText.ofTheServer());
+    }
+
+    public static Loadouts ofTheServer(Flight flight) {
+        return new Loadouts(ItemText.ofTheServer(), flight);
     }
 
     public Loadout capture(Player player) {
@@ -46,7 +62,8 @@ public final class Loadouts {
         return new Loadout(encode(player.getInventory().getContents()),
                 encode(player.getEnderChest().getContents()),
                 player.getLevel(), player.getExp(), player.getHealth(), player.getFoodLevel(),
-                player.getSaturation(), player.getGameMode().name(), player.getAllowFlight(), player.isFlying(),
+                player.getSaturation(), player.getGameMode().name(),
+                flight == null ? player.getAllowFlight() : flight.unleasedFlight(player), player.isFlying(),
                 effects, place, SideData.capture(player));
     }
 
@@ -83,7 +100,9 @@ public final class Loadouts {
         if (mode != null) {
             player.setGameMode(mode);
         }
-        player.setAllowFlight(loadout.allowFlight() || mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR);
+        boolean leased = flight != null && flight.isGranted(player.getUniqueId());
+        player.setAllowFlight(loadout.allowFlight() || leased || mode == GameMode.CREATIVE
+                || mode == GameMode.SPECTATOR);
         player.setFlying(player.getAllowFlight() && loadout.flying());
 
         AttributeInstance maxHealth = player.getAttribute(Attribute.MAX_HEALTH);

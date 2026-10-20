@@ -175,8 +175,15 @@ public final class Flight implements Listener {
      * something unaware of leases). Flight a claim alone lends is not theirs — {@code /fly} there turns it on.
      */
     public boolean hasOwnFlight(Player player) {
-        UUID id = player.getUniqueId();
-        return holds(id, FLY) || player.getAllowFlight() && (!isGranted(id) || foundFlying.contains(id));
+        return holds(player.getUniqueId(), FLY) || unleasedFlight(player);
+    }
+
+    /**
+     * Whether they have flight no lease explains — their own, or given by something unaware of leases. What a
+     * saved inventory side should remember, since leases are the player's, not the side's.
+     */
+    public boolean unleasedFlight(Player player) {
+        return player.getAllowFlight() && (!isGranted(player.getUniqueId()) || foundFlying.contains(player.getUniqueId()));
     }
 
     /** Who grants them flight, as a snapshot — for a diagnostic. */

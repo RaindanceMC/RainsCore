@@ -146,7 +146,7 @@ public final class Vanish {
         sink.collidable(who, false);
         sink.silent(who, true);
         sink.silentJoinLeave(who, true);
-        if (flightWhileVanished && !couldFlyAlready) {
+        if (flightWhileVanished && (!couldFlyAlready || sink.leasesFlight())) {
             sink.allowFlight(who, true);
         }
         if (announceAsDeparture) {
@@ -169,7 +169,7 @@ public final class Vanish {
         sink.collidable(who, true);
         sink.silent(who, false);
         sink.silentJoinLeave(who, false);
-        if (flightWhileVanished && !couldAlreadyFly.remove(who)) {
+        if (flightWhileVanished && (!couldAlreadyFly.remove(who) || sink.leasesFlight())) {
             // Only what was granted is taken back. A creative-mode builder who vanished must not
             // land in the void when they return.
             sink.allowFlight(who, false);

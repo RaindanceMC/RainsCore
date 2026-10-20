@@ -761,7 +761,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         powers = new PlayerPowers();
         getServer().getPluginManager().registerEvents(new PlayerPowerListener(powers), this);
 
-        vanish = new Vanish(new BukkitVanishSink(this));
+        vanish = new Vanish(new BukkitVanishSink(this, flight));
         playtime = new de.raindancer.core.social.presence.Playtime(databases.core());
         playtime.load();
         // A 1.x server's playtime.yml, brought into the database once (its minutes added) and kept renamed.

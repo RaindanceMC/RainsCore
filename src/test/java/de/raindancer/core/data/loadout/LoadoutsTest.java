@@ -173,4 +173,73 @@ class LoadoutsTest {
         loadouts.apply(player, Loadout.empty("FLOATING"));
         verify(player, never()).setGameMode(any());
     }
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("beside flight Core's leases lend")
+    class LeasedFlight {
+
+        private final java.util.UUID id = java.util.UUID.randomUUID();
+        private final de.raindancer.core.world.movement.Flight flight =
+                new de.raindancer.core.world.movement.Flight(mock(org.bukkit.plugin.Plugin.class), () -> 1_000L);
+        private final Loadouts leased = new Loadouts(codec, flight);
+        private boolean allowFlight;
+
+        private Player flier() {
+            Player player = player(slots(Loadout.INVENTORY_SLOTS), slots(Loadout.ENDER_SLOTS));
+            when(player.getUniqueId()).thenReturn(id);
+            when(player.getAllowFlight()).thenAnswer(call -> allowFlight);
+            org.mockito.Mockito.doAnswer(call -> allowFlight = call.getArgument(0))
+                    .when(player).setAllowFlight(org.mockito.ArgumentMatchers.anyBoolean());
+            org.bukkit.World world = mock(org.bukkit.World.class);
+            when(world.hasCollisionsIn(any())).thenReturn(true);
+            when(player.getWorld()).thenReturn(world);
+            when(player.getBoundingBox()).thenReturn(new org.bukkit.util.BoundingBox(0, 64, 0, 0.6, 65.8, 0.6));
+            when(player.getPersistentDataContainer())
+                    .thenReturn(mock(org.bukkit.persistence.PersistentDataContainer.class));
+            return player;
+        }
+
+        @Test
+        @DisplayName("a claim's flight is not captured as the side's own")
+        void lentFlightIsNotCaptured() {
+            Player player = flier();
+            flight.grant(player, "claims");
+
+            assertThat(leased.capture(player).allowFlight()).isFalse();
+        }
+
+        @Test
+        @DisplayName("flight nothing lends is captured as before")
+        void ownFlightIsCaptured() {
+            Player player = flier();
+            allowFlight = true;
+
+            assertThat(leased.capture(player).allowFlight()).isTrue();
+        }
+
+        @Test
+        @DisplayName("putting on a side without flight does not end a lease's flight")
+        void applyingKeepsLeasedFlight() {
+            Player player = flier();
+            flight.grant(player, de.raindancer.core.world.movement.Flight.FLY);
+
+            leased.apply(player, Loadout.empty("SURVIVAL"));
+
+            assertThat(allowFlight).isTrue();
+            assertThat(flight.hasOwnFlight(player)).isTrue();
+        }
+
+        @Test
+        @DisplayName("a side captured on a claim's flight, put back after the claim let go, does not fly")
+        void restoredSideDoesNotKeepTheClaimsFlight() {
+            Player player = flier();
+            flight.grant(player, "claims");
+            Loadout survival = leased.capture(player);
+            flight.revoke(player, "claims");
+
+            leased.apply(player, survival);
+
+            assertThat(allowFlight).isFalse();
+        }
+    }
 }

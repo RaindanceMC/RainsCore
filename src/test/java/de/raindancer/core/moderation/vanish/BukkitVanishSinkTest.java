@@ -12,6 +12,7 @@ import org.mockito.MockedStatic;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -126,6 +127,85 @@ class BukkitVanishSinkTest {
                 sink.allowFlight(MOD, true);
             }
             // Reaching here without throwing is the assertion.
+        }
+    }
+
+    @Nested
+    @DisplayName("beside flight somebody else lends")
+    class Leases {
+
+        private boolean allowFlight;
+        private final java.util.Set<Object> saved = new java.util.HashSet<>();
+        private final de.raindancer.core.world.movement.Flight flight =
+                new de.raindancer.core.world.movement.Flight(mock(Plugin.class), () -> 1_000L);
+
+        private Player survivalPlayer() {
+            Player player = playerIn(GameMode.SURVIVAL);
+            org.bukkit.World world = mock(org.bukkit.World.class);
+            when(world.hasCollisionsIn(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+            when(player.getWorld()).thenReturn(world);
+            when(player.getBoundingBox()).thenReturn(new org.bukkit.util.BoundingBox(0, 64, 0, 0.6, 65.8, 0.6));
+            when(player.getAllowFlight()).thenAnswer(call -> allowFlight);
+            org.mockito.Mockito.doAnswer(call -> allowFlight = call.getArgument(0))
+                    .when(player).setAllowFlight(anyBoolean());
+            org.bukkit.persistence.PersistentDataContainer data =
+                    mock(org.bukkit.persistence.PersistentDataContainer.class);
+            when(player.getPersistentDataContainer()).thenReturn(data);
+            org.mockito.Mockito.doAnswer(call -> saved.add(call.getArgument(0))).when(data)
+                    .set(org.mockito.ArgumentMatchers.any(org.bukkit.NamespacedKey.class),
+                            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+            org.mockito.Mockito.doAnswer(call -> saved.remove(call.getArgument(0))).when(data)
+                    .remove(org.mockito.ArgumentMatchers.any(org.bukkit.NamespacedKey.class));
+            return player;
+        }
+
+        private void vanishFlight(Player target, boolean allowed) {
+            BukkitVanishSink sink = new BukkitVanishSink(mock(Plugin.class), flight);
+            try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class)) {
+                bukkit.when(() -> Bukkit.getPlayer(MOD)).thenReturn(target);
+                sink.allowFlight(MOD, allowed);
+            }
+        }
+
+        @Test
+        @DisplayName("revealing inside a flying claim leaves the claim's flight on")
+        void revealKeepsTheClaimsFlight() {
+            Player target = survivalPlayer();
+            flight.grant(target, "claims");
+            vanishFlight(target, true);
+
+            vanishFlight(target, false);
+
+            assertThat(allowFlight).isTrue();
+            assertThat(flight.holds(MOD, "claims")).isTrue();
+            assertThat(flight.holds(MOD, BukkitVanishSink.FLIGHT_SOURCE)).isFalse();
+        }
+
+        @Test
+        @DisplayName("revealing does not end /fly")
+        void revealKeepsFly() {
+            Player target = survivalPlayer();
+            flight.grant(target, de.raindancer.core.world.movement.Flight.FLY);
+            vanishFlight(target, true);
+
+            vanishFlight(target, false);
+
+            assertThat(allowFlight).isTrue();
+            assertThat(flight.hasOwnFlight(target)).isTrue();
+        }
+
+        @Test
+        @DisplayName("flight vanish alone lent goes with the reveal")
+        void ownFlightEndsWithTheReveal() {
+            Player target = survivalPlayer();
+            vanishFlight(target, true);
+            assertThat(allowFlight).isTrue();
+            assertThat(flight.hasOwnFlight(target)).isFalse();
+
+            vanishFlight(target, false);
+
+            assertThat(allowFlight).isFalse();
+            assertThat(flight.isGranted(MOD)).isFalse();
         }
     }
 
