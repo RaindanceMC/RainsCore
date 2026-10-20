@@ -87,9 +87,17 @@ class FlightTest {
             }
             return null;
         }).when(player).removePotionEffect(any(PotionEffectType.class));
+        org.bukkit.persistence.PersistentDataContainer data = mock(org.bukkit.persistence.PersistentDataContainer.class);
+        when(player.getPersistentDataContainer()).thenReturn(data);
+        when(data.has(any(org.bukkit.NamespacedKey.class))).thenAnswer(call -> saved.contains(call.getArgument(0)));
+        doAnswer(call -> saved.add(call.getArgument(0))).when(data).set(any(org.bukkit.NamespacedKey.class), any(), any());
+        doAnswer(call -> saved.remove(call.getArgument(0))).when(data).remove(any(org.bukkit.NamespacedKey.class));
         grounded(true);
         flight = new Flight(plugin, now::get);
     }
+
+    /** What the player's saved data holds — it survives a restart, the leases do not. */
+    private final java.util.Set<Object> saved = new java.util.HashSet<>();
 
     private void grounded(boolean onGround) {
         when(world.hasCollisionsIn(any())).thenReturn(onGround);
@@ -353,5 +361,87 @@ class FlightTest {
         }).when(event).setCancelled(anyBoolean());
         when(event.isCancelled()).thenAnswer(call -> cancelled[0]);
         return event;
+    }
+
+    @Test
+    @DisplayName("/fly, into a flying claim, /fly off, out of the claim: flight ends (found on Lilly)")
+    void flyCommandThenClaim() {
+        flight.grant(player, Flight.FLY);
+        flight.grant(player, "claims");
+        assertThat(flight.hasOwnFlight(player)).isTrue();
+
+        flight.revoke(player, Flight.FLY);
+        assertThat(allowFlight).as("the claim still lets them fly").isTrue();
+        assertThat(flight.hasOwnFlight(player)).as("but /fly is off").isFalse();
+
+        assertThat(flight.revoke(player, "claims")).isTrue();
+        assertThat(allowFlight).isFalse();
+    }
+
+    @Test
+    @DisplayName("/fly counts as on only while its lease holds or flight no lease explains is on")
+    void ownFlight() {
+        assertThat(flight.hasOwnFlight(player)).isFalse();
+        flight.grant(player, "claims");
+        assertThat(flight.hasOwnFlight(player)).as("only the claim lets them fly").isFalse();
+        flight.revoke(player, "claims");
+        allowFlight = true; // something unaware of leases
+        assertThat(flight.hasOwnFlight(player)).isTrue();
+    }
+
+    @Test
+    @DisplayName("flight a lease gave and a restart left on is taken back on the next join")
+    void restartLeftItOn() {
+        flight.grant(player, "claims");
+        // The server stops: plugins are disabled before players are kicked, so nobody takes it back,
+        // and the game saves the player able to fly.
+        flight = new Flight(plugin, now::get);
+        flight.onJoin(new PlayerJoinEvent(player, (net.kyori.adventure.text.Component) null));
+
+        assertThat(allowFlight).isFalse();
+        assertThat(saved).isEmpty();
+        // And the next lease no longer mistakes it for flight they had of their own.
+        flight.grant(player, "claims");
+        assertThat(flight.revoke(player, "claims")).isTrue();
+        assertThat(allowFlight).isFalse();
+    }
+
+    @Test
+    @DisplayName("flight that was the player's own before any lease survives a join untouched")
+    void ownFlightSurvivesJoin() {
+        allowFlight = true;
+        flight.grant(player, "claims");
+        flight = new Flight(plugin, now::get);
+        flight.onJoin(new PlayerJoinEvent(player, (net.kyori.adventure.text.Component) null));
+        assertThat(allowFlight).isTrue();
+    }
+
+    @Test
+    @DisplayName("the saved mark goes with the last lease and with a logout")
+    void markFollowsLeases() {
+        flight.grant(player, "claims");
+        assertThat(saved).isNotEmpty();
+        flight.revoke(player, "claims");
+        assertThat(saved).isEmpty();
+
+        flight.grant(player, "claims");
+        flight.onQuit(new PlayerQuitEvent(player, (net.kyori.adventure.text.Component) null,
+                PlayerQuitEvent.QuitReason.DISCONNECTED));
+        assertThat(saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("joining in the air with stale flight lands softly")
+    void staleFlightMidAir() {
+        flight.grant(player, "claims");
+        flight = new Flight(plugin, now::get);
+        grounded(false);
+        flight.onJoin(new PlayerJoinEvent(player, (net.kyori.adventure.text.Component) null));
+        assertThat(allowFlight).isFalse();
+        EntityDamageEvent fall = mock(EntityDamageEvent.class);
+        when(fall.getCause()).thenReturn(EntityDamageEvent.DamageCause.FALL);
+        when(fall.getEntity()).thenReturn(player);
+        flight.onFall(fall);
+        verify(fall).setCancelled(true);
     }
 }

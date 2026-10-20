@@ -92,4 +92,51 @@ class BukkitPlayerAdminSinkTest {
 
         verify(target, never()).setFoodLevel(anyInt());
     }
+
+    @Test
+    @DisplayName("with Core's flight, the switch is /fly's lease: on takes it, off gives it back, and a claim's flight stays")
+    void flightIsALease() {
+        bukkit.when(() -> Bukkit.isOwnedByCurrentRegion(target)).thenReturn(true);
+        de.raindancer.core.world.movement.Flight flight = mock(de.raindancer.core.world.movement.Flight.class);
+        BukkitPlayerAdminSink sink = new BukkitPlayerAdminSink(plugin, flight);
+
+        sink.allowFlight(who, true);
+        verify(flight).grant(target, de.raindancer.core.world.movement.Flight.FLY);
+        verify(target, never()).setAllowFlight(anyBoolean());
+
+        when(flight.isGranted(who)).thenReturn(true); // a claim still lends it
+        when(target.getAllowFlight()).thenReturn(true);
+        when(target.getUniqueId()).thenReturn(who);
+        sink.allowFlight(who, false);
+        verify(flight).revoke(target, de.raindancer.core.world.movement.Flight.FLY);
+        verify(target, never()).setAllowFlight(false);
+    }
+
+    @Test
+    @DisplayName("off with no lease behind the flight switches it off — an admin asked for it")
+    void offWithoutLease() {
+        bukkit.when(() -> Bukkit.isOwnedByCurrentRegion(target)).thenReturn(true);
+        de.raindancer.core.world.movement.Flight flight = mock(de.raindancer.core.world.movement.Flight.class);
+        when(target.getUniqueId()).thenReturn(who);
+        when(target.getAllowFlight()).thenReturn(true);
+        when(target.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
+
+        new BukkitPlayerAdminSink(plugin, flight).allowFlight(who, false);
+
+        verify(target).setAllowFlight(false);
+    }
+
+    @Test
+    @DisplayName("whether they fly is /fly's own flight, not what a claim lends")
+    void stateReadsOwnFlight() {
+        de.raindancer.core.world.movement.Flight flight = mock(de.raindancer.core.world.movement.Flight.class);
+        when(target.getAllowFlight()).thenReturn(true);
+        when(target.getHealth()).thenReturn(20.0);
+        when(target.getGameMode()).thenReturn(org.bukkit.GameMode.SURVIVAL);
+        when(flight.hasOwnFlight(target)).thenReturn(false);
+
+        PlayerState state = new BukkitPlayerAdminSink(plugin, flight).stateOf(who).orElseThrow();
+
+        org.assertj.core.api.Assertions.assertThat(state.flying()).isFalse();
+    }
 }

@@ -2,6 +2,7 @@ package de.raindancer.core.world.movement;
 
 import de.raindancer.core.platform.util.Scheduling;
 import org.bukkit.GameMode;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -12,6 +13,7 @@ import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -38,6 +40,9 @@ import java.util.function.LongSupplier;
  *       cleared the effect on the way down.</li>
  *   <li>Leases do not survive logging out: the game saves {@code mayfly} with the player, and a grant nobody
  *       holds any more would come back with them. Sources re-grant after the join as they see fit.</li>
+ *   <li>Nor a restart or a crash, where nobody gets to take it back — plugins are disabled before players are
+ *       kicked. So the player's saved data is marked while leases gave them flight, and flight still marked on
+ *       the next join is taken back (softly, if they arrive in the air).</li>
  * </ul>
  *
  * <p>{@link #grant} and {@link #revoke} touch the player and belong on the thread that owns them — any event about
@@ -47,6 +52,9 @@ public final class Flight implements Listener {
 
     /** A minute of falling is plenty — from build height it takes a few seconds. */
     public static final long SOFT_LANDING_MILLIS = 60_000L;
+    /** The lease of {@code /fly} and the moderation tools' flight switch. */
+    public static final String FLY = "fly";
+    private static final NamespacedKey LEASED = new NamespacedKey("rainscore", "flight_leased");
     private static final long LANDING_CHECK_TICKS = 5L;
 
     private final Plugin plugin;
@@ -82,6 +90,9 @@ public final class Flight implements Listener {
             return ConcurrentHashMap.newKeySet();
         });
         boolean added = held.add(source);
+        if (!foundFlying.contains(id)) {
+            player.getPersistentDataContainer().set(LEASED, PersistentDataType.BYTE, (byte) 1);
+        }
         endSlowFall(player);
         if (!ownedByMode && !player.getAllowFlight()) {
             player.setAllowFlight(true);
@@ -105,6 +116,7 @@ public final class Flight implements Listener {
             return false;
         }
         leases.remove(id, held);
+        player.getPersistentDataContainer().remove(LEASED);
         if (foundFlying.remove(id) || gameModeOwnsFlight(player) || !player.getAllowFlight()) {
             return false;
         }
@@ -156,6 +168,15 @@ public final class Flight implements Listener {
     public boolean isGranted(UUID player) {
         Set<String> held = leases.get(player);
         return held != null && !held.isEmpty();
+    }
+
+    /**
+     * Whether they fly by {@code /fly}'s say: its lease holds, or flight is on that no lease explains (given by
+     * something unaware of leases). Flight a claim alone lends is not theirs — {@code /fly} there turns it on.
+     */
+    public boolean hasOwnFlight(Player player) {
+        UUID id = player.getUniqueId();
+        return holds(id, FLY) || player.getAllowFlight() && (!isGranted(id) || foundFlying.contains(id));
     }
 
     /** Who grants them flight, as a snapshot — for a diagnostic. */
@@ -211,6 +232,7 @@ public final class Flight implements Listener {
         boolean wasFound = foundFlying.remove(id);
         landings.forget(id);
         endSlowFall(player);
+        player.getPersistentDataContainer().remove(LEASED);
         if (held == null || held.isEmpty() || wasFound || gameModeOwnsFlight(player)) {
             return;
         }
@@ -223,9 +245,23 @@ public final class Flight implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
         if (returningAirborne.remove(id)) {
             landings.launched(id);
         }
+        if (!player.getPersistentDataContainer().has(LEASED)) {
+            return;
+        }
+        // Leased flight a restart or crash left switched on; sources grant it again as they see fit.
+        player.getPersistentDataContainer().remove(LEASED);
+        if (leases.containsKey(id) || gameModeOwnsFlight(player) || !player.getAllowFlight()) {
+            return;
+        }
+        if (!Footing.grounded(player)) {
+            landings.launched(id);
+        }
+        player.setFlying(false);
+        player.setAllowFlight(false);
     }
 }

@@ -749,7 +749,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 Scheduling.asyncLater(this, millis, TimeUnit.MILLISECONDS, what));
 
         votes = new Votes(System::currentTimeMillis);
-        players = new PlayerAdmin(new BukkitPlayerAdminSink(this));
+        flight = new de.raindancer.core.world.movement.Flight(this, System::currentTimeMillis);
+        getServer().getPluginManager().registerEvents(flight, this);
+        players = new PlayerAdmin(new BukkitPlayerAdminSink(this, flight));
         bodies = new de.raindancer.core.moderation.players.PlayerBody(
                 new de.raindancer.core.moderation.players.BukkitPlayerBodySink(this));
 
@@ -758,8 +760,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // see Combat's own class note. Neither survives a restart; see PlayerPowers.
         powers = new PlayerPowers();
         getServer().getPluginManager().registerEvents(new PlayerPowerListener(powers), this);
-        flight = new de.raindancer.core.world.movement.Flight(this, System::currentTimeMillis);
-        getServer().getPluginManager().registerEvents(flight, this);
 
         vanish = new Vanish(new BukkitVanishSink(this));
         playtime = new de.raindancer.core.social.presence.Playtime(databases.core());

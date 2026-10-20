@@ -39,6 +39,8 @@ public final class BukkitPlayerAdminSink implements PlayerAdminSink {
     private final Set<String> unknown = ConcurrentHashMap.newKeySet();
     /** Whose scheduler a change is run through; null acts on the caller's thread, as before. */
     private final Plugin plugin;
+    /** Core's shared flight, so the switch is {@code /fly}'s lease; null sets the switch directly, as before. */
+    private final de.raindancer.core.world.movement.Flight flight;
 
     /** Acts on whichever thread calls it — right on Paper's main thread, wrong across Folia regions. */
     public BukkitPlayerAdminSink() {
@@ -47,7 +49,16 @@ public final class BukkitPlayerAdminSink implements PlayerAdminSink {
 
     /** Makes every change on the target's own thread, wherever the call came from. */
     public BukkitPlayerAdminSink(Plugin plugin) {
+        this(plugin, null);
+    }
+
+    /**
+     * Flight through Core's shared {@link de.raindancer.core.world.movement.Flight}: {@code /fly} takes a lease
+     * instead of flipping the switch, so a claim that also lets them fly neither ends it nor is ended by it.
+     */
+    public BukkitPlayerAdminSink(Plugin plugin, de.raindancer.core.world.movement.Flight flight) {
         this.plugin = plugin;
+        this.flight = flight;
     }
 
     /**
@@ -78,7 +89,7 @@ public final class BukkitPlayerAdminSink implements PlayerAdminSink {
         double max = player.getAttribute(Attribute.MAX_HEALTH) == null
                 ? 20 : player.getAttribute(Attribute.MAX_HEALTH).getValue();
         return Optional.of(new PlayerState(player.getHealth(), max, player.getFoodLevel(),
-                player.getAllowFlight(), player.getGameMode().name()));
+                flight == null ? player.getAllowFlight() : flight.hasOwnFlight(player), player.getGameMode().name()));
     }
 
     @Override
@@ -130,6 +141,18 @@ public final class BukkitPlayerAdminSink implements PlayerAdminSink {
     @Override
     public void allowFlight(UUID who, boolean allowed) {
         onTarget(who, player -> {
+            if (flight != null) {
+                if (allowed) {
+                    flight.grant(player, de.raindancer.core.world.movement.Flight.FLY);
+                    return;
+                }
+                flight.revoke(player, de.raindancer.core.world.movement.Flight.FLY);
+                GameMode mode = player.getGameMode();
+                boolean ownedByMode = mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR;
+                if (flight.isGranted(player.getUniqueId()) || ownedByMode || !player.getAllowFlight()) {
+                    return;
+                }
+            }
             player.setAllowFlight(allowed);
             if (!allowed && player.isFlying()) {
                 player.setFlying(false);
