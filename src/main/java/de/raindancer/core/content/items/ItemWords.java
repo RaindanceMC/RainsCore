@@ -20,7 +20,7 @@ import java.util.Map;
  * was given, its enchantments, a potion's effect, its lore. Searched by {@link WordSearch}.
  *
  * @param material   the material, as a player reads it ("Oak Log")
- * @param customName the name it was given, or null
+ * @param customName the name it was given — renamed, or its own item name — or null
  * @param extra      everything else worth finding
  * @param kind       its creative tab
  */
@@ -35,8 +35,12 @@ public record ItemWords(String material, String customName, List<String> extra, 
         String custom = null;
         ItemMeta meta = item.hasItemMeta() ? item.getItemMeta() : null;
         if (meta != null) {
+            // A rename wins; otherwise the item's own name, which is how a plugin names its items (a shard,
+            // a wand) without making them look renamed.
             if (meta.hasCustomName()) {
                 custom = plain(meta.customName());
+            } else if (meta.hasItemName()) {
+                custom = plain(meta.itemName());
             }
             enchantments(meta.getEnchants(), extra);
             if (meta instanceof EnchantmentStorageMeta book) {
