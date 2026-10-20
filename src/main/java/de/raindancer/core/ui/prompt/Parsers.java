@@ -97,6 +97,29 @@ public final class Parsers {
         };
     }
 
+    /**
+     * An amount of money as the currency reads it — {@code 12}, {@code 12.50}, {@code 1.5k}. Every module asking
+     * for a price or a sum asks this way, so an amount means the same in every window.
+     *
+     * @param zero whether 0 is an answer — "none", "stop selling" — rather than a mistake
+     * @param most the highest that may be typed; {@link de.raindancer.core.social.economy.Money#ZERO} for no limit
+     */
+    public static Parser<de.raindancer.core.social.economy.Money> money(
+            de.raindancer.core.social.economy.Currency currency, boolean zero,
+            de.raindancer.core.social.economy.Money most) {
+        String example = zero ? "an amount like 12, 12.50 or 1.5k — or 0 for none" : "an amount like 12, 12.50 or 1.5k";
+        return typed -> {
+            var read = currency.parse(typed == null ? "" : typed.strip());
+            if (read.isEmpty() || read.get().isNegative() || (!zero && !read.get().isPositive())) {
+                return Parsed.no("That is not " + example + ".");
+            }
+            if (most.isPositive() && read.get().compareTo(most) > 0) {
+                return Parsed.no("At most " + currency.format(most) + ".");
+            }
+            return Parsed.ok(read.get());
+        };
+    }
+
     /** Yes or no, in the ways people say it. */
     public static Parser<Boolean> yesNo() {
         return typed -> switch ((typed == null ? "" : typed.strip()).toLowerCase(Locale.ROOT)) {

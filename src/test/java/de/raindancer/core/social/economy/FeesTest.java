@@ -32,6 +32,13 @@ class FeesTest {
     }
 
     @Test
+    @DisplayName("without an economy, amounts are read and written in Core's default currency")
+    void defaultCurrency() {
+        assertThat(Fees.currency()).isEqualTo(Currency.DEFAULT);
+        assertThat(Fees.amount("1.5k")).isEqualTo(Currency.DEFAULT.ofMajor(1500));
+    }
+
+    @Test
     @DisplayName("a real fee without any economy is refused as unavailable, never let through for free")
     void noEconomy() {
         assertThat(Fees.charge(payer, Money.of(100), "Teleport", "tpa.fee").outcome())

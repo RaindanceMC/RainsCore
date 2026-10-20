@@ -87,8 +87,12 @@ public final class Fees {
         if (written == null || written.isBlank()) {
             return Money.ZERO;
         }
-        Currency currency = Economies.current().map(Economy::currency).orElse(Currency.DEFAULT);
-        return currency.parse(written.strip()).orElse(Money.ZERO);
+        return currency().parse(written.strip()).orElse(Money.ZERO);
+    }
+
+    /** The server's currency — the economy's, or Core's default when there is none — for reading and writing amounts. */
+    public static Currency currency() {
+        return Economies.current().map(Economy::currency).orElse(Currency.DEFAULT);
     }
 
     /** The amount written in the server's currency, or plainly when there is no economy. */
