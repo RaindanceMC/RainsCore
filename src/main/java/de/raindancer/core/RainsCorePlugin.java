@@ -284,6 +284,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Votes votes;
     private Vanish vanish;
     private de.raindancer.core.social.presence.Playtime playtime;
+    private final de.raindancer.core.moderation.players.PingHistory pingHistory =
+            new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
     private de.raindancer.core.moderation.chatlog.ChatLog chatLog;
     private de.raindancer.core.social.presence.KnownNames knownNames;
     private de.raindancer.core.ui.changelog.Changelog changelog;
@@ -826,6 +828,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 playtime.minute(online.getUniqueId(), de.raindancer.core.social.presence.Away.isAway(online.getUniqueId()));
             }
         });
+        long pingEvery = de.raindancer.core.moderation.players.PingHistory.EVERY.toSeconds() * 20;
+        Scheduling.globalTimer(this, pingEvery, pingEvery, ignored -> {
+            for (org.bukkit.entity.Player online : getServer().getOnlinePlayers()) {
+                pingHistory.record(online.getUniqueId(), online.getName(), online.getPing());
+            }
+        });
         // Every five minutes at most a few minutes are lost to a crash; the write is off the server's threads.
         Scheduling.globalTimer(this, 20L * 60 * 5, 20L * 60 * 5, ignored -> {
             if (playtime.isDirty()) {
@@ -834,6 +842,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             if (knownNames.isDirty()) {
                 Scheduling.async(this, knownNames::save);
             }
+            pingHistory.prune();
             if (changelog.isDirty()) {
                 Scheduling.async(this, changelog::save);
             }
@@ -2439,6 +2448,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.social.presence.Playtime playtime() {
         return playtime;
+    }
+
+    @Override
+    public de.raindancer.core.moderation.players.PingHistory pingHistory() {
+        return pingHistory;
     }
 
     @Override

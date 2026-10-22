@@ -457,6 +457,9 @@ public interface RainsCore {
     /** How long everybody has played here, and how much of it actively — counted by Core, a minute at a time. */
     de.raindancer.core.social.presence.Playtime playtime();
 
+    /** Everybody's ping over the last hour on this server, sampled every few seconds — also for a while after they left. */
+    de.raindancer.core.moderation.players.PingHistory pingHistory();
+
     /**
      * Styled names above heads — off until something that offers name styles switches it on.
      * See {@link de.raindancer.core.ui.identity.Nametags}.
