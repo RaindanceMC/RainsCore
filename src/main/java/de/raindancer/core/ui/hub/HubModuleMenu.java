@@ -77,7 +77,7 @@ public final class HubModuleMenu extends HubPage {
     private void use(CommandNote note) {
         viewer().closeInventory();
         if (runsDirectly(note)) {
-            viewer().performCommand(note.command());
+            de.raindancer.core.platform.util.TypedCommands.run(viewer(), note.command());
             return;
         }
         viewer().sendMessage(Component.text("» Click to type ", net.kyori.adventure.text.format.NamedTextColor.GRAY)
