@@ -14,7 +14,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Whether staff powers apply right now — the LuckPerms contexts rains:powers and rains:dev. */
+/** Whether staff powers apply right now — the LuckPerms contexts rains:powers, rains:admin and rains:dev. */
 class DutyTest {
 
     private static final UUID ALEX = UUID.randomUUID();
@@ -49,6 +49,20 @@ class DutyTest {
         inAdminMode.add(ALEX);
 
         assertThat(Duty.powersOn(ALEX)).isTrue();
+    }
+
+    @Test
+    @DisplayName("rains:admin follows admin mode alone, whatever the duty switch says")
+    void adminMode() {
+        assertThat(Duty.contextsOf(ALEX)).containsEntry(Duty.ADMIN, Duty.OFF);
+
+        inAdminMode.add(ALEX);
+        assertThat(Duty.contextsOf(ALEX)).containsEntry(Duty.ADMIN, Duty.ON)
+                .containsEntry(Duty.POWERS, Duty.ON);
+
+        Duty.powersNeedAdminMode(true);
+        inAdminMode.remove(ALEX);
+        assertThat(Duty.contextsOf(ALEX)).containsEntry(Duty.ADMIN, Duty.OFF);
     }
 
     @Test

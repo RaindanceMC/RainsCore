@@ -71,6 +71,7 @@ public final class LuckPermsGroups implements PermissionGroups {
             public net.luckperms.api.context.ContextSet estimatePotentialContexts() {
                 return net.luckperms.api.context.ImmutableContextSet.builder()
                         .add(Duty.POWERS, Duty.ON).add(Duty.POWERS, Duty.OFF)
+                        .add(Duty.ADMIN, Duty.ON).add(Duty.ADMIN, Duty.OFF)
                         .add(Duty.DEV, Duty.ON).add(Duty.DEV, Duty.OFF).build();
             }
         });

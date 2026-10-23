@@ -17,6 +17,8 @@ import java.util.function.Consumer;
  * <ul>
  *   <li>{@code rains:powers} — {@code on} unless the server says powers need admin mode
  *       ({@link #powersNeedAdminMode(boolean)}) and they are not in it.</li>
+ *   <li>{@code rains:admin} — {@code on} exactly while they are in admin mode ({@code /admin}), whatever the
+ *       switch says: what admin mode itself gives is set in LuckPerms with this context.</li>
  *   <li>{@code rains:dev} — {@code on} while they have switched dev mode on ({@code /dev}).</li>
  * </ul>
  *
@@ -26,6 +28,7 @@ import java.util.function.Consumer;
 public final class Duty {
 
     public static final String POWERS = "rains:powers";
+    public static final String ADMIN = "rains:admin";
     public static final String DEV = "rains:dev";
     public static final String ON = "on";
     public static final String OFF = "off";
@@ -77,7 +80,8 @@ public final class Duty {
     }
 
     public static Map<String, String> contextsOf(UUID who) {
-        return Map.of(POWERS, powersOn(who) ? ON : OFF, DEV, devOn(who) ? ON : OFF);
+        return Map.of(POWERS, powersOn(who) ? ON : OFF, ADMIN, AdminModes.isOn(who) ? ON : OFF,
+                DEV, devOn(who) ? ON : OFF);
     }
 
     public static NetworkBus.Subscription onChange(Consumer<UUID> listener) {
