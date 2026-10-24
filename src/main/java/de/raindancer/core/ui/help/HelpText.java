@@ -32,7 +32,8 @@ import java.util.Set;
  *
  * Formats after {@code |}: {@code percent}, {@code money}, {@code seconds}, {@code minutes}, {@code hours},
  * {@code days}, {@code ticks} (as a duration), {@code yesno}, {@code onoff}, {@code count} (of a list),
- * {@code number}, {@code lower}, {@code upper}.
+ * {@code number}, {@code name} (a key or constant as words: {@code minecraft:end/kill_dragon} → "kill dragon",
+ * {@code TRAPPED_CHEST} → "trapped chest"), {@code lower}, {@code upper}.
  *
  * <p>Every value is inserted as the characters it is: a claim called {@code <red>x} reads as that, and cannot
  * colour or click anything. Only the author's own markup is markup.
@@ -289,11 +290,14 @@ public final class HelpText {
             case "count" -> value instanceof java.util.Collection<?> items ? String.valueOf(items.size())
                     : number.map(HelpValues::number).orElse(shown);
             case "number" -> number.map(HelpValues::number).orElse(shown);
+            case "name" -> value instanceof java.util.Collection<?> items
+                    ? String.join(", ", items.stream().map(item -> HelpValues.word(String.valueOf(item))).toList())
+                    : HelpValues.word(shown);
             case "lower" -> shown.toLowerCase(Locale.ROOT);
             case "upper" -> shown.toUpperCase(Locale.ROOT);
             default -> {
                 problems.add("'" + format + "' is no format (percent, money, seconds, minutes, hours, days, ticks, "
-                        + "yesno, onoff, count, number, lower, upper)");
+                        + "yesno, onoff, count, number, name, lower, upper)");
                 yield shown;
             }
         };

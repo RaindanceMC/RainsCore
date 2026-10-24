@@ -103,6 +103,11 @@ public final class HelpCommand implements BasicCommand {
                 open(desk, sender, numbered.get(), section.get(), chat);
                 return;
             }
+            if (numbered.isPresent()) {
+                // A number past the end (or a question switched off here): the topic, so its questions show.
+                open(desk, sender, numbered.get(), null, chat);
+                return;
+            }
         }
         Optional<HelpTopic> topic = library.find(typed, context);
         if (topic.isPresent()) {
@@ -119,6 +124,14 @@ public final class HelpCommand implements BasicCommand {
                     return;
                 }
             }
+        }
+        // A real topic, switched off on this server — said so, rather than "I know nothing". Not for topics the
+        // reader may not read: those stay unmentioned, so a player never learns the staff pages' names.
+        Optional<HelpTopic> off = library.byId(typed)
+                .filter(hidden -> hidden.permission() == null || sender.hasPermission(hidden.permission()));
+        if (off.isPresent()) {
+            say(sender, "help.switched-off", "title", off.get().title());
+            return;
         }
         // Not a subject: then it was a question.
         search(desk, sender, typed, chat);

@@ -103,4 +103,11 @@ public final class HelpValues {
         }
         return said.toString();
     }
+
+    /** A namespaced key or a constant as a reader says it: the last part, underscores as spaces, lower case. */
+    public static String word(String key) {
+        String text = key == null ? "" : key.strip();
+        int cut = Math.max(text.lastIndexOf(':'), text.lastIndexOf('/'));
+        return text.substring(cut + 1).replace('_', ' ').toLowerCase(Locale.ROOT);
+    }
 }

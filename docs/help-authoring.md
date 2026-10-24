@@ -52,6 +52,7 @@ is right on every server and after every change:
 |---|---|
 | `{setting:<schema-id>:<key>}` | the value as it is now (`on`/`off`, lists comma-joined) |
 | `{setting:…\|percent}` `\|money` `\|seconds` `\|minutes` `\|hours` `\|days` `\|ticks` `\|yesno` `\|onoff` `\|count` `\|number` | formatted |
+| `{setting:…\|name}` | a key or constant as words: `minecraft:end/kill_dragon` → "kill dragon", `TRAPPED_CHEST` → "trapped chest" — never print raw keys |
 | `{money:250}` | an amount in the server's currency |
 | `{fact:<plugin>:<name>}` | a runtime value the module provides via `HelpFacts.provide(...)` |
 | `{player}` `{server}` | reader, server name |

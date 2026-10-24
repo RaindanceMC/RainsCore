@@ -47,6 +47,15 @@ class HelpTextTest {
     }
 
     @Test
+    @DisplayName("|name turns keys and constants into words")
+    void names() {
+        HelpContexts.Fixed keys = HelpContexts.fixed(Map.of("speedrun:goal", "minecraft:end/kill_dragon",
+                "shops:blocks", List.of("CHEST", "TRAPPED_CHEST")));
+        assertThat(HelpText.plain(HelpText.render("Until {setting:speedrun:goal|name}; in {setting:shops:blocks|name}.",
+                keys, new ArrayList<>()))).isEqualTo("Until kill dragon; in chest, trapped chest.");
+    }
+
+    @Test
     @DisplayName("an unknown setting is a problem and a question mark, not a crash")
     void unknown() {
         List<String> problems = new ArrayList<>();

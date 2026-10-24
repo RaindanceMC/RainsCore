@@ -476,6 +476,8 @@ help:
   search-found: "<gray>Here is what I know about that:"
   search-nothing: "<gray>Hmm. I know nothing about <white><asked></white>. Try other words — or fewer of them."
   search-did-you-mean: "<gray>Did you mean <white><names></white>?"
+  # A topic that exists but is switched off on this server. <title>.
+  switched-off: "<gray><white><title></white> is not part of this server right now — whoever runs it has switched that off."
   search-empty: "<gray>You have to actually type a question into the box, dear. I read minds only on Tuesdays."
   # Generated topics, for a feature that shipped no guide.
   generated-note: "<dark_gray><i>Nobody has written me a proper guide for this yet, so here is what it tells me about itself.</i>"
