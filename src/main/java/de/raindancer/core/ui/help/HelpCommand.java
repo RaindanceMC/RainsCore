@@ -95,6 +95,15 @@ public final class HelpCommand implements BasicCommand {
         HelpContext context = desk.contextFor(sender);
         HelpLibrary library = desk.library();
         String typed = String.join(" ", words);
+        // "/help shop 2" is the second question of the shop, even though "shop 2" alone would find the shop too.
+        if (words.size() == 2 && words.get(1).chars().allMatch(Character::isDigit)) {
+            Optional<HelpTopic> numbered = library.find(words.getFirst(), context);
+            Optional<HelpSection> section = numbered.flatMap(subject -> HelpLibrary.section(subject, words.get(1), context));
+            if (section.isPresent()) {
+                open(desk, sender, numbered.get(), section.get(), chat);
+                return;
+            }
+        }
         Optional<HelpTopic> topic = library.find(typed, context);
         if (topic.isPresent()) {
             open(desk, sender, topic.get(), null, chat);
