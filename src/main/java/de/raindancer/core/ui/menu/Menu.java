@@ -234,8 +234,21 @@ public abstract class Menu implements InventoryHolder {
         if (!designed()) {
             return title;
         }
+        // The trail was fitted to the game's font; the title font is wider, so it is measured again in that.
+        // The brand shortens a page with "…" to fit the game's font; in the wider title font the page alone, whole.
+        if (Backdrop.TITLE_FONT.equals(backdrop().titleFont())) {
+            String plain = PLAIN.serialize(title);
+            if (plain.contains("\u2026") || TitleFont.width(plain) > TitleFont.BUDGET) {
+                Component page = brand.trail(null, title());
+                String pagePlain = PLAIN.serialize(page);
+                title = !pagePlain.contains("\u2026") && TitleFont.width(pagePlain) <= TitleFont.BUDGET ? page : title();
+            }
+        }
         return backdrop().frame(title);
     }
+
+    private static final net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer PLAIN =
+            net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
 
     // ------------------------------------------------------------------- placing things
 

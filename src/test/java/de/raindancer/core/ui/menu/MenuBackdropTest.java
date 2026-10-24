@@ -108,8 +108,8 @@ class MenuBackdropTest {
     }
 
     @Test
-    @DisplayName("The title after the painting is in the default font, readable on the painting")
-    void titleIsInTheDefaultFont() {
+    @DisplayName("The title after the painting is in the game's font unless a backdrop asks for the title font")
+    void titleIsInTheGamesFont() {
         MenuStyle.install(Set.of(WEARING)::contains);
         Component shown = new Page(viewer(WEARING), 6).shownTitle();
 
@@ -206,5 +206,83 @@ class MenuBackdropTest {
         assertThat(title.children().getFirst().color()).isEqualTo(NamedTextColor.DARK_GRAY);
         assertThat(light.frame(Component.text("A").color(TextColor.color(0xC9A0FF))).children().getFirst().color())
                 .as("the brand's light purple is too faint on parchment").isEqualTo(TextColor.color(0x4A3220));
+    }
+
+    @Test
+    @DisplayName("The title font is measured: a trail too wide for the window drops the page it came from")
+    void longTrailDropsTheParent() {
+        MenuStyle.install(Set.of(WEARING)::contains);
+        Menu parent = new Menu(viewer(WEARING), BRAND, null) {
+            @Override
+            protected Component title() {
+                return Component.text("Every adventurer's ledger");
+            }
+
+            @Override
+            protected void render() {
+            }
+        };
+        Menu child = new Menu(viewer(WEARING), BRAND, parent) {
+            @Override
+            protected Component title() {
+                return Component.text("Choose your class");
+            }
+
+            @Override
+            protected Backdrop backdrop() {
+                return Backdrop.house(6).writtenIn(Backdrop.TITLE_FONT);
+            }
+
+            @Override
+            protected void render() {
+            }
+        };
+        String shown = plain(child.shownTitle());
+        assertThat(TitleFont.width(shown.substring(Backdrop.house(6).glyphs().length())))
+                .isLessThanOrEqualTo(TitleFont.BUDGET);
+        assertThat(shown).endsWith("Choose your class").doesNotContain("ledger");
+        assertThat(child.shownTitle().children().getFirst().font()).isEqualTo(Backdrop.TITLE_FONT);
+    }
+
+    @Test
+    @DisplayName("The title font's widths come from its own glyphs; what it lacks is measured as the game's font")
+    void widths() {
+        assertThat(TitleFont.width("A")).isEqualTo(8);
+        assertThat(TitleFont.width("i")).isEqualTo(4);
+        assertThat(TitleFont.width(" ")).isEqualTo(4);
+        assertThat(TitleFont.width("\u2603")).isPositive();
+    }
+
+    @Test
+    @DisplayName("In the title font a page the brand had to shorten is shown whole, without the brand")
+    void clippedPageShownWhole() {
+        MenuStyle.install(Set.of(WEARING)::contains);
+        Menu page = new Menu(viewer(WEARING), new Brand("Adventurers"), null) {
+            @Override
+            protected Component title() {
+                return Component.text("Choose your class");
+            }
+
+            @Override
+            protected void render() {
+            }
+
+            @Override
+            protected Backdrop backdrop() {
+                return Backdrop.house(6).writtenIn(Backdrop.TITLE_FONT);
+            }
+        };
+        String shown = plain(page.shownTitle());
+        assertThat(shown).endsWith("Choose your class").doesNotContain("Adventurers").doesNotContain("\u2026");
+    }
+
+    @Test
+    @DisplayName("A gradient is recoloured whole or not at all — half a word in ink and half in purple reads as a fault")
+    void gradientsWhole() {
+        Backdrop light = new Backdrop(Key.key("x", "page"), "\uE000", TextColor.color(0x4A3220));
+        Component brand = Component.text().append(Component.text("A").color(TextColor.color(0xC9A0FF)),
+                Component.text("B").color(TextColor.color(0x7C5CBF))).build();
+        Component title = light.frame(brand).children().getFirst();
+        assertThat(title.children()).allSatisfy(letter -> assertThat(letter.color()).isEqualTo(light.ink()));
     }
 }

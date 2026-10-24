@@ -78,14 +78,14 @@ def house(rows):
     panel(6, chest_top - 1, W - 6, chest_bottom + 1, 100 + rows)
     panel(6, inv_top - 1, W - 6, hot_top + 19, 200 + rows)
 
-    WELL, RIM_D, RIM_L = (70, 46, 28), (34, 20, 11), (126, 86, 50)
+    WELL, RIM_D, RIM_L = (176, 132, 84), (92, 58, 32), (224, 188, 136)
     for r in range(rows):
         for col in range(9):
             x, y = chest_well(r, col)
             if r == rows - 1:
-                well(c, x, y, (44, 28, 17), (22, 12, 6), (104, 70, 40), 0.35)
+                well(c, x, y, (112, 76, 46), (40, 24, 12), (168, 122, 76), 0.3)
             else:
-                well(c, x, y, WELL, RIM_D, RIM_L, 0.42, show=0.45)
+                well(c, x, y, WELL, RIM_D, RIM_L, 0.26, show=0.3)
     # the shelf the navigation sits on: a brass rail along its top, capped at both ends
     cy = chest_well(rows - 1, 0)[1]
     if rows > 1:
@@ -103,13 +103,13 @@ def house(rows):
     for r in range(3):
         for col in range(9):
             x, y = inventory_well(rows, r, col)
-            well(c, x, y, WELL, RIM_D, RIM_L, 0.42, show=0.45)
+            well(c, x, y, WELL, RIM_D, RIM_L, 0.26, show=0.3)
     gy = hot_top - 2
     c.hline(6, W - 6, gy, INK)
     c.hline(6, W - 6, gy + 1, OAK_L, 120)
     for col in range(9):
         x, y = hotbar_well(rows, col)
-        well(c, x, y, WELL, RIM_D, RIM_L, 0.42, show=0.45)
+        well(c, x, y, WELL, RIM_D, RIM_L, 0.26, show=0.3)
 
     # the label the game writes "Inventory" on, in its fixed dark grey: parchment in a brass frame
     ly = label_y(rows)
@@ -170,7 +170,7 @@ def workshop(rows):
     bay(5, chest_top - 1, W - 5, chest_bottom + 1)
     bay(5, inv_top - 1, W - 5, hot_top + 19)
 
-    WELL, RIM_D, RIM_L = (30, 36, 44), (12, 14, 18), (128, 142, 156)
+    WELL, RIM_D, RIM_L = (84, 96, 110), (24, 28, 34), (150, 164, 178)
     for r in range(rows):
         chrome = r == rows - 1
         for col in range(9):
@@ -239,6 +239,14 @@ def write_pack():
             sheets.append((name, c.img))
     providers.append({"type": "space", "advances": {"": -8, "": -169}})
     out(f"assets/{NS}/font/menu.json", {"providers": providers})
+
+    import title_font
+    sheet, title = title_font.provider(NS)
+    out(f"assets/{NS}/textures/font/title.png", image=sheet)
+    out(f"assets/{NS}/font/title.json", {"providers": [
+        {"type": "space", "advances": {" ": 4}},
+        title,
+        {"type": "reference", "id": "minecraft:include/default"}]})
 
     out(f"assets/{NS}/items/ui/blank.json", {"model": {"type": "minecraft:model", "model": f"{NS}:item/ui/blank"}})
     out(f"assets/{NS}/models/item/ui/blank.json", {"parent": "minecraft:item/generated",

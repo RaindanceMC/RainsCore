@@ -13,12 +13,23 @@ import net.kyori.adventure.text.format.TextColor;
  * painting, and a negative space back to where the title starts. The painting covers the player's inventory too,
  * so it has to leave a light patch where the game writes "Inventory" in its fixed dark grey.
  *
- * @param ink the title's colour; parts of a title that bring their own colour keep it
+ * @param ink       the title's colour; parts of a title that bring their own colour keep it
+ * @param titleFont what the title is written in — the game's font unless a backdrop asks for {@link #TITLE_FONT}
  */
-public record Backdrop(Key font, String glyphs, TextColor ink) {
+public record Backdrop(Key font, String glyphs, TextColor ink, Key titleFont) {
 
     public static final Key FONT = Key.key(MenuStyle.NAMESPACE, "menu");
-    private static final Key DEFAULT_FONT = Key.key("minecraft", "default");
+    /** Storybook small capitals for titles that want them; anything it lacks falls back to the game's font. */
+    public static final Key TITLE_FONT = Key.key(MenuStyle.NAMESPACE, "title");
+    public static final Key DEFAULT_FONT = Key.key("minecraft", "default");
+
+    public Backdrop(Key font, String glyphs, TextColor ink) {
+        this(font, glyphs, ink, DEFAULT_FONT);
+    }
+
+    public Backdrop writtenIn(Key titleFont) {
+        return new Backdrop(font, glyphs, ink, titleFont);
+    }
     /** Back from the title's start (x 8) to the window's edge, and from the end of a 176-wide painting to x 8. */
     private static final String LEAD = "";
     private static final String RETURN = "";
@@ -42,7 +53,7 @@ public record Backdrop(Key font, String glyphs, TextColor ink) {
 
     public Component frame(Component title) {
         return Component.text(glyphs).font(font).color(NamedTextColor.WHITE)
-                .append(legible(title.font(DEFAULT_FONT).colorIfAbsent(ink)));
+                .append(legible(title.font(titleFont).colorIfAbsent(ink)));
     }
 
     /**
@@ -54,7 +65,12 @@ public record Backdrop(Key font, String glyphs, TextColor ink) {
         if (colour != null && clashes(colour)) {
             part = part.color(ink);
         }
-        return part.children(part.children().stream().map(this::legible).toList());
+        java.util.List<Component> children = part.children();
+        // A gradient is a run of coloured siblings: if any of it clashes, all of it takes the ink.
+        boolean anyClashes = children.stream().anyMatch(child -> child.color() != null && clashes(child.color()));
+        return part.children(children.stream()
+                .map(child -> anyClashes && child.color() != null ? child.color(ink) : child)
+                .map(this::legible).toList());
     }
 
     private boolean clashes(TextColor colour) {

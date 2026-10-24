@@ -1,4 +1,5 @@
 assets/rainscore/font/menu.json
+assets/rainscore/font/title.json
 assets/rainscore/items/ui/blank.json
 assets/rainscore/models/item/ui/blank.json
 assets/rainscore/textures/font/menu/house_1.png
@@ -13,5 +14,6 @@ assets/rainscore/textures/font/menu/workshop_3.png
 assets/rainscore/textures/font/menu/workshop_4.png
 assets/rainscore/textures/font/menu/workshop_5.png
 assets/rainscore/textures/font/menu/workshop_6.png
+assets/rainscore/textures/font/title.png
 assets/rainscore/textures/item/ui/blank.png
 pack.mcmeta
