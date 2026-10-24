@@ -76,21 +76,9 @@ public final class HelpLibrary {
         if (hidden != null) {
             hidden.forEach(id -> byId.remove(id.toLowerCase(Locale.ROOT)));
         }
-        Set<String> names = new LinkedHashSet<>();
-        for (HelpTopic topic : byId.values()) {
-            for (String alias : topic.aliases()) {
-                if (byId.containsKey(alias) && !alias.equals(topic.id())) {
-                    found.add("'" + alias + "' is an alias of " + topic.id() + " and a topic of its own; the topic wins.");
-                } else if (!names.add(alias)) {
-                    found.add("The alias '" + alias + "' is used by more than one topic.");
-                }
-            }
-            for (String related : topic.related()) {
-                if (!byId.containsKey(related)) {
-                    found.add(topic.id() + " points to the related topic '" + related + "', which is not here.");
-                }
-            }
-        }
+        // Shared aliases ("ban" on the player page and the staff page) and links to topics of plugins that are not
+        // installed are not faults: /help ban lists both, and a missing link is left out. HelpLint holds authors to
+        // their own module; this only reports what a server owner has to act on.
         return new HelpLibrary(Map.copyOf(byId), List.copyOf(found));
     }
 
@@ -178,9 +166,17 @@ public final class HelpLibrary {
         }
         List<HelpTopic> mine = visibleTo(context);
         for (HelpTopic topic : mine) {
-            if (topic.id().equals(wanted) || topic.aliases().contains(wanted)) {
+            if (topic.id().equals(wanted)) {
                 return Optional.of(topic);
             }
+        }
+        // An alias several topics share is not one topic: the caller searches instead, and the reader picks.
+        List<HelpTopic> aliased = mine.stream().filter(topic -> topic.aliases().contains(wanted)).toList();
+        if (aliased.size() == 1) {
+            return Optional.of(aliased.getFirst());
+        }
+        if (aliased.size() > 1) {
+            return Optional.empty();
         }
         String command = wanted.startsWith("/") ? wanted.substring(1) : wanted;
         for (HelpTopic topic : mine) {

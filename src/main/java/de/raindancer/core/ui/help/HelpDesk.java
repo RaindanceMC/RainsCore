@@ -141,7 +141,12 @@ public final class HelpDesk {
             for (String text : texts) {
                 List<String> found = new ArrayList<>();
                 HelpText.render(text, everything, found);
-                found.forEach(problem -> problems.add(topic.plugin() + " / " + topic.id() + ": " + problem));
+                found.stream()
+                        // A link to a topic that exists but is switched off here reads as plain words — not a fault.
+                        .filter(problem -> !(problem.startsWith("the topic '") && current.byId(
+                                problem.substring("the topic '".length(), problem.indexOf('\'', "the topic '".length())))
+                                .isPresent()))
+                        .forEach(problem -> problems.add(topic.plugin() + " / " + topic.id() + ": " + problem));
             }
         }
         return problems.stream().distinct().toList();

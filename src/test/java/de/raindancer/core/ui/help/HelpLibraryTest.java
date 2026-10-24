@@ -136,8 +136,9 @@ class HelpLibraryTest {
         HelpTopic again = SHOP.from("RainsShops");
         HelpLibrary library = HelpLibrary.of(List.of(SHOP, again, ECONOMY), List.of(), Set.of(), List.of(), List.of());
         assertThat(library.problems()).anyMatch(problem -> problem.contains("Two plugins ship the topic 'shop'"));
+        // A related topic of a plugin that is not installed is no fault on this server: the button is left out.
         HelpLibrary lonely = HelpLibrary.of(List.of(ECONOMY), List.of(), Set.of(), List.of(), List.of());
-        assertThat(lonely.problems()).anyMatch(problem -> problem.contains("'shop', which is not here"));
+        assertThat(lonely.problems()).isEmpty();
     }
 
     @Test
@@ -157,5 +158,34 @@ class HelpLibraryTest {
                 .extracting(HelpSection::question).containsExactly("Anything else?");
         assertThat(HelpLibrary.sectionsFor(topic, HelpContexts.fixed(Map.of("economy-supply:stock", 5))))
                 .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("an alias two topics share opens neither: the guide searches and the reader picks")
+    void sharedAlias() {
+        HelpTopic bans = topic("""
+                id: bans
+                title: Bans for staff
+                summary: Banning.
+                aliases: [ban]
+                sections:
+                  - question: How do I ban?
+                    text: With /ban.
+                """, "RainsModeration");
+        HelpTopic punished = topic("""
+                id: punished
+                title: Being punished
+                summary: Mutes and bans.
+                aliases: [ban, mute]
+                sections:
+                  - question: Why was I banned?
+                    text: A ban says why.
+                """, "RainsModeration");
+        HelpLibrary library = HelpLibrary.of(List.of(bans, punished), List.of(), Set.of(), List.of(), List.of());
+        assertThat(library.find("ban", player)).isEmpty();
+        assertThat(library.search("ban", player)).extracting(hit -> hit.topic().id())
+                .containsExactlyInAnyOrder("bans", "punished");
+        assertThat(library.find("mute", player)).contains(punished);
+        assertThat(library.problems()).isEmpty();
     }
 }
