@@ -1,0 +1,119 @@
+{
+ "providers": [
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_1.png",
+   "ascent": 13,
+   "height": 132,
+   "chars": [
+    "\ue001"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_1.png",
+   "ascent": 13,
+   "height": 132,
+   "chars": [
+    "\ue011"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_2.png",
+   "ascent": 13,
+   "height": 150,
+   "chars": [
+    "\ue002"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_2.png",
+   "ascent": 13,
+   "height": 150,
+   "chars": [
+    "\ue012"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_3.png",
+   "ascent": 13,
+   "height": 168,
+   "chars": [
+    "\ue003"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_3.png",
+   "ascent": 13,
+   "height": 168,
+   "chars": [
+    "\ue013"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_4.png",
+   "ascent": 13,
+   "height": 186,
+   "chars": [
+    "\ue004"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_4.png",
+   "ascent": 13,
+   "height": 186,
+   "chars": [
+    "\ue014"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_5.png",
+   "ascent": 13,
+   "height": 204,
+   "chars": [
+    "\ue005"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_5.png",
+   "ascent": 13,
+   "height": 204,
+   "chars": [
+    "\ue015"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/house_6.png",
+   "ascent": 13,
+   "height": 222,
+   "chars": [
+    "\ue006"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/menu/workshop_6.png",
+   "ascent": 13,
+   "height": 222,
+   "chars": [
+    "\ue016"
+   ]
+  },
+  {
+   "type": "space",
+   "advances": {
+    "\uf808": -8,
+    "\uf8a9": -169
+   }
+  }
+ ]
+}

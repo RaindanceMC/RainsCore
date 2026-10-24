@@ -214,6 +214,15 @@ public final class Icons {
         return item;
     }
 
+    /** Whether this is one of {@link #filler}'s panes rather than a button. */
+    public static boolean isFiller(ItemStack item) {
+        if (item == null || !item.getType().name().endsWith("GLASS_PANE") || !item.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName() && Component.empty().equals(meta.displayName()) && !meta.hasLore();
+    }
+
     public static ItemStack back(String where) {
         String to = where == null ? word("menu.previous-menu", "the previous menu") : where;
         return of(Material.ARROW, "<" + Style.itemName() + ">" + word("menu.back", "Back"),

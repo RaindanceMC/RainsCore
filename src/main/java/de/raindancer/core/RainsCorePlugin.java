@@ -910,6 +910,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // a server nobody waits for.
         resourcePacks = new ResourcePacks(getDataFolder().toPath().resolve("packs"),
                 new BukkitPackSink());
+        de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks);
         startResourcePacks(settings.current());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         if (network.isNetwork()) {
@@ -1296,6 +1297,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public void onDisable() {
+        de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
         groupsFollowing.close();
         de.raindancer.core.platform.permission.Duty.clear();
         if (grants != null && grants.usesLuckPerms()) {

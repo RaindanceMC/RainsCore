@@ -108,7 +108,7 @@ public abstract class Menu implements InventoryHolder {
     @Override
     public @NotNull Inventory getInventory() {
         if (inventory == null) {
-            inventory = Bukkit.createInventory(this, layout.size(), windowTitle());
+            inventory = Bukkit.createInventory(this, layout.size(), shownTitle());
         }
         return inventory;
     }
@@ -195,6 +195,46 @@ public abstract class Menu implements InventoryHolder {
         // just a missing button. The flush empties the buffer as it writes, so nothing lands twice.
         layoutBands();
         paintChrome();
+        if (designed()) {
+            veil();
+        }
+    }
+
+    /** The decorative panes give way to the painting: they become slots that draw nothing. */
+    private void veil() {
+        ItemStack blank = null;
+        for (int slot = 0; slot < layout.size(); slot++) {
+            if (Icons.isFiller(getInventory().getItem(slot))) {
+                if (blank == null) {
+                    blank = MenuStyle.blank();
+                }
+                getInventory().setItem(slot, blank);
+            }
+        }
+    }
+
+    /**
+     * The painting behind this page for a viewer wearing the pack; {@code null} keeps the classic window. Staff
+     * screens answer {@link Backdrop#workshop}, a plugin with a window of its own its own backdrop.
+     *
+     * <p>A backdrop of a plugin's own has to keep the slots the page puts things in where its painting has them.
+     */
+    protected Backdrop backdrop() {
+        return Backdrop.house(layout.rows());
+    }
+
+    /** Whether this viewer sees the painted window. */
+    protected boolean designed() {
+        return viewer != null && MenuStyle.wearing(viewer.getUniqueId()) && backdrop() != null;
+    }
+
+    /** The title as the window shows it: {@link #windowTitle()}, behind the painting when there is one. */
+    public Component shownTitle() {
+        Component title = windowTitle();
+        if (!designed()) {
+            return title;
+        }
+        return backdrop().frame(title);
     }
 
     // ------------------------------------------------------------------- placing things
