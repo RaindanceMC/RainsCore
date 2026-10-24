@@ -446,7 +446,7 @@ help:
     - "Ah, <white><player></white>. Lost already? Splendid — lost people are my favourite kind."
     - "Welcome to <white><server></white>, dear. Ask me anything. I may even know the answer."
     - "Back again, <white><player></white>? Nobody reads the signs. That is why I exist."
-    - "Mind the cauldron. Now — what do you want to know?"
+    - "Right. What do you want to know?"
     - "I have answers. Lots of them. Whether they are to your questions, we shall see."
     - "Ah, a visitor. Questions cost nothing here. Answers cost nothing either. What a deal."
   # Under the greeting. <topics>: how many things the guide can explain to this reader.

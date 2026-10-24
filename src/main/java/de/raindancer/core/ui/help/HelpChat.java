@@ -36,7 +36,7 @@ final class HelpChat {
     }
 
     void home() {
-        say(line("help.chat-header", "title", desk.settings().guideName()));
+        say(line("help.chat-header", "title", "Help"));
         say(line("help.greeting"));
         for (Map.Entry<String, List<HelpTopic>> shelf : library.byCategory(context).entrySet()) {
             List<Component> links = new ArrayList<>();

@@ -71,7 +71,7 @@ Conditions (`when:` and `{if:…}`): `key` (on / non-zero / non-empty), `!key`, 
 
 ## Writing
 
-- The guide is a person (default "Hazel the Witch", renamable): a little playful, never smug, always useful.
+- The guide is a person (named in /settings, "Guide" by default): a little playful, never smug, always useful.
   Answers are second person: "You get…", "Type…". Short paragraphs, the important thing first.
 - **Explain every detail a player needs**: what it is, how to start, every command and option, limits, costs,
   cooldowns, what happens on death/logout, what staff can do (in `permission:`-guarded sections or a Staff topic).

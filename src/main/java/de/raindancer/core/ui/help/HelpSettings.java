@@ -24,7 +24,7 @@ public record HelpSettings(
         String guideSkins,
 
         @In("config/help") @Title("Guide's voice")
-        @Describe("The sound the guide makes when somebody starts talking, e.g. entity.witch.ambient. Empty: silent.")
+        @Describe("The sound the guide makes when somebody starts talking, e.g. entity.witch.ambient for a witch. Empty: silent.")
         String guideVoice,
 
         @In("config/help") @Title("Greet new players")
@@ -42,6 +42,6 @@ public record HelpSettings(
 
 ) {
 
-    public static final HelpSettings DEFAULTS = new HelpSettings("Hazel the Witch", "", "entity.witch.ambient", true,
+    public static final HelpSettings DEFAULTS = new HelpSettings("Guide", "", "block.amethyst_block.chime", true,
             "", false);
 }

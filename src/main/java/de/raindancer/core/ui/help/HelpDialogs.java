@@ -111,7 +111,7 @@ public final class HelpDialogs {
             buttons.add(ActionButton.builder(line("help.wiki-button", false)).tooltip(Component.text(wiki))
                     .width(BUTTON).action(DialogAction.staticAction(ClickEvent.openUrl(wiki))).build());
         }
-        show(body, List.of(DialogInput.text(ASK, line("help.ask-label", false)).width(WIDE_BUTTON)
+        show(null, body, List.of(DialogInput.text(ASK, line("help.ask-label", false)).width(WIDE_BUTTON)
                         .maxLength(100).labelVisible(true).build()),
                 buttons, ActionButton.builder(line("help.goodbye", false)).width(BUTTON).build(), 2);
     }
@@ -125,7 +125,7 @@ public final class HelpDialogs {
         }
         List<ActionButton> buttons = new ArrayList<>();
         topics.forEach(topic -> buttons.add(topicButton(topic, BUTTON)));
-        show(List.of(DialogBody.item(new ItemStack(HelpCategories.icon(category))).showTooltip(false)
+        show(category, List.of(DialogBody.item(new ItemStack(HelpCategories.icon(category))).showTooltip(false)
                         .description(DialogBody.plainMessage(line("help.category-intro", false, "category", category),
                                 TEXT_WIDTH - 40)).build()),
                 List.of(), buttons, back(dialogs -> dialogs.home(false)), 2);
@@ -136,8 +136,7 @@ public final class HelpDialogs {
         List<DialogBody> body = new ArrayList<>();
         Component opening = render(topic.opening());
         body.add(DialogBody.item(icon(topic)).showTooltip(false)
-                .description(DialogBody.plainMessage(MINI.deserialize("<bold><gradient:#C084FC:#7DD3FC>"
-                        + Text.literal(topic.title()) + "</gradient></bold>\n").append(opening), TEXT_WIDTH - 40))
+                .description(DialogBody.plainMessage(opening, TEXT_WIDTH - 40))
                 .build());
         if (topic.generated()) {
             body.add(DialogBody.plainMessage(line("help.generated-note", false), TEXT_WIDTH));
@@ -165,7 +164,7 @@ public final class HelpDialogs {
         }
         String shelf = topic.category();
         boolean shelves = library.byCategory(context).size() > 1;
-        show(body, List.of(), buttons, back(dialogs -> {
+        show(topic.title(), body, List.of(), buttons, back(dialogs -> {
             if (shelves) {
                 dialogs.category(shelf);
             } else {
@@ -189,7 +188,7 @@ public final class HelpDialogs {
         }
         buttons.add(button(line("help.something-else", false), null, WIDE_BUTTON,
                 (response, player) -> then(dialogs -> dialogs.home(false))));
-        show(body, List.of(), buttons, back(dialogs -> dialogs.topic(topic)), 1);
+        show(topic.title(), body, List.of(), buttons, back(dialogs -> dialogs.topic(topic)), 1);
     }
 
     /** The commands of a subject this reader may use — each a button that puts it into the chat bar. */
@@ -206,7 +205,7 @@ public final class HelpDialogs {
                     .action(DialogAction.staticAction(ClickEvent.suggestCommand(note.slashed() + " "))).build());
         }
         String intro = notes.isEmpty() ? "help.commands-none" : "help.commands-intro";
-        show(List.of(DialogBody.plainMessage(line(intro, false, "title", topic.title()), TEXT_WIDTH)), List.of(),
+        show(topic.title(), List.of(DialogBody.plainMessage(line(intro, false, "title", topic.title()), TEXT_WIDTH)), List.of(),
                 buttons, back(dialogs -> dialogs.topic(topic)), 2);
     }
 
@@ -214,7 +213,7 @@ public final class HelpDialogs {
     public void search(String asked) {
         String words = asked == null ? "" : asked.strip();
         if (words.isEmpty()) {
-            show(List.of(DialogBody.plainMessage(line("help.search-empty", false), TEXT_WIDTH)), List.of(), List.of(),
+            show("Search", List.of(DialogBody.plainMessage(line("help.search-empty", false), TEXT_WIDTH)), List.of(), List.of(),
                     back(dialogs -> dialogs.home(false)), 1);
             return;
         }
@@ -256,15 +255,16 @@ public final class HelpDialogs {
                 })));
             }
         }
-        show(body, List.of(), buttons, back(dialogs -> dialogs.home(false)), 1);
+        show("Search", body, List.of(), buttons, back(dialogs -> dialogs.home(false)), 1);
     }
 
     // ------------------------------------------------------------------ pieces
 
-    private void show(List<DialogBody> body, List<DialogInput> inputs, List<ActionButton> buttons, ActionButton exit,
-                      int columns) {
-        Component title = MINI.deserialize("<gradient:#C084FC:#7DD3FC>" + Text.literal(desk.settings().guideName())
-                + "</gradient>");
+    /** @param page where the reader is — "The shop" — or null on the greeting; shown at the top of the window */
+    private void show(String page, List<DialogBody> body, List<DialogInput> inputs, List<ActionButton> buttons,
+                      ActionButton exit, int columns) {
+        Component title = MINI.deserialize("<gradient:#C084FC:#7DD3FC>Help</gradient>" + (page == null ? ""
+                : " <dark_gray>›</dark_gray> <white>" + Text.literal(page)));
         // A dialog of type multi_action needs at least one button; a window with nothing to press gets the exit.
         List<ActionButton> pressable = buttons.isEmpty() ? List.of(exit) : buttons;
         Dialog dialog = Dialog.create(factory -> factory.empty()

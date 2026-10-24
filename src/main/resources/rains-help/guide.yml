@@ -6,7 +6,7 @@ intro: |
 icon: ENCHANTED_BOOK
 category: Getting started
 order: 1
-aliases: [help, helper, witch, hazel, questions]
+aliases: [help, helper, questions]
 keywords: [guide, how, explain, manual, tutorial]
 commands: [help]
 sections:
