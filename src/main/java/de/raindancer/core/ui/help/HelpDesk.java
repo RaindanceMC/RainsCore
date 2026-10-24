@@ -42,6 +42,9 @@ public final class HelpDesk {
     private final SettingsRegistry registry;
     private final SettingsStore<HelpSettings> settings;
     private final YamlStore overrides;
+    /** The owner's help.yml as last read — off the server's threads, since it lives in the database. */
+    private volatile YamlConfiguration ownersPages = new YamlConfiguration();
+    private volatile boolean ownersPagesReadable = true;
     private volatile HelpLibrary library;
 
     public HelpDesk(Plugin core, SettingsRegistry registry, SettingsStore<HelpSettings> settings, Path dataFolder) {
@@ -49,7 +52,29 @@ public final class HelpDesk {
         this.registry = registry;
         this.settings = settings;
         this.overrides = new YamlStore(dataFolder.resolve("help.yml"));
-        this.overrides.writeTextIfAbsent(EXAMPLE);
+    }
+
+    /**
+     * Reads the owner's help.yml (writing the commented example the first time) and forgets the library. Reaches the
+     * database, so never on a server thread: Core calls it from {@code Scheduling.async}, at start and on reload.
+     */
+    public void readOwnersPages() {
+        overrides.writeTextIfAbsent(EXAMPLE);
+        var read = overrides.readIfReadable();
+        ownersPagesReadable = read.isPresent();
+        ownersPages = read.orElseGet(YamlConfiguration::new);
+        invalidate();
+    }
+
+    /** Reads everything again off the server's threads, then tells {@code done} what the guide knows now. */
+    public void reloadAsync(java.util.function.Consumer<HelpLibrary> done) {
+        de.raindancer.core.platform.util.Scheduling.async(core, () -> {
+            readOwnersPages();
+            HelpLibrary built = library();
+            if (done != null) {
+                done.accept(built);
+            }
+        });
     }
 
     /** The desk Core runs, once it has started. */
@@ -87,12 +112,6 @@ public final class HelpDesk {
     /** Forgets the library; the next question reads every plugin's files again. A plugin came or went. */
     public void invalidate() {
         library = null;
-    }
-
-    /** Reads everything again now, and says how it went. */
-    public HelpLibrary reload() {
-        invalidate();
-        return library();
     }
 
     /** This server, for this reader. */
@@ -140,10 +159,10 @@ public final class HelpDesk {
 
         List<HelpTopic> owners = new ArrayList<>();
         Set<String> hidden = new LinkedHashSet<>();
-        YamlConfiguration file = overrides.readIfReadable().orElseGet(() -> {
+        if (!ownersPagesReadable) {
             problems.add("help.yml could not be read — the owner's topics are left out until it is fixed");
-            return new YamlConfiguration();
-        });
+        }
+        YamlConfiguration file = ownersPages;
         ConfigurationSection topics = file.getConfigurationSection("topics");
         if (topics != null) {
             for (String id : topics.getKeys(false)) {

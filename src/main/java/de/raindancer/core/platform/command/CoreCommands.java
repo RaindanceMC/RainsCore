@@ -183,7 +183,7 @@ public final class CoreCommands {
         if (!HELP_TAKEN.compareAndSet(false, true)) {
             return false;
         }
-        registrar.register(name, "Ask the guide: every feature here, explained as it is set up.", List.of(aliases),
+        registrar.register(name, de.raindancer.core.ui.help.HelpCommand.DESCRIPTION, List.of(aliases),
                 new de.raindancer.core.ui.help.HelpCommand());
         return true;
     }

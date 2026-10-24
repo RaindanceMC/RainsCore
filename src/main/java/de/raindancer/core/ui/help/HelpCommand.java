@@ -35,6 +35,9 @@ import java.util.Optional;
  */
 public final class HelpCommand implements BasicCommand {
 
+    /** What {@code /help} says about itself — also how {@link HelpTakeover} recognises it among the server's commands. */
+    public static final String DESCRIPTION = "Ask the guide: every feature here, explained as it is set up.";
+
     /** {@code /help check} and {@code /help reload}. Undeclared Core nodes are operators' only. */
     public static final String MANAGE = "rainscore.help.manage";
     /** Placing and removing guides. */
@@ -67,9 +70,8 @@ public final class HelpCommand implements BasicCommand {
             return;
         }
         if (first.equals("reload") && sender.hasPermission(MANAGE)) {
-            HelpLibrary library = desk.reload();
-            say(sender, "help.reloaded", "topics", String.valueOf(library.all().size()),
-                    "problems", String.valueOf(library.problems().size()));
+            desk.reloadAsync(library -> say(sender, "help.reloaded", "topics", String.valueOf(library.all().size()),
+                    "problems", String.valueOf(library.problems().size())));
             return;
         }
         if (first.equals("guide") && sender.hasPermission(GUIDE) && sender instanceof Player player) {

@@ -36,9 +36,10 @@ public final class HelpListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onStarted(ServerLoadEvent event) {
+        HelpTakeover.takeOver(org.bukkit.Bukkit.getCommandMap());
         // Every plugin and module has reported to the hub by now; build once, so the first reader waits for nothing
         // and the console says what the guide knows.
-        desk.reload();
+        desk.reloadAsync(null);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

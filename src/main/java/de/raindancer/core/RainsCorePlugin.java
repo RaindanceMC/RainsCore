@@ -2638,6 +2638,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 de.raindancer.core.ui.help.HelpSettings.DEFAULTS), getDataFolder().toPath().resolve("config.yml"));
         var helpDesk = new de.raindancer.core.ui.help.HelpDesk(this, registry, helpSettings, getDataFolder().toPath());
         de.raindancer.core.ui.help.HelpDesk.install(helpDesk);
+        Scheduling.async(this, helpDesk::readOwnersPages);
         de.raindancer.core.social.desk.ServiceDesks.offer(de.raindancer.core.social.desk.ServiceDesk.GUIDE,
                 new de.raindancer.core.ui.help.HelpGuide(helpDesk));
         de.raindancer.core.social.desk.ServiceDesks.skins(de.raindancer.core.social.desk.ServiceDesk.GUIDE,
