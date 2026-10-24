@@ -137,10 +137,15 @@ public final class HelpLibrary {
                 && (topic.when() == null || topic.when().test(context));
     }
 
-    /** Whether this reader gets this question. */
+    /**
+     * Whether this reader gets this question. Not when its answer quotes a setting this server does not have — a
+     * module's part that only runs on the network's bank, say: a missing answer reads better than a "?" in one.
+     * {@code /help check} still names the setting.
+     */
     public static boolean visible(HelpSection section, HelpContext context) {
         return (section.permission() == null || context.has(section.permission()))
-                && (section.when() == null || section.when().test(context));
+                && (section.when() == null || section.when().test(context))
+                && HelpText.settingsRead(section.text()).stream().allMatch(key -> context.setting(key).isPresent());
     }
 
     /** The topics this reader may see, by category and then order. */

@@ -139,4 +139,23 @@ class HelpLibraryTest {
         HelpLibrary lonely = HelpLibrary.of(List.of(ECONOMY), List.of(), Set.of(), List.of(), List.of());
         assertThat(lonely.problems()).anyMatch(problem -> problem.contains("'shop', which is not here"));
     }
+
+    @Test
+    @DisplayName("a question whose answer quotes a setting this server lacks is left out, never shown with a '?'")
+    void missingSettings() {
+        HelpTopic topic = topic("""
+                id: supply
+                title: Supply
+                summary: Stock.
+                sections:
+                  - question: How much stock?
+                    text: "{setting:economy-supply:stock|number} items."
+                  - question: Anything else?
+                    text: No.
+                """, "RainsEconomy");
+        assertThat(HelpLibrary.sectionsFor(topic, HelpContexts.fixed(Map.of())))
+                .extracting(HelpSection::question).containsExactly("Anything else?");
+        assertThat(HelpLibrary.sectionsFor(topic, HelpContexts.fixed(Map.of("economy-supply:stock", 5))))
+                .hasSize(2);
+    }
 }
