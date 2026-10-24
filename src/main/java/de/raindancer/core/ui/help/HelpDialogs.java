@@ -186,27 +186,165 @@ public final class HelpDialogs {
             buttons.add(button(line("help.next-question", false, "question", next.question()), null, WIDE_BUTTON,
                     (response, player) -> then(dialogs -> dialogs.answer(topic, next))));
         }
+        // Every command the answer talks about, one click from being run — at most four, the answer is not a menu.
+        List<CommandNote> mine = visibleNotes();
+        int offered = 0;
+        for (String usage : HelpText.commandsMentioned(section.text(), context)) {
+            if (offered == 4) {
+                break;
+            }
+            var match = CommandForms.forUsage(usage, mine);
+            if (match.isPresent()) {
+                buttons.add(formButton(match.get().note(), match.get().form(), dialogs -> dialogs.answer(topic, section)));
+                offered++;
+            }
+        }
         buttons.add(button(line("help.something-else", false), null, WIDE_BUTTON,
                 (response, player) -> then(dialogs -> dialogs.home(false))));
         show(topic.title(), body, List.of(), buttons, back(dialogs -> dialogs.topic(topic)), 1);
     }
 
-    /** The commands of a subject this reader may use — each a button that puts it into the chat bar. */
+    /** The commands of a subject this reader may use — each a button that opens it, ready to run. */
     public void commands(HelpTopic topic) {
         List<CommandNote> notes = notesFor(topic);
         List<ActionButton> buttons = new ArrayList<>();
         for (CommandNote note : notes) {
-            StringBuilder tooltip = new StringBuilder("<gray>" + Text.literal(note.sentence()));
-            for (String option : note.options()) {
-                tooltip.append("\n<dark_gray>").append(Text.literal(note.slashed() + " " + option));
-            }
-            buttons.add(ActionButton.builder(MINI.deserialize("<#7DD3FC>" + Text.literal(note.slashed())))
-                    .tooltip(MINI.deserialize(tooltip.toString())).width(BUTTON)
-                    .action(DialogAction.staticAction(ClickEvent.suggestCommand(note.slashed() + " "))).build());
+            buttons.add(commandButton(note, BUTTON, dialogs -> dialogs.commands(topic)));
         }
         String intro = notes.isEmpty() ? "help.commands-none" : "help.commands-intro";
         show(topic.title(), List.of(DialogBody.plainMessage(line(intro, false, "title", topic.title()), TEXT_WIDTH)), List.of(),
                 buttons, back(dialogs -> dialogs.topic(topic)), 2);
+    }
+
+    /** One command: every way to use it, each a button — or straight to its form when there is only one. */
+    public void command(CommandNote note, Consumer<HelpDialogs> backTo) {
+        List<CommandForm> forms = CommandForms.of(note);
+        if (forms.size() == 1) {
+            form(note, forms.getFirst(), backTo, null);
+            return;
+        }
+        List<ActionButton> buttons = new ArrayList<>();
+        for (CommandForm form : forms) {
+            buttons.add(formButton(note, form, dialogs -> dialogs.command(note, backTo)));
+        }
+        show(note.slashed(), List.of(DialogBody.plainMessage(MINI.deserialize("<" + HelpText.LINK + ">"
+                        + Text.literal(note.slashed()) + "</" + HelpText.LINK + "> <gray>— " + Text.literal(note.sentence())
+                        + "\n\n").append(line("help.command-pick", false)), TEXT_WIDTH)),
+                List.of(), buttons, back(backTo), 1);
+    }
+
+    /**
+     * A command as a form: a box per argument (a list of who is online where it wants a player, a pick where it takes
+     * fixed words), and Run. Running is the player typing it — the same permissions, the same command blocks, the
+     * same messages — just without the typing.
+     */
+    public void form(CommandNote note, CommandForm form, Consumer<HelpDialogs> backTo, String complaint) {
+        List<DialogBody> body = new ArrayList<>();
+        StringBuilder text = new StringBuilder("<bold><" + HelpText.LINK + ">" + Text.literal(form.usage()) + "</"
+                + HelpText.LINK + "></bold>\n<gray>" + Text.literal(note.sentence()));
+        if (!form.note().isEmpty()) {
+            text.append("\n<dark_gray>").append(Text.literal(form.note()));
+        }
+        body.add(DialogBody.plainMessage(MINI.deserialize(text.toString()), TEXT_WIDTH));
+        if (complaint != null) {
+            body.add(DialogBody.plainMessage(line("help.form-missing", false, "field", complaint), TEXT_WIDTH));
+        }
+        List<DialogInput> inputs = new ArrayList<>();
+        for (CommandForm.Field field : form.fields()) {
+            inputs.add(input(field));
+        }
+        List<ActionButton> buttons = new ArrayList<>();
+        buttons.add(button(line("help.run", false), Component.text(form.usage()), BUTTON, (response, player) -> {
+            java.util.Map<String, String> values = new java.util.HashMap<>();
+            for (CommandForm.Field field : form.fields()) {
+                String value = response.getText(field.key());
+                values.put(field.key(), value == null || value.equals(LEAVE_OUT) ? "" : value);
+            }
+            var typed = form.build(values);
+            if (typed.isEmpty()) {
+                String missing = form.fields().stream().filter(CommandForm.Field::required)
+                        .filter(field -> values.getOrDefault(field.key(), "").isBlank())
+                        .map(CommandForm.Field::label).findFirst().orElse("?");
+                then(dialogs -> dialogs.form(note, form, backTo, missing));
+                return;
+            }
+            run(typed.get());
+        }));
+        buttons.add(ActionButton.builder(line("help.type-it", false)).width(BUTTON)
+                .action(DialogAction.staticAction(ClickEvent.suggestCommand(form.typeable()))).build());
+        show(note.slashed(), body, inputs, buttons, back(backTo), 2);
+    }
+
+    /** What a dropdown offers to mean "leave this out" for an optional field. */
+    private static final String LEAVE_OUT = "-";
+
+    private DialogInput input(CommandForm.Field field) {
+        Component label = Component.text(field.label() + (field.required() ? "" : " (optional)"));
+        List<String> choices = field.choices();
+        if (field.players()) {
+            List<String> online = org.bukkit.Bukkit.getOnlinePlayers().stream().filter(reader::canSee)
+                    .map(org.bukkit.entity.Player::getName).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+            if (!online.isEmpty() && online.size() <= 40) {
+                choices = online;
+            }
+        }
+        if (choices.isEmpty()) {
+            return DialogInput.text(field.key(), label).width(WIDE_BUTTON).maxLength(256).labelVisible(true).build();
+        }
+        List<io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
+        if (!field.required()) {
+            entries.add(io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput.OptionEntry.create(
+                    LEAVE_OUT, Component.text("—"), true));
+        }
+        boolean first = field.required();
+        for (String choice : choices) {
+            entries.add(io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput.OptionEntry.create(
+                    choice, Component.text(choice), first));
+            first = false;
+        }
+        return DialogInput.singleOption(field.key(), label, entries).width(WIDE_BUTTON).labelVisible(true).build();
+    }
+
+    /** A command's button: opens it, or — when it takes nothing at all — runs it. */
+    private ActionButton commandButton(CommandNote note, int width, Consumer<HelpDialogs> backTo) {
+        List<CommandForm> forms = CommandForms.of(note);
+        if (forms.size() == 1 && forms.getFirst().fields().isEmpty()) {
+            return formButton(note, forms.getFirst(), backTo);
+        }
+        return button(MINI.deserialize("<" + HelpText.LINK + ">▶ " + Text.literal(note.slashed())),
+                MINI.deserialize("<gray>" + Text.literal(note.sentence())), width,
+                (response, player) -> then(dialogs -> dialogs.command(note, backTo)));
+    }
+
+    /** One form's button: ▶ and its usage. Runs at once when there is nothing to fill in, opens the form otherwise. */
+    private ActionButton formButton(CommandNote note, CommandForm form, Consumer<HelpDialogs> backTo) {
+        Component label = MINI.deserialize("<" + HelpText.LINK + ">▶ " + Text.literal(form.usage()));
+        Component tooltip = MINI.deserialize("<gray>" + Text.literal(note.sentence())
+                + (form.note().isEmpty() ? "" : "\n<dark_gray>" + Text.literal(form.note()))
+                + "\n\n<dark_gray>" + (form.fields().isEmpty() ? "Click to run it" : "Click to fill it in and run it"));
+        if (form.fields().isEmpty()) {
+            String typed = form.build(java.util.Map.of()).orElse(form.command());
+            return button(label, tooltip, WIDE_BUTTON, (response, player) -> run(typed));
+        }
+        return button(label, tooltip, WIDE_BUTTON, (response, player) -> then(dialogs -> dialogs.form(note, form, backTo, null)));
+    }
+
+    /**
+     * Runs a command as the reader, on their own thread, the way typing it would: {@code Player#chat} goes through
+     * the command events, so a frozen player's blocks, watched commands and cooldowns all still apply.
+     */
+    private void run(String typed) {
+        Scheduling.entity(desk.plugin(), reader, () -> {
+            if (reader.isOnline()) {
+                reader.closeDialog();
+                reader.chat(typed.startsWith("/") ? typed : "/" + typed);
+            }
+        });
+    }
+
+    /** Every command this reader may use. */
+    private List<CommandNote> visibleNotes() {
+        return RainsCore.isAvailable() ? RainsCore.get().commands().visibleTo(reader::hasPermission) : List.of();
     }
 
     /** What the guide knows about some words: the best answers first. */
@@ -226,7 +364,12 @@ public final class HelpDialogs {
         List<DialogBody> body = new ArrayList<>();
         body.add(DialogBody.plainMessage(line("help.search-intro", false, "asked", words), TEXT_WIDTH));
         List<ActionButton> buttons = new ArrayList<>();
-        if (hits.isEmpty()) {
+        // Commands too: "pay", "sell all", "home" — whatever their name, plugin or sentence says.
+        List<CommandNote> commands = visibleNotes().stream()
+                .filter(note -> de.raindancer.core.ui.text.WordSearch.matches(words, note.command(), note.sentence(),
+                        note.plugin(), String.join(" ", note.options())))
+                .limit(6).toList();
+        if (hits.isEmpty() && commands.isEmpty()) {
             body.add(DialogBody.plainMessage(line("help.search-nothing", false, "asked", words), TEXT_WIDTH));
             List<String> close = library.closest(words, context);
             if (!close.isEmpty()) {
@@ -236,7 +379,7 @@ public final class HelpDialogs {
                     library.find(name, context).ifPresent(topic -> buttons.add(topicButton(topic, WIDE_BUTTON)));
                 }
             }
-        } else {
+        } else if (!hits.isEmpty()) {
             body.add(DialogBody.plainMessage(line("help.search-found", false), TEXT_WIDTH));
             for (HelpLibrary.Hit hit : hits.subList(0, Math.min(8, hits.size()))) {
                 HelpTopic topic = hit.topic();
@@ -253,6 +396,12 @@ public final class HelpDialogs {
                         dialogs.answer(topic, section);
                     }
                 })));
+            }
+        }
+        if (!commands.isEmpty()) {
+            // A dialog draws its text above its buttons, so a heading here would float away from them: the ▶ says it.
+            for (CommandNote note : commands) {
+                buttons.add(commandButton(note, WIDE_BUTTON, dialogs -> dialogs.search(words)));
             }
         }
         show("Search", body, List.of(), buttons, back(dialogs -> dialogs.home(false)), 1);

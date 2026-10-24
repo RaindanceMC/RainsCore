@@ -185,6 +185,41 @@ public final class HelpText {
         return keys;
     }
 
+    /**
+     * The commands a text shows ({@code {cmd:…}}, {@code {run:…}}) in the branches this reader gets, in order, each
+     * once — what the answer offers as buttons to run.
+     */
+    public static List<String> commandsMentioned(String text, HelpContext context) {
+        List<String> found = new ArrayList<>();
+        if (text == null) {
+            return found;
+        }
+        Boolean chosen = null;
+        boolean inElse = false;
+        for (Token token : tokens(text, new ArrayList<>())) {
+            if (!(token instanceof Tag tag)) {
+                continue;
+            }
+            String content = tag.content().strip();
+            String lower = content.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("if:")) {
+                chosen = condition(content.substring(3), context, new ArrayList<>());
+                inElse = false;
+            } else if (lower.equals("else")) {
+                inElse = true;
+            } else if (lower.equals("/if")) {
+                chosen = null;
+            } else if ((chosen == null || chosen != inElse) && (lower.startsWith("cmd:") || lower.startsWith("run:"))) {
+                String command = content.substring(4).strip();
+                command = command.startsWith("/") ? command : "/" + command;
+                if (!found.contains(command)) {
+                    found.add(command);
+                }
+            }
+        }
+        return found;
+    }
+
     /** The topics a text links to, for a lint to check they exist. */
     public static Set<String> topicsLinked(String text) {
         Set<String> ids = new LinkedHashSet<>();
