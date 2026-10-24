@@ -157,6 +157,33 @@ public final class HelpText {
         return keys;
     }
 
+    /**
+     * The setting keys whose values a text prints — {@code {setting:…}} and {@code {money:…}}, not conditions. A
+     * condition on a setting this server lacks is simply off; a value it lacks would print as "?".
+     */
+    public static Set<String> settingsShown(String text) {
+        Set<String> keys = new LinkedHashSet<>();
+        if (text == null) {
+            return keys;
+        }
+        for (Token token : tokens(text, new ArrayList<>())) {
+            if (!(token instanceof Tag tag)) {
+                continue;
+            }
+            String content = tag.content().strip();
+            String lower = content.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("setting:")) {
+                keys.add(argument(content.substring("setting:".length())));
+            } else if (lower.startsWith("money:")) {
+                String amount = argument(content.substring("money:".length()));
+                if (amount.contains(":")) {
+                    keys.add(amount);
+                }
+            }
+        }
+        return keys;
+    }
+
     /** The topics a text links to, for a lint to check they exist. */
     public static Set<String> topicsLinked(String text) {
         Set<String> ids = new LinkedHashSet<>();
@@ -332,13 +359,9 @@ public final class HelpText {
 
     private static boolean condition(String expression, HelpContext context, List<String> problems) {
         try {
-            HelpExpression parsed = HelpExpression.parse(expression);
-            for (String key : parsed.settings()) {
-                if (context.setting(key).isEmpty()) {
-                    problems.add("the setting '" + key + "' is not declared here");
-                }
-            }
-            return parsed.test(context);
+            // A setting nobody here declares is off — that is what a condition on another server's part means.
+            // A typo in one is caught by HelpLint in the module's build, which checks every key it reads.
+            return HelpExpression.parse(expression).test(context);
         } catch (IllegalArgumentException broken) {
             problems.add("condition: " + broken.getMessage());
             return false;

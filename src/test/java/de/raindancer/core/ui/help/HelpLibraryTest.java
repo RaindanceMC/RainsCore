@@ -152,8 +152,9 @@ class HelpLibraryTest {
                   - question: How much stock?
                     text: "{setting:economy-supply:stock|number} items."
                   - question: Anything else?
-                    text: No.
+                    text: "No.{if:economy-client:shop-here} The shop is open here.{/if}"
                 """, "RainsEconomy");
+        // A condition on a setting this server lacks is just off: that question stays, and says no more.
         assertThat(HelpLibrary.sectionsFor(topic, HelpContexts.fixed(Map.of())))
                 .extracting(HelpSection::question).containsExactly("Anything else?");
         assertThat(HelpLibrary.sectionsFor(topic, HelpContexts.fixed(Map.of("economy-supply:stock", 5))))

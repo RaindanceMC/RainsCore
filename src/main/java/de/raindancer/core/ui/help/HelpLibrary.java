@@ -133,7 +133,7 @@ public final class HelpLibrary {
     public static boolean visible(HelpSection section, HelpContext context) {
         return (section.permission() == null || context.has(section.permission()))
                 && (section.when() == null || section.when().test(context))
-                && HelpText.settingsRead(section.text()).stream().allMatch(key -> context.setting(key).isPresent());
+                && HelpText.settingsShown(section.text()).stream().allMatch(key -> context.setting(key).isPresent());
     }
 
     /** The topics this reader may see, by category and then order. */
