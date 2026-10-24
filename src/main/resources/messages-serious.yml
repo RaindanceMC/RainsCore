@@ -48,3 +48,13 @@ vanish-chat:
 
 items:
   not-for-spawners: "<red>Spawn eggs from the shop cannot be used on spawners."
+
+help:
+  greeting:
+    - "Welcome, <white><player></white>. How can I help?"
+    - "Welcome to <white><server></white>. What would you like to know?"
+  greeting-hint: "<gray>Choose a subject below, or type a question into the box. There are <white><topics></white> subjects here."
+  search-nothing: "<gray>Nothing matches <white><asked></white>. Try other or fewer words."
+  search-empty: "<gray>Type a question into the box first."
+  generated-note: "<dark_gray><i>There is no written guide for this feature yet; this is what it reports about itself.</i>"
+  new-player: "<gray>New here? Type <white><click:run_command:'/help'><hover:show_text:'<gray>Click to ask'>/help</hover></click></white> or talk to <white><guide></white> at spawn."

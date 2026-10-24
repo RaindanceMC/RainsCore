@@ -1,0 +1,37 @@
+id: guide
+title: Asking the guide
+summary: How /help works, and how to get the most out of me.
+intro: |
+  Me? I am <white>{setting:core-help:guide-name}</white>, and I know how everything on <white>{server}</white> works — <i>as it is set up right now</i>. When the owner changes a price, I know the new one before you do.
+icon: ENCHANTED_BOOK
+category: Getting started
+order: 1
+aliases: [help, helper, witch, hazel, questions]
+keywords: [guide, how, explain, manual, tutorial]
+commands: [help]
+sections:
+  - question: How do I ask you something?
+    title: Asking
+    text: |
+      Three ways, pick your favourite:
+      <white>•</white> Type {run:/help} and click through the subjects.
+      <white>•</white> Type your question into the box on my first page, or {cmd:/help search <words>} — I search every answer I have.
+      <white>•</white> {cmd:/help <subject>} goes straight to a subject. Command names work too: <white>/help sell</white> opens whatever explains selling.
+  - question: Where do I find you in the world?
+    title: The guide in the world
+    text: |
+      Somewhere near the spawn, usually — look for my name floating over my head. Right-click me and we talk, exactly like {run:/help}. I am not much of a fighter, so please do not try.
+  - question: Can I get the answers in chat?
+    title: Answers in chat
+    text: |
+      Add <white>chat</white> to the end of any /help: {cmd:/help economy chat}. Every question turns into a link, and the answers land in your chat where you can scroll back to them.
+  - question: Why do you know more than I do?
+    title: Live answers
+    text: |
+      Because I read the server's settings every time you ask. The prices, limits and cooldowns I quote are the ones in force right now — not whatever somebody wrote into a guide two updates ago.
+  - question: Something here is wrong.
+    title: Reporting mistakes
+    text: |
+      Then tell the staff. They can check every page I know with <white>/help check</white> and add or replace pages of their own.
+
+      {if:@perm:rainscore.help.manage}<gray>You are staff: {cmd:/help check} lists every problem, and <white>plugins/RainsCore/help.yml</white> holds the server's own pages (export it with /documents). {cmd:/help reload} reads it again.{/if}

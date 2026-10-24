@@ -1,0 +1,34 @@
+id: basics
+title: Finding your way
+summary: The hub, every command in one book, what changed lately, and player profiles.
+intro: |
+  New to <white>{server}</white>? Splendid. Here is how not to stay lost. Everything else on this server hangs off these few doors.
+icon: COMPASS
+category: Getting started
+order: 2
+aliases: [start, new, newbie, beginner, hub, smp, getting-started]
+keywords: [lost, begin, first, menu, features]
+commands: [hub, commands, changelog]
+related: [guide]
+sections:
+  - question: What is there to do here?
+    title: The hub
+    text: |
+      Type {run:/hub} — the hub. It shows every feature this server runs, each with its own page: what it does and the commands it brings. Click a feature to open it.
+  - question: Is there a list of all commands?
+    title: All commands
+    text: |
+      {run:/commands} opens a book with every command <i>you</i> may use, plugin by plugin — commands you cannot use are left out, so nothing in it will refuse you. {cmd:/commands <plugin>} shows just one plugin's.
+  - question: What changed lately?
+    title: What's new
+    text: |
+      {run:/changelog} tells you what changed on the server. When you come back after a while you are told about the news once, so you do not miss anything.
+  - question: How do I see who somebody is?
+    title: Profiles
+    text: |
+      Click a player's name in chat and their profile opens: who they are, how long they have played, and what you can do with them from there.
+  - question: Can I change settings?
+    title: Settings
+    permission: rainscore.settings
+    text: |
+      You can: {run:/settings} holds everything every plugin on this server can be told to do. Changes take hold at once — and I quote the new values from then on.

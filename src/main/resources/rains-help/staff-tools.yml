@@ -1,0 +1,38 @@
+id: staff-tools
+title: Running the server
+summary: Settings, maintenance, documents and the network — the owner's levers.
+intro: |
+  The levers behind the curtain. With great power, and so on. Everything here is for staff only — players never see this page.
+icon: COMMAND_BLOCK
+category: Staff
+order: 900
+permission: rainscore.settings
+aliases: [admin, owner, server-admin]
+keywords: [configure, config, maintenance, documents, network]
+commands: [settings, maintenance, documents, network, prefix]
+related: [guide]
+sections:
+  - question: How do I change what plugins do?
+    title: Settings
+    text: |
+      {run:/settings} opens every plugin's settings in one menu; {cmd:/settings <key> <value>} sets one from chat. Changes apply at once, and the guide quotes the new values on the next click.
+  - question: How do I close the server for work?
+    title: Maintenance
+    permission: rainscore.maintenance
+    text: |
+      {cmd:/maintenance on <reason>} closes the server — only operators and the maintenance list may join. {cmd:/maintenance off} opens it again; {cmd:/maintenance add <player>} lets somebody in meanwhile.
+  - question: Where are the config files?
+    title: Documents
+    permission: rainscore.documents
+    text: |
+      In the database, since RainsCore 2.0. {cmd:/documents list} shows them, {cmd:/documents export <plugin> <name>} writes one to edit by hand, and {cmd:/documents import} reads every edited file back. The guide's own pages are <white>RainsCore / help.yml</white>.
+  - question: How do I place a guide at spawn?
+    title: Placing a guide
+    permission: rainscore.help.guide
+    text: |
+      Stand where the guide should stand, facing the way they should face, and type {cmd:/help guide place} for a person (their skin is the setting <white>guide-skins</white>) or {cmd:/help guide place witch} — any mob works. {cmd:/help guide remove} takes away the nearest one. They are called <white>{setting:core-help:guide-name}</white>; change that in /settings.
+  - question: Is the guide correct here?
+    title: Checking the guide
+    permission: rainscore.help.manage
+    text: |
+      {run:/help check} reads every page as somebody with every permission and lists each setting, placeholder or link that does not fill in on this server. {run:/help reload} reads every plugin's pages and help.yml again.

@@ -43,6 +43,27 @@ public final class HubModuleMenu extends HubPage {
     @Override
     void header() {
         set(MenuLayout.HEADER_SUBJECT, HubMenu.door(entry, Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission).size(), false));
+        guideButton();
+    }
+
+    /** "Ask the guide": the feature's own topic in /help, when the guide has one this viewer may read. */
+    private void guideButton() {
+        var desk = de.raindancer.core.ui.help.HelpDesk.current().orElse(null);
+        if (desk == null) {
+            return;
+        }
+        var context = desk.contextFor(viewer());
+        var library = desk.library();
+        library.visibleTo(context).stream()
+                .filter(topic -> entry.id().equalsIgnoreCase(topic.module()) || entry.id().equalsIgnoreCase(topic.id()))
+                .findFirst()
+                .ifPresent(topic -> set(MenuLayout.HEADER_RIGHT, tidy(Icons.of(org.bukkit.Material.ENCHANTED_BOOK,
+                        "<gradient:#C084FC:#7DD3FC>Ask " + Text.literal(desk.settings().guideName()) + "</gradient>",
+                        "<gray>How " + Text.literal(entry.name()) + " works here,", "<gray>explained as it is set up.", "",
+                        "<dark_gray>» <white>Click to ask"), false), event -> {
+                    viewer().closeInventory();
+                    de.raindancer.core.ui.help.HelpDialogs.forReader(desk, viewer()).topic(topic);
+                }));
     }
 
     @Override

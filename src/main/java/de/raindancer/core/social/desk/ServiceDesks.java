@@ -135,14 +135,20 @@ public final class ServiceDesks {
 
     /** An attendant of this desk where the player stands, facing them. On the player's own region thread. */
     public static Mannequin place(Player player, ServiceDesk desk) {
-        return Attendants.place(player, Component.text(desk.title(), NamedTextColor.GOLD),
+        return place(player, desk, Component.text(desk.title(), NamedTextColor.GOLD));
+    }
+
+    /** The same, under a name of its own — a guide called after the server's guide rather than "Guide". */
+    public static Mannequin place(Player player, ServiceDesk desk, Component name) {
+        return Attendants.place(player, name,
                 Component.text("Right click to talk", NamedTextColor.GRAY),
                 Attendants.look(de.raindancer.core.world.npc.Skins.pick(skins(desk), UUID.randomUUID())),
                 attendant -> attendant.getPersistentDataContainer().set(DESK, PersistentDataType.STRING, desk.name()));
     }
 
     public static Optional<ServiceDesk> deskOf(Entity entity) {
-        if (!(entity instanceof Mannequin)) {
+        // Attendants are people; a guide may be any mob (a witch by the spawn), held still and tagged the same way.
+        if (!(entity instanceof org.bukkit.entity.LivingEntity) || entity instanceof Player) {
             return Optional.empty();
         }
         return ServiceDesk.read(entity.getPersistentDataContainer().get(DESK, PersistentDataType.STRING));

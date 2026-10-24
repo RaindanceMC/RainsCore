@@ -684,6 +684,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         int signed = messages.claimSections(chat.brand()::chatPrefix);
         de.raindancer.core.social.desk.ServiceDesks.install(messages, chat.brand());
         getServer().getPluginManager().registerEvents(new de.raindancer.core.social.desk.DeskListener(), this);
+        startTheGuide();
         if (signed > 0) {
             log.debug("{} message section(s) signed as Core's own.", signed);
         }
@@ -696,6 +697,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                                 "[plugin] — only that plugin's"),
                 CommandNote
                         .of("Core", "changelog", "What changed on this server lately."),
+                CommandNote
+                        .of("Core", "help", "Ask the guide anything: every feature here, explained as it is set up.",
+                                "<topic> — one subject, e.g. /help economy", "<topic> <question> — one answer",
+                                "search <words> — whatever mentions them", "… chat — the answer in chat"),
                 CommandNote
                         .of("Core", "maintenance", "Close the server for maintenance: only ops and its own list can join.",
                                 "on [reason] — close it", "off — open it", "add|remove <player> — the list", "list")
@@ -1314,6 +1319,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
+        de.raindancer.core.ui.help.HelpDesk.install(null);
         de.raindancer.core.social.roles.PlayerRoles.clear();
         de.raindancer.core.data.loadout.SideData.clear();
         de.raindancer.core.world.blocks.PlacedBlocks.clear();
@@ -2621,6 +2627,25 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     // ------------------------------------------------------------------------ housekeeping
+
+    /**
+     * /help and the guide standing in the world: their settings in Core's config.yml, the library of every plugin's
+     * guide, the guide's desk, and the listener keeping it current. The command itself is registered by whichever
+     * plugin's bootstrapper asks first — see {@code CoreCommands.help}.
+     */
+    private void startTheGuide() {
+        var helpSettings = settingsFor(SettingsSchema.of(de.raindancer.core.ui.help.HelpSettings.class,
+                de.raindancer.core.ui.help.HelpSettings.DEFAULTS), getDataFolder().toPath().resolve("config.yml"));
+        var helpDesk = new de.raindancer.core.ui.help.HelpDesk(this, registry, helpSettings, getDataFolder().toPath());
+        de.raindancer.core.ui.help.HelpDesk.install(helpDesk);
+        de.raindancer.core.social.desk.ServiceDesks.offer(de.raindancer.core.social.desk.ServiceDesk.GUIDE,
+                new de.raindancer.core.ui.help.HelpGuide(helpDesk));
+        de.raindancer.core.social.desk.ServiceDesks.skins(de.raindancer.core.social.desk.ServiceDesk.GUIDE,
+                helpSettings.current().guideSkins());
+        helpSettings.onChange(changed -> de.raindancer.core.social.desk.ServiceDesks.skins(
+                de.raindancer.core.social.desk.ServiceDesk.GUIDE, changed.guideSkins()));
+        getServer().getPluginManager().registerEvents(new de.raindancer.core.ui.help.HelpListener(helpDesk), this);
+    }
 
     /**
      * The one basic, cross-cutting fact worth an audit line before any moderator has done anything:

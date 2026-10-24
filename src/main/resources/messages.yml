@@ -438,3 +438,60 @@ party:
   failed: "<red>That did not work — try again in a moment."
   not-online: "<red><white><name></white> is not online."
   usage: "<gray>/party invite|accept|kick <name> · leave · list · chat <message> · /pc <message>"
+
+# ────────────────────────────────────────── /help and the guide at spawn
+help:
+  # What the guide says first, one line dealt at a time. <player>, <server>, <guide>.
+  greeting:
+    - "Ah, <white><player></white>. Lost already? Splendid — lost people are my favourite kind."
+    - "Welcome to <white><server></white>, dear. Ask me anything. I may even know the answer."
+    - "Back again, <white><player></white>? Nobody reads the signs. That is why I exist."
+    - "Mind the cauldron. Now — what do you want to know?"
+    - "I have answers. Lots of them. Whether they are to your questions, we shall see."
+    - "Ah, a visitor. Questions cost nothing here. Answers cost nothing either. What a deal."
+  # Under the greeting. <topics>: how many things the guide can explain to this reader.
+  greeting-hint: "<gray>Pick a subject below, or type a question into the box. I know about <white><topics></white> things here."
+  ask-label: "Ask me something"
+  ask-button: "<#C4B5FD>✦ Ask"
+  ask-tooltip: "Searches every answer I have for the words in the box."
+  commands-button: "<#FDE68A>All commands"
+  commands-tooltip: "Every command you may use here, in one book."
+  wiki-button: "<#7DD3FC>Read the wiki"
+  goodbye: "<gray>Goodbye"
+  back: "<gray>« Back"
+  # A shelf of topics. <category>.
+  category-intro: "<white><category></white><gray> — what would you like to know?"
+  # On a topic page.
+  which-commands: "<#FDE68A>Which commands are there?"
+  related: "<gray>About <white><title></white>…"
+  more-on-wiki: "<#7DD3FC>Read more on the wiki"
+  # Under an answer.
+  next-question: "<gray>Next: <white><question></white>"
+  something-else: "<gray>Ask about something else"
+  # The commands of a topic. <title>.
+  commands-intro: "<gray>The commands for <white><title></white> you may use. Click one and it waits in your chat bar."
+  commands-none: "<gray>Nothing to type for <white><title></white> — it all happens by itself, or by clicking."
+  # Searching. <asked>: what was typed.
+  search-intro: "<gray>You asked: <white><asked></white>"
+  search-found: "<gray>Here is what I know about that:"
+  search-nothing: "<gray>Hmm. I know nothing about <white><asked></white>. Try other words — or fewer of them."
+  search-did-you-mean: "<gray>Did you mean <white><names></white>?"
+  search-empty: "<gray>You have to actually type a question into the box, dear. I read minds only on Tuesdays."
+  # Generated topics, for a feature that shipped no guide.
+  generated-note: "<dark_gray><i>Nobody has written me a proper guide for this yet, so here is what it tells me about itself.</i>"
+  # Chat, for the console and anybody who asks for it.
+  chat-header: "<gradient:#C084FC:#7DD3FC>━━━━━━━━ <title> ━━━━━━━━</gradient>"
+  chat-question: " <#C4B5FD><number>.</#C4B5FD> <white><question></white>"
+  chat-index-category: "<#C4B5FD><category>:</#C4B5FD> <topics>"
+  # A new player's first join.
+  new-player: "<gray>New here? Type <white><click:run_command:'/help'><hover:show_text:'<gray>Click to ask'>/help</hover></click></white> or talk to <white><guide></white> at spawn — they know everything. Almost."
+  # Staff.
+  usage-guide: "<gray>/help guide place [mannequin|witch|villager|…] · /help guide remove"
+  guide-placed: "<green><guide> is standing here now. Right-click them to talk."
+  guide-removed: "<green>The guide nearest you is gone."
+  guide-none-near: "<red>No guide within four blocks of you."
+  guide-bad-type: "<red><type> cannot be a guide — pick a mob, or mannequin for a person in any skin."
+  reloaded: "<green>The guide re-read every help file: <white><topics></white> topics, <white><problems></white> problem(s)."
+  check-clean: "<green>Every topic reads, every setting it quotes exists. <white><topics></white> topics checked."
+  check-header: "<red><count> problem(s) in the guide:"
+  check-line: "<dark_gray>• <gray><problem>"

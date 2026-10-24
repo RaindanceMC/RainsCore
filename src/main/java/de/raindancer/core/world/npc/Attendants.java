@@ -126,7 +126,8 @@ public final class Attendants {
         Entity nearest = null;
         double best = Double.MAX_VALUE;
         for (Entity nearby : player.getNearbyEntities(radius, radius, radius)) {
-            if (nearby instanceof Mannequin && which.test(nearby)) {
+            // Any non-player creature: a guide may be a witch. Whoever asks says which ones they mean by their tag.
+            if (nearby instanceof org.bukkit.entity.LivingEntity && !(nearby instanceof Player) && which.test(nearby)) {
                 double distance = nearby.getLocation().distanceSquared(player.getLocation());
                 if (distance <= radius * radius && distance < best) {
                     best = distance;

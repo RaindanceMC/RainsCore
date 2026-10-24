@@ -172,6 +172,26 @@ public final class CoreCommands {
         return changelog(registrar, "changelog", "news");
     }
 
+    private static final AtomicBoolean HELP_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /help}: the guide — every feature here explained as this server has it set up, in dialog windows. One
+     * per server, so taken by the first plugin that asks, like {@link #commandList}. Replaces Bukkit's own
+     * {@code /help}, which lists command names and nothing a player can use.
+     */
+    public static boolean help(Commands registrar, String name, String... aliases) {
+        if (!HELP_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register(name, "Ask the guide: every feature here, explained as it is set up.", List.of(aliases),
+                new de.raindancer.core.ui.help.HelpCommand());
+        return true;
+    }
+
+    public static boolean help(Commands registrar) {
+        return help(registrar, "help", "?", "guide");
+    }
+
     private static final AtomicBoolean HUB_TAKEN = new AtomicBoolean();
 
     /**
