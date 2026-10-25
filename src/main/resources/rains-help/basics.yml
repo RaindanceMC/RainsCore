@@ -31,6 +31,10 @@ sections:
     title: Painted menus
     text: |
       With the server pack on, menus are drawn as wood, brass and parchment. If you would rather have the plain glass windows, open {run:/hub}, click <white>Your profile</white> and then <white>Painted menus</white> — that switches them off for you alone, and the same click brings them back.
+  - question: Can I see my own nametag?
+    title: Your own nametag
+    text: |
+      Where names above heads are styled, open {run:/hub}, click <white>Your profile</white> and then <white>Your own nametag</white> — your name then floats above your own head for you too, best seen from behind (F5). The same click hides it again.
   - question: Can I change settings?
     title: Settings
     permission: rainscore.settings

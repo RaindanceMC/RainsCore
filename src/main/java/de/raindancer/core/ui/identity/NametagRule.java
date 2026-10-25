@@ -20,4 +20,15 @@ public final class NametagRule {
     public Component text(Component name, Optional<Component> subtitle) {
         return subtitle.map(line -> name.append(Component.newline()).append(line)).orElse(name);
     }
+
+    /**
+     * Whether one viewer is shown a wearer's name.
+     *
+     * @param ownName      the viewer is the wearer — vanilla never shows you your own, so only on their switch
+     * @param wantsOwn     the wearer switched on seeing their own name
+     * @param seesWearer   the server lets the viewer see the wearer at all
+     */
+    public boolean seenBy(boolean ownName, boolean wantsOwn, boolean seesWearer) {
+        return ownName ? wantsOwn : seesWearer;
+    }
 }

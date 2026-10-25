@@ -43,4 +43,19 @@ class NametagRuleTest {
         assertThat(plain.serialize(rule.text(Component.text("Bo"), Optional.of(Component.text("12 kills")))))
                 .isEqualTo("Bo\n12 kills");
     }
+
+    @Test
+    @DisplayName("the wearer sees their own name only when they switched it on")
+    void ownName() {
+        assertThat(rule.seenBy(true, false, true)).as("own, switched off").isFalse();
+        assertThat(rule.seenBy(true, true, true)).as("own, switched on").isTrue();
+    }
+
+    @Test
+    @DisplayName("everybody else sees it as long as the server lets them see the wearer")
+    void others() {
+        assertThat(rule.seenBy(false, false, true)).isTrue();
+        assertThat(rule.seenBy(false, true, true)).isTrue();
+        assertThat(rule.seenBy(false, false, false)).as("wearer hidden from them").isFalse();
+    }
 }

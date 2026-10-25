@@ -278,6 +278,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Seclusion seclusion;
     private ResourcePacks resourcePacks;
     private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
+    private de.raindancer.core.ui.profile.ProfileExtension ownNametagSwitch;
     private ChunkHolds chunks;
     private Safety safety;
     private Effects effects;
@@ -859,6 +860,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 this, vanish, new de.raindancer.core.moderation.vanish.VanishedSpeech(), messages, buttons), this);
         nametags = new de.raindancer.core.ui.identity.Nametags(this, identities, vanish);
         getServer().getPluginManager().registerEvents(nametags, this);
+        ownNametagSwitch = nametags.profileSwitch();
+        de.raindancer.core.ui.profile.ProfileExtensions.register(ownNametagSwitch);
         getServer().getPluginManager().registerEvents(
                 new VanishListener(this, vanish, player -> VanishSight.sees(player, vanish, SEE_VANISHED)), this);
         // Hiding a player's entity does not take them off a *custom* tablist — that list is built from
@@ -1308,6 +1311,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
         if (menusSwitch != null) {
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
+        }
+        if (ownNametagSwitch != null) {
+            de.raindancer.core.ui.profile.ProfileExtensions.unregister(ownNametagSwitch);
         }
         groupsFollowing.close();
         de.raindancer.core.platform.permission.Duty.clear();

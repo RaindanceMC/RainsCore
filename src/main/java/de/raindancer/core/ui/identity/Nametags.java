@@ -4,6 +4,7 @@ import de.raindancer.core.moderation.vanish.Vanish;
 import de.raindancer.core.platform.log.Log;
 import de.raindancer.core.platform.log.LogChannel;
 import de.raindancer.core.platform.util.Scheduling;
+import de.raindancer.core.ui.profile.PlayerSwitch;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -51,6 +52,8 @@ public final class Nametags implements Listener {
     private static final double ABOVE_HEAD = 0.3;
     /** As far as a nametag could be seen from; a viewer further away is not asked about. */
     private static final double SIGHT = 128;
+    /** A player's own "show me my name" switch, flipped from their profile. Off: vanilla shows nobody their own. */
+    public static final PlayerSwitch OWN_NAME = new PlayerSwitch("rainscore", "own-nametag", false);
 
     private final Plugin plugin;
     private final Identities identities;
@@ -186,14 +189,13 @@ public final class Nametags implements Listener {
     /**
      * The name floats where its wearer is, so it must not show to anybody the server hides the wearer
      * from — another plugin's {@code hidePlayer}, a minigame's spectators. Otherwise it gives away a
-     * position the hiding was meant to keep secret.
+     * position the hiding was meant to keep secret. The wearer sees it only on {@link #OWN_NAME}.
      */
     private void matchVisibility(Player wearer, TextDisplay display) {
+        boolean wantsOwn = OWN_NAME.isOn(wearer);
         for (Player viewer : wearer.getLocation().getNearbyPlayers(SIGHT)) {
-            if (viewer.equals(wearer)) {
-                continue;
-            }
-            if (viewer.canSee(wearer)) {
+            boolean own = viewer.equals(wearer);
+            if (rule.seenBy(own, wantsOwn, own || viewer.canSee(wearer))) {
                 viewer.showEntity(plugin, display);
             } else {
                 viewer.hideEntity(plugin, display);
@@ -265,8 +267,7 @@ public final class Nametags implements Listener {
             // Moved every tick; the client glides between the two places instead of jumping.
             made.setTeleportDuration(1);
         });
-        // Hidden by default, so the wearer never sees their own (vanilla does not show you yours) and
-        // everybody else is let in one by one.
+        // Hidden by default, so everybody — the wearer too, unless they asked for it — is let in one by one.
         matchVisibility(player, display);
         displays.put(player.getUniqueId(), display);
         return display;
@@ -307,6 +308,31 @@ public final class Nametags implements Listener {
         } catch (RuntimeException ignored) {
             // On Folia the main scoreboard belongs to the global thread; the next tick tidies it.
         }
+    }
+
+    // ------------------------------------------------------------------ own name
+
+    /**
+     * The button on a player's own profile that flips {@link #OWN_NAME}. Nothing on somebody else's profile, and
+     * nothing while styled nametags are off — there is no floating name to see then.
+     */
+    public de.raindancer.core.ui.profile.ProfileExtension profileSwitch() {
+        return (viewer, subject, parent) -> {
+            if (!enabled || !viewer.getUniqueId().equals(subject.getUniqueId())) {
+                return null;
+            }
+            boolean on = OWN_NAME.isOn(viewer);
+            org.bukkit.inventory.ItemStack icon = de.raindancer.core.ui.menu.Icons.of(org.bukkit.Material.NAME_TAG,
+                    (on ? "<green>" : "<gray>") + "Your own nametag: " + (on ? "shown" : "hidden"),
+                    "<gray>See the name above your head",
+                    "<gray>yourself, best from behind (F5).",
+                    "",
+                    "<yellow>Click<gray> to " + (on ? "hide" : "show") + " it for you");
+            return new de.raindancer.core.ui.profile.ProfileButton(icon, click -> {
+                OWN_NAME.toggle(viewer);
+                parent.reopen();
+            });
+        };
     }
 
     // ------------------------------------------------------------------ preview
