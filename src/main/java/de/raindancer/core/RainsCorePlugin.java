@@ -1827,6 +1827,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // Through a static entry point so no LuckPerms type is ever resolved here: a server
             // without LuckPerms must be able to load this class.
             groups = de.raindancer.core.platform.permission.LuckPermsGroups.startOn(this, bus());
+            de.raindancer.core.platform.permission.Duty.onChange(
+                    de.raindancer.core.platform.permission.DutyCommands.refreshing(getServer()::getPlayer,
+                            getServer()::getOnlinePlayers, (player, task) -> Scheduling.entity(this, player, task)));
             return;
         }
         var local = new de.raindancer.core.platform.permission.LocalGroups(
