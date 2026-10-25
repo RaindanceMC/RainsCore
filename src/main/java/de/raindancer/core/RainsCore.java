@@ -467,6 +467,12 @@ public interface RainsCore {
     de.raindancer.core.ui.identity.Nametags nametags();
 
     /**
+     * Screens floating in the world, put up by staff with {@code /screen}: register a {@link
+     * de.raindancer.core.ui.hologram.ScreenKind} for anything a plugin can show — for everybody, or everybody their own.
+     */
+    de.raindancer.core.ui.hologram.Screens screens();
+
+    /**
      * Doing things to a player from a management screen — heal, feed, starve, effects, flight,
      * gamemode, kick.
      *

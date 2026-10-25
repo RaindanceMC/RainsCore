@@ -236,6 +236,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.ui.identity.Nicknames nicknames;
     private de.raindancer.core.ui.chat.PrefixService prefixes;
     private de.raindancer.core.ui.identity.Nametags nametags;
+    private de.raindancer.core.ui.hologram.Screens screens;
     private Grants grants;
     private de.raindancer.core.platform.permission.PermissionGroups groups =
             de.raindancer.core.platform.permission.PermissionGroups.NONE;
@@ -816,6 +817,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         changelog.problems().forEach(problem -> log.warn("{}", problem));
         getServer().getPluginManager().registerEvents(
                 new de.raindancer.core.ui.changelog.ChangelogListener(this, changelog), this);
+        screens = new de.raindancer.core.ui.hologram.Screens(this, getServer(),
+                new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("screens.yml")));
+        getServer().getPluginManager().registerEvents(screens, this);
+        de.raindancer.core.ui.hologram.CoreScreens.register(screens, this, getServer());
+        screens.start();
         startNetworkWhitelist();
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
                 getDataFolder().toPath().resolve("maintenance.yml"), System::currentTimeMillis);
@@ -1480,6 +1486,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (nametags != null) {
             nametags.shutdown();
+        }
+        if (screens != null) {
+            screens.stop();
         }
         if (tablists != null) {
             // Before anything else: the teams it makes live on the main scoreboard, and one left
@@ -2496,6 +2505,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.ui.identity.Nametags nametags() {
         return nametags;
+    }
+
+    @Override
+    public de.raindancer.core.ui.hologram.Screens screens() {
+        return screens;
     }
 
     @Override

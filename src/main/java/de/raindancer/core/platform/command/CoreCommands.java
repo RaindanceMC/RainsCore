@@ -192,6 +192,26 @@ public final class CoreCommands {
         return help(registrar, "help", "?", "guide");
     }
 
+    private static final AtomicBoolean SCREEN_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /screen}: putting up, nudging and taking down screens — every plugin's kinds, everybody's own stats.
+     * One per server, taken by the first plugin that asks, like {@link #commandList}. Op-only through
+     * {@value de.raindancer.core.ui.hologram.ScreenCommand#PERMISSION}.
+     */
+    public static boolean screens(Commands registrar, String name, String... aliases) {
+        if (!SCREEN_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register(name, de.raindancer.core.ui.hologram.ScreenCommand.DESCRIPTION, List.of(aliases),
+                new de.raindancer.core.ui.hologram.ScreenCommand());
+        return true;
+    }
+
+    public static boolean screens(Commands registrar) {
+        return screens(registrar, "screen", "screens", "holo");
+    }
+
     private static final AtomicBoolean HUB_TAKEN = new AtomicBoolean();
 
     /**
