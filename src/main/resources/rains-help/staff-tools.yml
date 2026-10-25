@@ -8,8 +8,8 @@ category: Staff
 order: 900
 permission: rainscore.settings
 aliases: [admin, owner, server-admin]
-keywords: [configure, config, maintenance, documents, network]
-commands: [settings, maintenance, documents, network, prefix]
+keywords: [configure, config, maintenance, documents, network, screen, hologram, display]
+commands: [settings, maintenance, documents, network, prefix, screen]
 related: [guide]
 sections:
   - question: How do I change what plugins do?
@@ -26,6 +26,12 @@ sections:
     permission: rainscore.documents
     text: |
       In the database, since RainsCore 2.0. {cmd:/documents list} shows them, {cmd:/documents export <plugin> <name>} writes one to edit by hand, and {cmd:/documents import} reads every edited file back. The guide's own pages are <white>RainsCore / help.yml</white>.
+  - question: How do I put up screens?
+    title: Screens
+    text: |
+      Stand where it should float and type {run:/screen} — every kind there is, from every plugin, click one to put it up over your head. Some show the same to everybody (who is online, the richest, the top guilds); others show every player near them their <i>own</i> (their money, their guild, their quests, their playtime).
+
+      {cmd:/screen up} and {cmd:/screen down} nudge the nearest a quarter block, {cmd:/screen up 1} as far as you say, {cmd:/screen up 0.5 #3} screen number 3 wherever you are. {cmd:/screen move <number>} brings one over your head, {cmd:/screen remove} takes the nearest away, {run:/screen list} shows them all with their numbers.
   - question: How do I place a guide at spawn?
     title: Placing a guide
     permission: rainscore.help.guide
