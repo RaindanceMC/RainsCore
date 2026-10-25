@@ -18,7 +18,7 @@ class CoreGuideTest {
                 .settings(CoreConfig.class, CoreConfig.DEFAULTS)
                 .settings(HelpSettings.class, HelpSettings.DEFAULTS)
                 .commands(List.of("help", "commands", "changelog", "hub", "settings", "maintenance", "documents",
-                        "network", "prefix"))
+                        "network", "prefix", "screen"))
                 .problems()).isEmpty();
     }
 
