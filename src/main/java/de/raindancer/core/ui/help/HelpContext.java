@@ -42,6 +42,12 @@ public interface HelpContext {
     /** The title of another topic, for a link to it. Empty when the reader cannot see it. */
     Optional<String> topicTitle(String id);
 
+    /** What opens the features panel here, without a slash — what a page's {@code /hub} becomes. */
+    default String hubCommand() {
+        return de.raindancer.core.ui.hub.HubCommand.name(setting("core:hub-command").map(String::valueOf).orElse(null),
+                false);
+    }
+
     /** What this server calls itself. */
     String serverName();
 

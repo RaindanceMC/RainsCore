@@ -100,6 +100,23 @@ class HelpTextTest {
     }
 
     @Test
+    @DisplayName("/hub in a page is the panel's command as this server names it — on a network the proxy takes /hub")
+    void hubCommand() {
+        HelpContexts.Fixed network = HelpContexts.fixed(Map.of("core:hub-command", "smp"));
+        List<String> problems = new ArrayList<>();
+        Component rendered = HelpText.render("Type {run:/hub}, or {cmd:/hub <feature>}; {run:/hubs} stays.", network,
+                problems);
+        assertThat(problems).isEmpty();
+        assertThat(HelpText.plain(rendered)).isEqualTo("Type /smp, or /smp <feature>; /hubs stays.");
+        List<ClickEvent> clicks = new ArrayList<>();
+        collect(rendered, clicks);
+        assertThat(clicks).extracting(click -> click.payload().toString())
+                .anySatisfy(payload -> assertThat(payload).contains("/smp").doesNotContain("/hub"));
+        assertThat(HelpText.commandsMentioned("{run:/HUB}", network)).containsExactly("/smp");
+        assertThat(plain("Type {run:/hub}.")).isEqualTo("Type /hub.");
+    }
+
+    @Test
     @DisplayName("double braces write a brace; markup written by the author works")
     void escapesAndMarkup() {
         assertThat(plain("Use {{braces}} and <gold>gold</gold>")).isEqualTo("Use {braces} and gold");

@@ -2927,8 +2927,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public String hubCommand() {
         CoreConfig config = settings == null ? null : settings.current();
-        String name = config == null || config.hubCommand() == null ? "" : config.hubCommand().strip();
-        return name.isEmpty() ? "hub" : name;
+        return de.raindancer.core.ui.hub.HubCommand.name(config == null ? null : config.hubCommand(),
+                network != null && network.isNetwork());
     }
 
     /** server-name in link.yml, read once at start; empty without one. */

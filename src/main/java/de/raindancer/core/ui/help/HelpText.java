@@ -210,7 +210,7 @@ public final class HelpText {
             } else if (lower.equals("/if")) {
                 chosen = null;
             } else if ((chosen == null || chosen != inElse) && (lower.startsWith("cmd:") || lower.startsWith("run:"))) {
-                String command = content.substring(4).strip();
+                String command = hub(content.substring(4), context).strip();
                 command = command.startsWith("/") ? command : "/" + command;
                 if (!found.contains(command)) {
                     found.add(command);
@@ -251,8 +251,8 @@ public final class HelpText {
             case "fact" -> fact(rest, context, problems);
             case "player" -> Text.literal(context.readerName());
             case "server" -> Text.literal(context.serverName());
-            case "cmd" -> command(rest, false, problems);
-            case "run" -> command(rest, true, problems);
+            case "cmd" -> command(hub(rest, context), false, problems);
+            case "run" -> command(hub(rest, context), true, problems);
             case "topic" -> topic(rest, context, problems);
             case "url" -> url(rest, problems);
             default -> {
@@ -336,6 +336,22 @@ public final class HelpText {
                 yield shown;
             }
         };
+    }
+
+    /**
+     * {@code /hub} as this server names the panel. Pages say /hub, but on a network the proxy takes /hub to send
+     * people to the hub server, and there the panel is /smp.
+     */
+    private static String hub(String written, HelpContext context) {
+        String command = written.strip();
+        String bare = command.startsWith("/") ? command.substring(1) : command;
+        int space = bare.indexOf(' ');
+        String first = space < 0 ? bare : bare.substring(0, space);
+        if (!first.equalsIgnoreCase("hub")) {
+            return command;
+        }
+        String name = context.hubCommand();
+        return name.equalsIgnoreCase("hub") ? command : "/" + name + (space < 0 ? "" : bare.substring(space));
     }
 
     private static String command(String written, boolean runs, List<String> problems) {

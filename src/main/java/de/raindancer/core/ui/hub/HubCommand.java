@@ -55,6 +55,21 @@ public final class HubCommand implements BasicCommand {
         printTo(sender, wanted.map(List::of).orElse(visible), core);
     }
 
+    /**
+     * What opens the panel here: the server's setting, without a slash. On a network the proxy answers /hub itself
+     * (it sends people to the hub server), so there the default — and a setting still saying hub — means /smp.
+     */
+    public static String name(String setting, boolean network) {
+        String name = setting == null ? "" : setting.strip();
+        if (name.startsWith("/")) {
+            name = name.substring(1).strip();
+        }
+        if (name.isEmpty() || name.equalsIgnoreCase("hub")) {
+            return network ? "smp" : "hub";
+        }
+        return name;
+    }
+
     /** "No feature called X — try /<command>", naming the command the server says opens this panel. */
     static String notFound(String typed, String command) {
         String name = command == null || command.isBlank() ? "hub" : command.strip();

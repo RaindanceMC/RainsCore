@@ -393,8 +393,9 @@ public record CoreConfig(
         boolean tablistShowPerformance,
 
         @In("config/chat") @Title("Command for the panel")
-        @Describe("What players type to open the features panel, as hints name it. The panel answers to /hub and /smp; "
-                + "on a network whose proxy takes /hub to send people to a hub server, set smp.")
+        @Describe("What players type to open the features panel, as hints and the /help guide name it. The panel "
+                + "answers to /hub and /smp; on a network the proxy takes /hub to send people to the hub server, so "
+                + "there hub means smp.")
         String hubCommand,
 
         @In("appearance") @Title("Painted menus")

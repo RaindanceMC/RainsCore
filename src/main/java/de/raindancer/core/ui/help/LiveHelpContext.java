@@ -96,6 +96,11 @@ final class LiveHelpContext implements HelpContext {
     }
 
     @Override
+    public String hubCommand() {
+        return RainsCore.isAvailable() ? RainsCore.get().hubCommand() : HelpContext.super.hubCommand();
+    }
+
+    @Override
     public String serverName() {
         return RainsCore.isAvailable() ? RainsCore.get().serverName() : "this server";
     }

@@ -21,4 +21,15 @@ class HubHintTest {
         assertThat(plain(HubCommand.notFound("tpa", "/smp"))).isEqualTo("No feature here is called tpa. Try /smp to see them all.");
         assertThat(plain(HubCommand.notFound("<red>x", " "))).isEqualTo("No feature here is called <red>x. Try /hub to see them all.");
     }
+
+    @Test
+    @DisplayName("on a network /hub belongs to the proxy, so the panel is named smp unless the server chose otherwise")
+    void name() {
+        assertThat(HubCommand.name("", false)).isEqualTo("hub");
+        assertThat(HubCommand.name("hub", false)).isEqualTo("hub");
+        assertThat(HubCommand.name("", true)).isEqualTo("smp");
+        assertThat(HubCommand.name(" /hub ", true)).isEqualTo("smp");
+        assertThat(HubCommand.name("/menu", true)).isEqualTo("menu");
+        assertThat(HubCommand.name(null, false)).isEqualTo("hub");
+    }
 }
