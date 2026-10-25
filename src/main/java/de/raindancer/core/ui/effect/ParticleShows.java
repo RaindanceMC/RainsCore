@@ -79,22 +79,40 @@ public final class ParticleShows {
     public static void around(Player wearer, String particle, Integer colour, Integer colourTo, int count,
                               ParticleShape shape, long tick, double range, Predicate<Player> sees,
                               Integer lifetimeTicks, int share) {
+        at(wearer.getLocation(), facing(wearer), wearer, particle, colour, colourTo, count, shape, tick, range, sees,
+                lifetimeTicks, share);
+    }
+
+    /**
+     * The same, around a spot with nobody on it — where somebody is about to land. Call on the thread that owns
+     * {@code feet}'s region ({@code Scheduling.region}).
+     *
+     * @param yaw which way the shape faces
+     */
+    public static void at(Location feet, float yaw, String particle, Integer colour, Integer colourTo, int count,
+                          ParticleShape shape, long tick, double range, Predicate<Player> sees,
+                          Integer lifetimeTicks) {
+        at(feet, yaw, null, particle, colour, colourTo, count, shape, tick, range, sees, lifetimeTicks, 1);
+    }
+
+    private static void at(Location feet, float yaw, Player source, String particle, Integer colour,
+                           Integer colourTo, int count, ParticleShape shape, long tick, double range,
+                           Predicate<Player> sees, Integer lifetimeTicks, int share) {
         Particle found = particleOf(particle);
-        if (found == null || !canShow(particle)) {
+        if (found == null || !canShow(particle) || feet.getWorld() == null) {
             return;
         }
-        Location feet = wearer.getLocation();
         List<Player> viewers = feet.getNearbyPlayers(range).stream().filter(sees).toList();
         if (viewers.isEmpty()) {
             return;
         }
-        World world = wearer.getWorld();
+        World world = feet.getWorld();
         Particle drawn = drawnAs(particle, lifetimeTicks);
         boolean trail = drawn == Particle.TRAIL && found != Particle.TRAIL;
         int from = colour == null ? 0xFFFFFF : colour;
         Object single = BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
         boolean blended = colourTo != null && takesColour(particle);
-        List<double[]> offsets = shape.offsets(tick, facing(wearer), count);
+        List<double[]> offsets = shape.offsets(tick, yaw, count);
         for (int index = 0; index < offsets.size(); index++) {
             if (!isDrawnNow(index, tick, share)) {
                 continue;
@@ -106,7 +124,7 @@ public final class ParticleShows {
             int rgb = blended ? colourAlong(from, colourTo, offset[3]) : from;
             Object data = trail ? trailData(new Location(world, x, y, z), rgb, lifetimeTicks)
                     : blended ? BukkitEffectSink.dataFor(found.getDataType(), rgb, dustSize(count)) : single;
-            world.spawnParticle(drawn, viewers, wearer, x, y, z, 1, 0, 0, 0, 0, data);
+            world.spawnParticle(drawn, viewers, source, x, y, z, 1, 0, 0, 0, 0, data);
         }
     }
 

@@ -52,8 +52,8 @@ public final class Nametags implements Listener {
     private static final double ABOVE_HEAD = 0.3;
     /** As far as a nametag could be seen from; a viewer further away is not asked about. */
     private static final double SIGHT = 128;
-    /** A player's own "show me my name" switch, flipped from their profile. Off: vanilla shows nobody their own. */
-    public static final PlayerSwitch OWN_NAME = new PlayerSwitch("rainscore", "own-nametag", false);
+    /** A player's own "show me my name" switch, flipped from their profile. */
+    public static final PlayerSwitch OWN_NAME = new PlayerSwitch("rainscore", "own-nametag", true);
 
     private final Plugin plugin;
     private final Identities identities;

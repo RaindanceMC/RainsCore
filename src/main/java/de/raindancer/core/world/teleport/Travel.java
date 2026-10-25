@@ -237,7 +237,7 @@ public final class Travel {
         journeys.put(who, away != null
                 ? new Journey(null, trip, told, countdown, null, away)
                 : new Journey(destination.clone(), trip, told, countdown, prepare(destination, trip), null));
-        shimmer(traveller, trip);
+        shimmer(traveller, trip, away != null ? null : destination.clone());
 
         // The window this closes: between begin() above and the put() on the line before, a movement
         // or a quit on another thread finds the departure and cancels it, but finds no journey — so
@@ -588,7 +588,7 @@ public final class Travel {
      * <p>Stops itself: it checks the departure every time it draws, so none of the five ways a warm-up
      * ends has to remember to cancel it.
      */
-    private void shimmer(Player traveller, Trip trip) {
+    private void shimmer(Player traveller, Trip trip, Location landing) {
         TravelShow show = show();
         if (show == null || trip.isQuiet()) {
             return;
@@ -621,6 +621,31 @@ public final class Travel {
             de.raindancer.core.ui.effect.ParticleShows.around(traveller, particle.get(), colour, colourTo, density, shape,
                     drawn[0]++, SHIMMER_RANGE, viewer -> true,
                     // Wings live exactly until the next redraw: longer and two frames show at once.
+                    shape.isWings() ? (int) SHIMMER_EVERY_TICKS : null);
+        });
+        if (landing != null && landing.getWorld() != null && show.marksLanding(who, false)) {
+            markLanding(who, landing, particle.get(), colour, colourTo, density, shape);
+        }
+    }
+
+    /**
+     * The same particles where the traveller is about to land, for whoever is standing there — somebody is
+     * coming. Drawn by the region that owns the spot, and only while that spot is loaded: with nobody near it
+     * there is nobody to see it, and drawing must never be what loads it.
+     */
+    private void markLanding(UUID who, Location landing, String particle, Integer colour, Integer colourTo,
+                             int density, de.raindancer.core.ui.effect.ParticleShape shape) {
+        long[] drawn = {0};
+        Scheduling.regionTimer(plugin, landing, 1L, SHIMMER_EVERY_TICKS, task -> {
+            if (!departures.isLeaving(who)) {
+                task.cancel();
+                return;
+            }
+            if (!landing.getWorld().isChunkLoaded(landing.getBlockX() >> 4, landing.getBlockZ() >> 4)) {
+                return;
+            }
+            de.raindancer.core.ui.effect.ParticleShows.at(landing, landing.getYaw(), particle, colour, colourTo,
+                    density, shape, drawn[0]++, SHIMMER_RANGE, viewer -> true,
                     shape.isWings() ? (int) SHIMMER_EVERY_TICKS : null);
         });
     }

@@ -34,7 +34,7 @@ sections:
   - question: Can I see my own nametag?
     title: Your own nametag
     text: |
-      Where names above heads are styled, open {run:/hub}, click <white>Your profile</white> and then <white>Your own nametag</white> — your name then floats above your own head for you too, best seen from behind (F5). The same click hides it again.
+      Where names above heads are styled, you see your own too — best from behind (F5). If it gets in your way, open {run:/hub}, click <white>Your profile</white> and then <white>Your own nametag</white> to hide it for you alone; the same click brings it back.
   - question: Can I change settings?
     title: Settings
     permission: rainscore.settings

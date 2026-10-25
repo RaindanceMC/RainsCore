@@ -259,4 +259,21 @@ class TravelShowTest {
 
         assertThat(show.waitDensity(BO)).isEqualTo(20);
     }
+
+    @Test
+    @DisplayName("the spot somebody is about to land on shimmers while they wait, unless there is nothing to show there")
+    void landingSpot() {
+        assertThat(show.marksLanding(BO, false)).as("the server's waiting particles").isTrue();
+        assertThat(show.marksLanding(BO, true)).as("landing on another server").isFalse();
+
+        show.looks(who -> new TravelLook(null, null, "", null));
+        assertThat(show.marksLanding(BO, false)).as("chose no waiting particles").isFalse();
+
+        TravelShow hiding = new TravelShow(effects, who -> who.equals(BO));
+        assertThat(hiding.marksLanding(BO, false)).as("vanished: nobody may learn they are coming").isFalse();
+        assertThat(hiding.marksLanding(CY, false)).isTrue();
+
+        effects.enabled(false);
+        assertThat(hiding.marksLanding(CY, false)).isFalse();
+    }
 }

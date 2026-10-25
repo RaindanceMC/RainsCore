@@ -123,6 +123,15 @@ public final class TravelShow {
                 .map(ParticleCue::particle);
     }
 
+    /**
+     * Whether the spot the traveller will land on shimmers in their waiting particles while they wait, so
+     * whoever stands there sees somebody is coming. Not for a landing on another server, nor for anybody whose
+     * waiting particles are none — vanished travellers included.
+     */
+    public boolean marksLanding(UUID traveller, boolean otherServer) {
+        return !otherServer && waitParticle(traveller).isPresent();
+    }
+
     /** The traveller's colour for the waiting particle, or empty for white. */
     public Optional<Integer> waitColour(UUID traveller) {
         return Optional.ofNullable(lookFor(traveller).waitColour());
