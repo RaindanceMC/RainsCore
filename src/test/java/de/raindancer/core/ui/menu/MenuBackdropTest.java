@@ -285,4 +285,29 @@ class MenuBackdropTest {
         Component title = light.frame(brand).children().getFirst();
         assertThat(title.children()).allSatisfy(letter -> assertThat(letter.color()).isEqualTo(light.ink()));
     }
+
+    @Test
+    @DisplayName("An owner can switch the paintings off for the whole server")
+    void serverOff() {
+        MenuStyle.install(Set.of(WEARING)::contains, () -> false, id -> true);
+        assertThat(new Page(viewer(WEARING), 6).designed()).isFalse();
+        MenuStyle.install(Set.of(WEARING)::contains, () -> true, id -> true);
+        assertThat(new Page(viewer(WEARING), 6).designed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("A player can switch them off for themselves only")
+    void playerOff() {
+        UUID other = UUID.randomUUID();
+        MenuStyle.install(Set.of(WEARING, other)::contains, () -> true, id -> !id.equals(WEARING));
+        assertThat(new Page(viewer(WEARING), 6).designed()).isFalse();
+        assertThat(new Page(viewer(other), 6).designed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("The player's switch is Core's own, on unless they turn it off")
+    void playerSwitch() {
+        assertThat(MenuStyle.PAINTED.key().toString()).isEqualTo("rainsswitches:rainscore.painted-menus");
+        assertThat(MenuStyle.PAINTED.defaultOn()).isTrue();
+    }
 }

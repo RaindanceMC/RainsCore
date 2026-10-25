@@ -277,6 +277,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private InteractionProtectionListener interactionProtection;
     private Seclusion seclusion;
     private ResourcePacks resourcePacks;
+    private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
     private ChunkHolds chunks;
     private Safety safety;
     private Effects effects;
@@ -915,7 +916,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // a server nobody waits for.
         resourcePacks = new ResourcePacks(getDataFolder().toPath().resolve("packs"),
                 new BukkitPackSink());
-        de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks);
+        de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks, () -> settings.current().menusPainted());
+        menusSwitch = de.raindancer.core.ui.menu.MenuPack.profileSwitch(() -> settings.current().menusPainted());
+        de.raindancer.core.ui.profile.ProfileExtensions.register(menusSwitch);
         startResourcePacks(settings.current());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         if (network.isNetwork()) {
@@ -1303,6 +1306,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public void onDisable() {
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
+        if (menusSwitch != null) {
+            de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
+        }
         groupsFollowing.close();
         de.raindancer.core.platform.permission.Duty.clear();
         if (grants != null && grants.usesLuckPerms()) {

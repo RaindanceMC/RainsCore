@@ -27,6 +27,10 @@ sections:
     title: Profiles
     text: |
       Click a player's name in chat and their profile opens: who they are, how long they have played, and what you can do with them from there.
+  - question: Can I have the plain menus back?
+    title: Painted menus
+    text: |
+      With the server pack on, menus are drawn as wood, brass and parchment. If you would rather have the plain glass windows, open {run:/hub}, click <white>Your profile</white> and then <white>Painted menus</white> — that switches them off for you alone, and the same click brings them back.
   - question: Can I change settings?
     title: Settings
     permission: rainscore.settings

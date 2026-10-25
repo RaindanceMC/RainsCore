@@ -393,7 +393,13 @@ public record CoreConfig(
         @In("config/chat") @Title("Command for the panel")
         @Describe("What players type to open the features panel, as hints name it. The panel answers to /hub and /smp; "
                 + "on a network whose proxy takes /hub to send people to a hub server, set smp.")
-        String hubCommand
+        String hubCommand,
+
+        @In("appearance") @Title("Painted menus")
+        @Describe("Menus drawn as wood, brass and parchment for players wearing the server pack, instead of glass "
+                + "panes. Off: every menu is the classic window for everybody. Players can also switch them off for "
+                + "themselves on their profile.")
+        boolean menusPainted
 
 ) {
 
@@ -441,5 +447,6 @@ public record CoreConfig(
             false, "", "",
             "",
             true,
-            "hub");
+            "hub",
+            true);
 }
