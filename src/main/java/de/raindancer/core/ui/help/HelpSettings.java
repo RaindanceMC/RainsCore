@@ -20,7 +20,8 @@ public record HelpSettings(
 
         @In("config/help") @Title("Guide's skins")
         @Describe("For guides placed as people: a player name, a MineSkin link or mineskin:<id>; several, "
-                + "comma-separated, are shared out. Empty: the black suit. Placed guides keep theirs until placed again.")
+                + "comma-separated, are shared out. Default: the Wise Old Man in his blue robe. Empty: the black suit. "
+                + "Placed guides keep theirs until placed again.")
         String guideSkins,
 
         @In("config/help") @Title("Guide's voice")
@@ -42,6 +43,7 @@ public record HelpSettings(
 
 ) {
 
-    public static final HelpSettings DEFAULTS = new HelpSettings("Guide", "", "block.amethyst_block.chime", true,
+    public static final HelpSettings DEFAULTS = new HelpSettings("Guide",
+            "mineskin:09625d300be0469db9d173dcb6a32bef", "block.amethyst_block.chime", true,
             "", false);
 }
