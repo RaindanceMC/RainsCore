@@ -13,6 +13,9 @@ public final class ScreenRule {
     public static final double LEAST_NUDGE = 0.05;
     public static final double MOST_NUDGE = 10;
 
+    /** Why a player may not put up a screen. */
+    public enum Refusal { OFF, KIND, LIMIT }
+
     /** Who gets a display now, and whose goes. */
     public record Viewers(Set<java.util.UUID> add, Set<java.util.UUID> remove) {
     }
@@ -47,5 +50,47 @@ public final class ScreenRule {
         Set<java.util.UUID> remove = new HashSet<>(showing);
         remove.removeAll(near);
         return new Viewers(Set.copyOf(add), Set.copyOf(remove));
+    }
+
+    public boolean mayTouch(PlacedScreen screen, java.util.UUID who, boolean staff) {
+        return staff || (screen.owner() != null && screen.owner().equals(who));
+    }
+
+    public List<PlacedScreen> mine(List<PlacedScreen> placed, java.util.UUID who) {
+        return placed.stream().filter(screen -> who.equals(screen.owner())).toList();
+    }
+
+    /**
+     * @param on       whether players may put up screens at all
+     * @param own      how many the player has up already
+     * @param excluded kinds players may not put up
+     * @return why not; null when they may
+     */
+    public Refusal mayPlace(boolean on, boolean staff, int own, int limit, String kind, Set<String> excluded) {
+        if (staff) {
+            return null;
+        }
+        if (!on) {
+            return Refusal.OFF;
+        }
+        if (excluded.contains(kind)) {
+            return Refusal.KIND;
+        }
+        return own >= limit ? Refusal.LIMIT : null;
+    }
+
+    /** Kind ids from a comma list, as a setting holds them. */
+    public Set<String> kinds(String setting) {
+        if (setting == null) {
+            return Set.of();
+        }
+        Set<String> found = new HashSet<>();
+        for (String word : setting.split(",")) {
+            String id = word.strip().toLowerCase(java.util.Locale.ROOT);
+            if (!id.isEmpty()) {
+                found.add(id);
+            }
+        }
+        return Set.copyOf(found);
     }
 }

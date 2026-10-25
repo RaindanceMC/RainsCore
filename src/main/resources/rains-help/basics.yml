@@ -8,7 +8,7 @@ category: Getting started
 order: 2
 aliases: [start, new, newbie, beginner, hub, smp, getting-started]
 keywords: [lost, begin, first, menu, features]
-commands: [hub, commands, changelog]
+commands: [hub, commands, changelog, screen]
 related: [guide]
 sections:
   - question: What is there to do here?
@@ -27,6 +27,12 @@ sections:
     title: Profiles
     text: |
       Click a player's name in chat and their profile opens: who they are, how long they have played, and what you can do with them from there.
+  - question: Can I put up screens in my base?
+    title: Screens of your own
+    text: |
+      If the server lets you: stand where it should float — somewhere you may build — and type {run:/screen}. Pick one: the server's status with its meters, charts of the last hours, the player record, your money, your guild, your quests… Screens marked <aqua>everybody near it sees their own</aqua> show each visitor their own stats.
+
+      {cmd:/screen up} and {cmd:/screen down} nudge your nearest screen, {cmd:/screen up 1} as far as you say, {cmd:/screen remove} takes it down, {run:/screen list} shows yours. There is a limit to how many you may have up at once.
   - question: Can I have the plain menus back?
     title: Painted menus
     text: |

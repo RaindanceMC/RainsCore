@@ -1,6 +1,8 @@
 package de.raindancer.core.ui.hologram;
 
 import de.raindancer.core.RainsCore;
+import de.raindancer.core.platform.stats.ServerStats;
+import de.raindancer.core.platform.stats.StatsHistory;
 import de.raindancer.core.social.presence.Playtime;
 import de.raindancer.core.ui.changelog.ChangelogEntry;
 import de.raindancer.core.world.time.Times;
@@ -15,6 +17,7 @@ import org.bukkit.plugin.Plugin;
 import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -48,6 +51,140 @@ public final class CoreScreens {
                 Material.CLOCK, CoreScreens::clock));
         screens.register(core, ScreenKind.everyone("news", "What's new", "The latest published changelog entry.",
                 Material.WRITABLE_BOOK, CoreScreens::news));
+    }
+
+    private static final int COLUMNS = 36;
+    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMMM yyyy, HH:mm", Locale.ENGLISH);
+
+    /** The server's health and history: status now, charts of the last hours, the record of players at once. */
+    public static void registerStats(Screens screens, Plugin core, Server server, ServerStats stats) {
+        screens.register(core, ScreenKind.everyone("server-status", "Server status",
+                "Ticks per second, tick time, memory, processor and players — right now, with meters.",
+                Material.REDSTONE_LAMP, () -> status(server, stats)));
+        screens.register(core, ScreenKind.everyone("chart-tps", "TPS chart", "Ticks per second over the last six hours.",
+                Material.REPEATER, () -> tpsChart(stats)));
+        screens.register(core, ScreenKind.everyone("chart-memory", "Memory chart", "Memory in use over the last six hours.",
+                Material.CHEST_MINECART, () -> memoryChart(stats)));
+        screens.register(core, ScreenKind.everyone("chart-cpu", "Processor chart",
+                "How much of the processor the server took over the last six hours.", Material.OBSERVER, () -> cpuChart(stats)));
+        screens.register(core, ScreenKind.everyone("chart-players", "Players chart",
+                "Players online over the last 24 hours, and today's peak.", Material.PLAYER_HEAD, () -> playersChart(server, stats)));
+        screens.register(core, ScreenKind.everyone("player-record", "Player record",
+                "Most players ever on at once, and today's peak and visitors.", Material.GOLDEN_HELMET, () -> record(server, stats)));
+    }
+
+    private static long minuteNow() {
+        return System.currentTimeMillis() / 60_000;
+    }
+
+    private static String axis(String from) {
+        return "\n<dark_gray>" + from + "                                    now";
+    }
+
+    private static String number(double value) {
+        return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private static Component status(Server server, ServerStats stats) {
+        double tps = stats.tps();
+        double mspt = stats.mspt();
+        Runtime runtime = Runtime.getRuntime();
+        double usedGb = (runtime.totalMemory() - runtime.freeMemory()) / 1073741824.0;
+        double maxGb = runtime.maxMemory() / 1073741824.0;
+        double ram = usedGb * 100 / maxGb;
+        double cpu = ServerStats.cpu();
+        String name = RainsCore.get().serverName();
+        StringBuilder text = new StringBuilder("<gold><bold>" + MINI.escapeTags(name == null || name.isBlank() ? "Server" : name)
+                + "</bold></gold>");
+        text.append("\n<gray>TPS ").append(Double.isNaN(tps) ? "<gray>not measured here"
+                : Charts.meter(tps / 20, Charts.tpsColour(tps)) + " " + Charts.tpsColour(tps) + number(tps));
+        if (!Double.isNaN(mspt)) {
+            text.append("\n<gray>Tick <white>").append(number(mspt)).append(" ms");
+        }
+        text.append("\n<gray>RAM ").append(Charts.meter(ram / 100, Charts.loadColour(ram))).append(" <white>")
+                .append(String.format(Locale.ROOT, "%.1f/%.1f GB", usedGb, maxGb));
+        if (!Double.isNaN(cpu)) {
+            text.append("\n<gray>CPU ").append(Charts.meter(cpu / 100, Charts.loadColour(cpu))).append(" <white>")
+                    .append(Math.round(cpu)).append("%");
+        }
+        text.append("\n<gray>Players <white>").append(visible(server).size()).append("/").append(server.getMaxPlayers())
+                .append(" <dark_gray>· <gray>up <white>")
+                .append(Times.brief(Duration.ofMillis(ManagementFactory.getRuntimeMXBean().getUptime())));
+        return MINI.deserialize(text.toString());
+    }
+
+    private static Component tpsChart(ServerStats stats) {
+        long now = minuteNow();
+        double[] lows = stats.history().columns(StatsHistory.Sample::tps, now - 360, now + 1, COLUMNS, StatsHistory.Mode.LOWEST);
+        double tps = stats.tps();
+        if (Double.isNaN(tps)) {
+            return MINI.deserialize("<gold><bold>TPS</bold></gold>\n<gray>Not measured on this server");
+        }
+        double lowest = java.util.Arrays.stream(lows).filter(v -> !Double.isNaN(v)).min().orElse(tps);
+        return MINI.deserialize("<gold><bold>TPS</bold></gold> <gray>· last 6 hours\n"
+                + Charts.spark(lows, 0, 20, Charts::tpsColour) + axis("-6h")
+                + "\n<gray>now " + Charts.tpsColour(tps) + number(tps) + " <dark_gray>· <gray>lowest "
+                + Charts.tpsColour(lowest) + number(lowest));
+    }
+
+    private static Component memoryChart(ServerStats stats) {
+        long now = minuteNow();
+        double[] used = stats.history().columns(StatsHistory.Sample::ramPercent, now - 360, now + 1, COLUMNS,
+                StatsHistory.Mode.HIGHEST);
+        StatsHistory.Sample latest = stats.history().latest();
+        double highest = java.util.Arrays.stream(used).filter(v -> !Double.isNaN(v)).max().orElse(0);
+        String nowText = latest == null ? "" : String.format(Locale.ROOT, "%.1f/%.1f GB", latest.ramUsed() / 1024.0,
+                latest.ramMax() / 1024.0);
+        return MINI.deserialize("<gold><bold>Memory</bold></gold> <gray>· last 6 hours\n"
+                + Charts.spark(used, 0, 100, Charts::loadColour) + axis("-6h")
+                + "\n<gray>now <white>" + nowText + " <dark_gray>· <gray>highest " + Charts.loadColour(highest)
+                + Math.round(highest) + "%");
+    }
+
+    private static Component cpuChart(ServerStats stats) {
+        long now = minuteNow();
+        double[] load = stats.history().columns(StatsHistory.Sample::cpu, now - 360, now + 1, COLUMNS,
+                StatsHistory.Mode.AVERAGE);
+        double cpu = ServerStats.cpu();
+        if (Double.isNaN(cpu)) {
+            return MINI.deserialize("<gold><bold>Processor</bold></gold>\n<gray>Not measured on this server");
+        }
+        double highest = java.util.Arrays.stream(load).filter(v -> !Double.isNaN(v)).max().orElse(cpu);
+        return MINI.deserialize("<gold><bold>Processor</bold></gold> <gray>· last 6 hours\n"
+                + Charts.spark(load, 0, 100, Charts::loadColour) + axis("-6h")
+                + "\n<gray>now " + Charts.loadColour(cpu) + Math.round(cpu) + "% <dark_gray>· <gray>highest "
+                + Charts.loadColour(highest) + Math.round(highest) + "%");
+    }
+
+    private static long todayFrom() {
+        return LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() / 60_000;
+    }
+
+    private static Component playersChart(Server server, ServerStats stats) {
+        long now = minuteNow();
+        double[] most = stats.history().columns(sample -> sample.players(), now - 1440, now + 1, COLUMNS,
+                StatsHistory.Mode.HIGHEST);
+        double top = Math.max(1, java.util.Arrays.stream(most).filter(v -> !Double.isNaN(v)).max().orElse(1));
+        int peak = Math.max(stats.history().peakSince(todayFrom()), visible(server).size());
+        return MINI.deserialize("<gold><bold>Players</bold></gold> <gray>· last 24 hours\n"
+                + Charts.spark(most, 0, top, value -> "<aqua>") + axis("-24h")
+                + "\n<gray>now <white>" + visible(server).size() + " <dark_gray>· <gray>peak today <white>" + peak);
+    }
+
+    private static Component record(Server server, ServerStats stats) {
+        StatsHistory.Record record = stats.history().record();
+        int peak = Math.max(stats.history().peakSince(todayFrom()), visible(server).size());
+        int visitors = stats.history().playersOn(LocalDate.now());
+        StringBuilder text = new StringBuilder("<gold><bold>Player record</bold></gold>");
+        if (record.players() == 0) {
+            text.append("\n<gray>Nobody yet");
+        } else {
+            text.append("\n<gray>Most at once <gold><bold>").append(record.players()).append("</bold></gold>")
+                    .append("\n<dark_gray>").append(WHEN.format(Instant.ofEpochMilli(record.at()).atZone(ZoneId.systemDefault())));
+        }
+        text.append("\n<gray>Today: peak <white>").append(peak).append(" <dark_gray>· <white>").append(visitors)
+                .append(" <gray>player").append(visitors == 1 ? "" : "s");
+        return MINI.deserialize(text.toString());
     }
 
     private static Playtime playtime() {

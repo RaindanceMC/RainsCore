@@ -32,6 +32,8 @@ sections:
       Stand where it should float and type {run:/screen} — every kind there is, from every plugin, click one to put it up over your head. Some show the same to everybody (who is online, the richest, the top guilds); others show every player near them their <i>own</i> (their money, their guild, their quests, their playtime).
 
       {cmd:/screen up} and {cmd:/screen down} nudge the nearest a quarter block, {cmd:/screen up 1} as far as you say, {cmd:/screen up 0.5 #3} screen number 3 wherever you are. {cmd:/screen move <number>} brings one over your head, {cmd:/screen remove} takes the nearest away, {run:/screen list} shows them all with their numbers.
+
+      Players may put up a few of their own where they may build — switch it off, change how many, or keep kinds for staff in {run:/settings} under screens. You handle every screen, theirs too; they only their own. Charts: <white>server-status</white>, <white>chart-tps</white>, <white>chart-memory</white>, <white>chart-cpu</white>, <white>chart-players</white> and <white>player-record</white> — measured once a minute, kept across restarts.
   - question: How do I place a guide at spawn?
     title: Placing a guide
     permission: rainscore.help.guide

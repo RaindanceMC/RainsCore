@@ -237,6 +237,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.ui.chat.PrefixService prefixes;
     private de.raindancer.core.ui.identity.Nametags nametags;
     private de.raindancer.core.ui.hologram.Screens screens;
+    private de.raindancer.core.platform.stats.ServerStats serverStats;
     private Grants grants;
     private de.raindancer.core.platform.permission.PermissionGroups groups =
             de.raindancer.core.platform.permission.PermissionGroups.NONE;
@@ -821,6 +822,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("screens.yml")));
         getServer().getPluginManager().registerEvents(screens, this);
         de.raindancer.core.ui.hologram.CoreScreens.register(screens, this, getServer());
+        serverStats = new de.raindancer.core.platform.stats.ServerStats(this, getServer(),
+                new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("server-stats.yml")),
+                System::currentTimeMillis);
+        getServer().getPluginManager().registerEvents(serverStats, this);
+        serverStats.start();
+        de.raindancer.core.ui.hologram.CoreScreens.registerStats(screens, this, getServer(), serverStats);
+        de.raindancer.core.ui.hologram.ScreenRule screenRule = new de.raindancer.core.ui.hologram.ScreenRule();
+        screens.players(() -> settings.current().playerScreens(),
+                () -> Math.max(0, settings.current().playerScreensEach()),
+                () -> screenRule.kinds(settings.current().staffOnlyScreens()));
         screens.start();
         startNetworkWhitelist();
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
@@ -1489,6 +1500,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (screens != null) {
             screens.stop();
+        }
+        if (serverStats != null) {
+            serverStats.stop();
         }
         if (tablists != null) {
             // Before anything else: the teams it makes live on the main scoreboard, and one left
@@ -2510,6 +2524,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.ui.hologram.Screens screens() {
         return screens;
+    }
+
+    @Override
+    public de.raindancer.core.platform.stats.ServerStats serverStats() {
+        return serverStats;
     }
 
     @Override

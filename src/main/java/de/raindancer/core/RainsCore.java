@@ -473,6 +473,12 @@ public interface RainsCore {
     de.raindancer.core.ui.hologram.Screens screens();
 
     /**
+     * The server measured once a minute — ticks, memory, processor, players — for the last day, the record of players
+     * at once and who came today; kept across restarts.
+     */
+    de.raindancer.core.platform.stats.ServerStats serverStats();
+
+    /**
      * Doing things to a player from a management screen — heal, feed, starve, effects, flight,
      * gamemode, kick.
      *

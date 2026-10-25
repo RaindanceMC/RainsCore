@@ -98,4 +98,51 @@ class ScreenRuleTest {
         assertThatThrownBy(() -> ScreenKind.everyone("Two Words", "x", "x", Material.STONE, Component::empty))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("a player's screen carries its owner on its line; staff screens have none, as before")
+    void owners() {
+        UUID ada = UUID.randomUUID();
+        PlacedScreen own = new PlacedScreen(4, "w", 1, 64, 1, "balance", ada);
+        assertThat(own.line()).endsWith(" balance " + ada);
+        assertThat(PlacedScreen.parse(own.line())).contains(own);
+        assertThat(PlacedScreen.parse("3 lobby 1.00 2.00 3.00 online")).get()
+                .extracting(PlacedScreen::owner).isNull();
+        assertThat(own.raised(1).owner()).isEqualTo(ada);
+        assertThat(own.at("x", 0, 0, 0).owner()).isEqualTo(ada);
+        assertThat(PlacedScreen.parse("3 lobby 1 2 3 online not-a-uuid")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("players touch only their own screens; staff touch every one")
+    void touching() {
+        UUID ada = UUID.randomUUID();
+        UUID bo = UUID.randomUUID();
+        PlacedScreen adas = new PlacedScreen(1, "w", 0, 64, 0, "balance", ada);
+        PlacedScreen staffs = new PlacedScreen(2, "w", 0, 64, 0, "online");
+        assertThat(rule.mayTouch(adas, ada, false)).isTrue();
+        assertThat(rule.mayTouch(adas, bo, false)).isFalse();
+        assertThat(rule.mayTouch(staffs, ada, false)).isFalse();
+        assertThat(rule.mayTouch(adas, bo, true)).isTrue();
+        assertThat(rule.mine(List.of(adas, staffs), ada)).containsExactly(adas);
+    }
+
+    @Test
+    @DisplayName("a player may put one up while the switch is on, the kind is allowed and they are under their limit")
+    void placing() {
+        assertThat(rule.mayPlace(true, false, 2, 3, "balance", Set.of())).isNull();
+        assertThat(rule.mayPlace(true, false, 3, 3, "balance", Set.of())).isEqualTo(ScreenRule.Refusal.LIMIT);
+        assertThat(rule.mayPlace(false, false, 0, 3, "balance", Set.of())).isEqualTo(ScreenRule.Refusal.OFF);
+        assertThat(rule.mayPlace(true, false, 0, 3, "online", Set.of("online")))
+                .isEqualTo(ScreenRule.Refusal.KIND);
+        assertThat(rule.mayPlace(false, true, 99, 3, "online", Set.of("online"))).as("staff always").isNull();
+    }
+
+    @Test
+    @DisplayName("the kinds players may not put up, read from a comma list")
+    void excluded() {
+        assertThat(rule.kinds(" online, Moderation-Staff ,,")).containsExactlyInAnyOrder("online", "moderation-staff");
+        assertThat(rule.kinds("")).isEmpty();
+        assertThat(rule.kinds(null)).isEmpty();
+    }
 }

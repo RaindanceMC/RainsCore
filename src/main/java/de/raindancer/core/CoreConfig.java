@@ -45,6 +45,8 @@ import org.bukkit.Material;
                 description = "The one pack every plugin's assets go into, and how it is served."),
         @Topic(path = "moderation/chatlog", title = "Chat log", icon = Material.BOOK,
                 description = "What everybody said in chat, kept for staff for a while."),
+        @Topic(path = "config/screens", title = "Screens", icon = Material.ITEM_FRAME,
+                description = "Screens floating in the world (/screen): what players may put up in their bases."),
         @Topic(path = "world/desks", title = "Attendants", icon = Material.ARMOR_STAND,
                 description = "People standing in the world who serve players: insurance agents and bankers."),
         @Topic(path = "moderation", title = "Moderation", icon = Material.IRON_AXE,
@@ -399,7 +401,21 @@ public record CoreConfig(
         @Describe("Menus drawn as wood, brass and parchment for players wearing the server pack, instead of glass "
                 + "panes. Off: every menu is the classic window for everybody. Players can also switch them off for "
                 + "themselves on their profile.")
-        boolean menusPainted
+        boolean menusPainted,
+
+        @In("config/screens") @Title("Players put up screens")
+        @Describe("Whether players may put up screens of their own — /screen — where they may build, their base: the "
+                + "server's status, their money, their guild… Staff always may, anywhere.")
+        boolean playerScreens,
+
+        @In("config/screens") @Title("Screens each player may put up") @Range(min = 0, max = 50)
+        @Describe("How many screens one player may have up at a time.")
+        int playerScreensEach,
+
+        @In("config/screens") @Title("Screens only staff put up")
+        @Describe("The kinds players may not put up, by name, comma separated (the names /screen place shows), "
+                + "e.g. moderation-staff, online. Empty: every kind.")
+        String staffOnlyScreens
 
 ) {
 
@@ -448,5 +464,7 @@ public record CoreConfig(
             "",
             true,
             "hub",
-            true);
+            true,
+            // Players put up a few screens in their bases; three keeps a busy server's refresh cheap.
+            true, 3, "");
 }

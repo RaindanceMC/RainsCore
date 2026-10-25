@@ -69,6 +69,9 @@ public final class Screens implements Listener {
     private final Map<Integer, Live> live = new ConcurrentHashMap<>();
     private final Set<String> failing = ConcurrentHashMap.newKeySet();
     private ScheduledTask timer;
+    private volatile java.util.function.BooleanSupplier playersMayPlace = () -> false;
+    private volatile java.util.function.IntSupplier eachPlayer = () -> 0;
+    private volatile java.util.function.Supplier<Set<String>> notForPlayers = Set::of;
 
     public Screens(Plugin plugin, Server server, YamlStore file) {
         this.plugin = plugin;
@@ -85,6 +88,41 @@ public final class Screens implements Listener {
         if (before != null && !before.owner().equals(owner)) {
             log.warn("Screen kind '{}' of {} replaced by {}'s.", kind.id(), before.owner().getName(), owner.getName());
         }
+    }
+
+    /**
+     * What players may put up in their bases: whether at all, how many each, and the kinds they may not (staff, with
+     * {@link ScreenCommand#PERMISSION}, may always put up any).
+     */
+    public void players(java.util.function.BooleanSupplier on, java.util.function.IntSupplier each,
+                        java.util.function.Supplier<Set<String>> excluded) {
+        playersMayPlace = on;
+        eachPlayer = each;
+        notForPlayers = excluded;
+    }
+
+    /** Why this player may not put up a screen of this kind now; null when they may. */
+    public ScreenRule.Refusal refusal(Player player, String kind, boolean staff) {
+        return rule.mayPlace(playersMayPlace.getAsBoolean(), staff, rule.mine(placed, player.getUniqueId()).size(),
+                eachPlayer.getAsInt(), kind, notForPlayers.get());
+    }
+
+    /** Whether players may put up screens at all. */
+    public boolean forPlayersAtAll() {
+        return playersMayPlace.getAsBoolean();
+    }
+
+    /** How many screens this player has up. */
+    public int countOf(UUID player) {
+        return rule.mine(placed, player).size();
+    }
+
+    public int limit() {
+        return eachPlayer.getAsInt();
+    }
+
+    public boolean forPlayers(String kind) {
+        return playersMayPlace.getAsBoolean() && !notForPlayers.get().contains(kind);
     }
 
     public void unregister(String id) {
@@ -134,10 +172,15 @@ public final class Screens implements Listener {
         }
     }
 
-    /** A new screen of {@code kind} at {@code at}. */
-    public synchronized PlacedScreen place(Location at, ScreenKind kind) {
+    /** A new screen of {@code kind} at {@code at}, put up by staff. */
+    public PlacedScreen place(Location at, ScreenKind kind) {
+        return place(at, kind, null);
+    }
+
+    /** A new screen of {@code kind} at {@code at}; {@code owner} the player whose it is, null for staff. */
+    public synchronized PlacedScreen place(Location at, ScreenKind kind, UUID owner) {
         PlacedScreen screen = new PlacedScreen(rule.nextNumber(placed), at.getWorld().getName(), at.getX(), at.getY(),
-                at.getZ(), kind.id());
+                at.getZ(), kind.id(), owner);
         placed.add(screen);
         save();
         Scheduling.async(plugin, this::refresh);
@@ -148,10 +191,16 @@ public final class Screens implements Listener {
      * The screen meant: by number, or the nearest to {@code near} within {@value #REACH} blocks.
      */
     public Optional<PlacedScreen> find(Location near, Integer number) {
+        return find(near, number, screen -> true);
+    }
+
+    /** As {@link #find(Location, Integer)}, among the screens {@code which} lets through — a player's own. */
+    public Optional<PlacedScreen> find(Location near, Integer number, java.util.function.Predicate<PlacedScreen> which) {
+        List<PlacedScreen> among = placed.stream().filter(which).toList();
         if (number != null) {
-            return placed.stream().filter(screen -> screen.number() == number).findFirst();
+            return among.stream().filter(screen -> screen.number() == number).findFirst();
         }
-        return rule.nearest(placed, near.getWorld().getName(), near.getX(), near.getY(), near.getZ(), REACH);
+        return rule.nearest(among, near.getWorld().getName(), near.getX(), near.getY(), near.getZ(), REACH);
     }
 
     public synchronized boolean remove(PlacedScreen screen) {
@@ -205,8 +254,16 @@ public final class Screens implements Listener {
             }
             ScreenKind kind = registered.kind();
             if (!kind.personal()) {
-                Component text = render(kind, null);
-                Scheduling.region(plugin, where, () -> showShared(screen, where, text));
+                // Asked only where somebody is near to read it: a base's screens cost nothing while nobody is home.
+                Scheduling.region(plugin, where, () -> {
+                    if (!where.isChunkLoaded() || where.getNearbyPlayers(RANGE * 2).isEmpty()) {
+                        return;
+                    }
+                    Scheduling.async(plugin, () -> {
+                        Component text = render(kind, null);
+                        Scheduling.region(plugin, where, () -> showShared(screen, where, text));
+                    });
+                });
                 continue;
             }
             Scheduling.region(plugin, where, () -> {
