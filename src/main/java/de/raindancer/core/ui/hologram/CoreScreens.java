@@ -160,21 +160,34 @@ public final class CoreScreens {
         return LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() / 60_000;
     }
 
+    /** Players over the day: from the journal, network-wide, where it is on; else this server's own samples. */
     private static Component playersChart(Server server, ServerStats stats) {
         long now = minuteNow();
-        double[] most = stats.history().columns(sample -> sample.players(), now - 1440, now + 1, COLUMNS,
-                StatsHistory.Mode.HIGHEST);
+        long millis = System.currentTimeMillis();
+        var journal = stats.journal();
+        double[] most = journal.map(timeline -> timeline.columns(millis - 86_400_000L, millis, COLUMNS))
+                .orElseGet(() -> stats.history().columns(sample -> sample.players(), now - 1440, now + 1, COLUMNS,
+                        StatsHistory.Mode.HIGHEST));
         double top = Math.max(1, java.util.Arrays.stream(most).filter(v -> !Double.isNaN(v)).max().orElse(1));
-        int peak = Math.max(stats.history().peakSince(todayFrom()), visible(server).size());
-        return MINI.deserialize("<gold><bold>Players</bold></gold> <gray>· last 24 hours\n"
+        int peak = Math.max(peakToday(stats), visible(server).size());
+        boolean network = journal.isPresent() && RainsCore.get().network() != null && RainsCore.get().network().isNetwork();
+        return MINI.deserialize("<gold><bold>Players</bold></gold> <gray>· last 24 hours" + (network ? " · network" : "") + "\n"
                 + Charts.spark(most, 0, top, value -> "<aqua>") + axis("-24h")
                 + "\n<gray>now <white>" + visible(server).size() + " <dark_gray>· <gray>peak today <white>" + peak);
     }
 
+    private static int peakToday(ServerStats stats) {
+        long from = todayFrom() * 60_000;
+        int fromJournal = stats.journal().map(timeline -> (int) timeline.columns(from, System.currentTimeMillis(), 1)[0])
+                .orElse(0);
+        return Math.max(fromJournal, stats.history().peakSince(todayFrom()));
+    }
+
     private static Component record(Server server, ServerStats stats) {
         StatsHistory.Record record = stats.history().record();
-        int peak = Math.max(stats.history().peakSince(todayFrom()), visible(server).size());
-        int visitors = stats.history().playersOn(LocalDate.now());
+        int peak = Math.max(peakToday(stats), visible(server).size());
+        int visitors = Math.max(stats.history().playersOn(LocalDate.now()),
+                stats.journal().map(timeline -> timeline.visitorsSince(todayFrom() * 60_000)).orElse(0));
         StringBuilder text = new StringBuilder("<gold><bold>Player record</bold></gold>");
         if (record.players() == 0) {
             text.append("\n<gray>Nobody yet");

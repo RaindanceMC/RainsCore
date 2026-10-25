@@ -824,7 +824,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.ui.hologram.CoreScreens.register(screens, this, getServer());
         serverStats = new de.raindancer.core.platform.stats.ServerStats(this, getServer(),
                 new de.raindancer.core.data.store.YamlStore(getDataFolder().toPath().resolve("server-stats.yml")),
-                System::currentTimeMillis);
+                System::currentTimeMillis, () -> settings.current().auditEnabled() ? audit : null);
         getServer().getPluginManager().registerEvents(serverStats, this);
         serverStats.start();
         de.raindancer.core.ui.hologram.CoreScreens.registerStats(screens, this, getServer(), serverStats);
