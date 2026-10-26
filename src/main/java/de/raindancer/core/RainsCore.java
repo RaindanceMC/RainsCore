@@ -457,6 +457,9 @@ public interface RainsCore {
     /** How long everybody has played here, and how much of it actively — counted by Core, a minute at a time. */
     de.raindancer.core.social.presence.Playtime playtime();
 
+    /** Who has bought the owner a coffee, across the network — for whatever thanks them to ask. */
+    de.raindancer.core.social.support.Supporters supporters();
+
     /** Everybody's ping over the last hour on this server, sampled every few seconds — also for a while after they left. */
     de.raindancer.core.moderation.players.PingHistory pingHistory();
 

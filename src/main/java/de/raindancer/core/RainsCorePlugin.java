@@ -288,6 +288,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Votes votes;
     private Vanish vanish;
     private de.raindancer.core.social.presence.Playtime playtime;
+    private de.raindancer.core.social.support.Supporters supporters;
+    private de.raindancer.core.platform.network.NetworkBus.Subscription supportersWatch;
     private final de.raindancer.core.moderation.players.PingHistory pingHistory =
             new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
     private de.raindancer.core.moderation.chatlog.ChatLog chatLog;
@@ -778,6 +780,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // A 1.x server's playtime.yml, brought into the database once (its minutes added) and kept renamed.
         playtime.importFrom(getDataFolder().toPath().resolve("playtime.yml"));
         playtime.connect(bus);
+        supporters = new de.raindancer.core.social.support.Supporters(
+                de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("supporters.yml")));
+        supporters.load();
+        supportersWatch = supporters.watch();
         // Every player's inventory into the network's database, per server: staff see it from anywhere, and it
         // outlives the server's files. Not applied on join — inventories stay each server's own.
         savedInventories = new de.raindancer.core.data.inventory.SavedInventories(databases.core(), System::currentTimeMillis);
@@ -862,6 +868,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         Scheduling.globalTimer(this, 20L * 60 * 5, 20L * 60 * 5, ignored -> {
             if (playtime.isDirty()) {
                 Scheduling.async(this, playtime::save);
+            }
+            if (supporters.isDirty()) {
+                Scheduling.async(this, supporters::save);
             }
             if (knownNames.isDirty()) {
                 Scheduling.async(this, knownNames::save);
@@ -1333,6 +1342,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(ownNametagSwitch);
         }
         groupsFollowing.close();
+        if (supportersWatch != null) {
+            supportersWatch.close();
+        }
         de.raindancer.core.platform.permission.Duty.clear();
         if (grants != null && grants.usesLuckPerms()) {
             de.raindancer.core.platform.permission.LuckPermsGroups.stop(groups);
@@ -1375,6 +1387,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (playtime != null && playtime.isDirty()) {
             playtime.save();
+        }
+        if (supporters != null && supporters.isDirty()) {
+            supporters.save();
         }
         if (knownNames != null && knownNames.isDirty()) {
             knownNames.save();
@@ -2494,6 +2509,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.social.presence.Playtime playtime() {
         return playtime;
+    }
+
+    @Override
+    public de.raindancer.core.social.support.Supporters supporters() {
+        return supporters;
     }
 
     @Override

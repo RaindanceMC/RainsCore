@@ -94,6 +94,9 @@ public final class ParticleCatalogue {
         if (name.isEmpty()) {
             return ParticleGroup.OTHER;
         }
+        if (de.raindancer.core.ui.effect.ParticleShows.isOwn(name)) {
+            return ParticleGroup.EMOTES;
+        }
         if (needsExtraData(name) && !name.startsWith("BLOCK") && !name.startsWith("ITEM")
                 && !name.startsWith("FALLING_DUST")) {
             return ParticleGroup.COLOURED;
@@ -191,6 +194,7 @@ public final class ParticleCatalogue {
             case "DUST", "DUST_COLOR_TRANSITION" -> "RED_DYE";
             case "BLOCK", "BLOCK_MARKER", "FALLING_DUST" -> "GRASS_BLOCK";
             case "ITEM" -> "ITEM_FRAME";
+            case "COFFEE" -> "COCOA_BEANS";
             default -> groupOf(name).icon();
         };
     }

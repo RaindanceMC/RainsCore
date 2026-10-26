@@ -21,11 +21,27 @@ import java.util.function.Predicate;
  */
 public final class ParticleShows {
 
+    /** Core's own particle, not one of Minecraft's: cocoa beans tumbling down, every fourth point a curl of steam. */
+    public static final String COFFEE = "COFFEE";
+
     private ParticleShows() {
+    }
+
+    /** Whether this is one of Core's own particles rather than Minecraft's. */
+    public static boolean isOwn(String particle) {
+        return particle != null && COFFEE.equalsIgnoreCase(particle.trim());
+    }
+
+    /** Which points of {@link #COFFEE} are steam rather than beans. */
+    static boolean isSteam(int index) {
+        return index % 4 == 3;
     }
 
     /** Whether this particle can be drawn with nothing but, at most, a colour. */
     public static boolean canShow(String particle) {
+        if (isOwn(particle)) {
+            return true;
+        }
         Particle found = particleOf(particle);
         if (found == null) {
             return false;
@@ -37,7 +53,7 @@ public final class ParticleShows {
     /** Whether it needs a colour to show — dust and the tinted ones. */
     public static boolean takesColour(String particle) {
         Particle found = particleOf(particle);
-        return found != null && found.getDataType() != Void.class && canShow(particle);
+        return !isOwn(particle) && found != null && found.getDataType() != Void.class && canShow(particle);
     }
 
     /**
@@ -110,7 +126,8 @@ public final class ParticleShows {
         Particle drawn = drawnAs(particle, lifetimeTicks);
         boolean trail = drawn == Particle.TRAIL && found != Particle.TRAIL;
         int from = colour == null ? 0xFFFFFF : colour;
-        Object single = BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
+        boolean own = isOwn(particle);
+        Object single = own ? beans() : BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
         boolean blended = colourTo != null && takesColour(particle);
         List<double[]> offsets = shape.offsets(tick, yaw, count);
         for (int index = 0; index < offsets.size(); index++) {
@@ -124,6 +141,10 @@ public final class ParticleShows {
             int rgb = blended ? colourAlong(from, colourTo, offset[3]) : from;
             Object data = trail ? trailData(new Location(world, x, y, z), rgb, lifetimeTicks)
                     : blended ? BukkitEffectSink.dataFor(found.getDataType(), rgb, dustSize(count)) : single;
+            if (own && isSteam(index)) {
+                world.spawnParticle(Particle.WHITE_SMOKE, viewers, source, x, y + 0.2, z, 1, 0, 0.02, 0, 0.01, null);
+                continue;
+            }
             world.spawnParticle(drawn, viewers, source, x, y, z, 1, 0, 0, 0, 0, data);
         }
     }
@@ -143,6 +164,9 @@ public final class ParticleShows {
 
     /** What is actually spawned: a coloured particle given a lifetime becomes a trail point, which has one. */
     public static Particle drawnAs(String particle, Integer lifetimeTicks) {
+        if (isOwn(particle)) {
+            return Particle.ITEM;
+        }
         Particle found = particleOf(particle);
         if (found == null) {
             return null;
@@ -196,7 +220,8 @@ public final class ParticleShows {
             return;
         }
         int from = colour == null ? 0xFFFFFF : colour;
-        Object single = BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
+        boolean own = isOwn(particle);
+        Object single = own ? beans() : BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
         boolean blended = colourTo != null && takesColour(particle);
         long rounds = Math.max(1, seconds) * 10L;
         long[] drawn = {0};
@@ -208,12 +233,19 @@ public final class ParticleShows {
             Location eye = viewer.getEyeLocation();
             Location feet = eye.clone().add(eye.getDirection().setY(0).normalize().multiply(3)).add(0, -1.6, 0);
             long frame = (long) Math.floor(drawn[0] * Math.max(0.1, speed));
-            for (double[] offset : shape.offsets(frame, eye.getYaw() + 180, count)) {
+            List<double[]> points = shape.offsets(frame, eye.getYaw() + 180, count);
+            for (int index = 0; index < points.size(); index++) {
+                double[] offset = points.get(index);
+                if (own && isSteam(index)) {
+                    viewer.spawnParticle(Particle.WHITE_SMOKE, feet.getX() + offset[0], feet.getY() + offset[1] + 0.2,
+                            feet.getZ() + offset[2], 1, 0, 0.02, 0, 0.01);
+                    continue;
+                }
                 Object data = blended
                         ? BukkitEffectSink.dataFor(found.getDataType(), colourAlong(from, colourTo, offset[3]),
                             dustSize(count))
                         : single;
-                viewer.spawnParticle(found, feet.getX() + offset[0], feet.getY() + offset[1],
+                viewer.spawnParticle(own ? Particle.ITEM : found, feet.getX() + offset[0], feet.getY() + offset[1],
                         feet.getZ() + offset[2], 1, 0, 0, 0, 0, data);
             }
         });
@@ -224,9 +256,16 @@ public final class ParticleShows {
         return BukkitEffectSink.dataFor(particle.getDataType(), 0xFFFFFF);
     }
 
+    private static org.bukkit.inventory.ItemStack beans() {
+        return new org.bukkit.inventory.ItemStack(org.bukkit.Material.COCOA_BEANS);
+    }
+
     static Particle particleOf(String name) {
         if (name == null || name.isBlank()) {
             return null;
+        }
+        if (isOwn(name)) {
+            return Particle.ITEM;
         }
         try {
             return Particle.valueOf(name.trim().toUpperCase(Locale.ROOT));

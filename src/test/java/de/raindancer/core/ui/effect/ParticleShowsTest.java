@@ -96,4 +96,20 @@ class ParticleShowsTest {
         }
         assertThat(ParticleShows.isDrawnNow(7, 5, 1)).as("a share of one is every point").isTrue();
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("COFFEE is Core's own particle: shown without a colour, drawn as tumbling beans with a curl of steam")
+    void coffee() {
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.canShow("COFFEE")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.canShow("coffee")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.takesColour("COFFEE")).isFalse();
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.drawnAs("COFFEE", null))
+                .isEqualTo(org.bukkit.Particle.ITEM);
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.drawnAs("COFFEE", 5))
+                .as("a lifetime is for coloured particles only").isEqualTo(org.bukkit.Particle.ITEM);
+        long steam = java.util.stream.IntStream.range(0, 12).filter(ParticleShows::isSteam).count();
+        org.assertj.core.api.Assertions.assertThat(steam).isEqualTo(3);
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.isOwn("COFFEE")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(ParticleShows.isOwn("FLAME")).isFalse();
+    }
 }
