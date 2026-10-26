@@ -4,3 +4,4 @@ target/
 .serena/
 /build/
 dependency-reduced-pom.xml
+__pycache__/
