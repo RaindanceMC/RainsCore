@@ -37,8 +37,8 @@ public final class CoreScreens {
     }
 
     public static void register(Screens screens, Plugin core, Server server) {
-        screens.register(core, ScreenKind.personal("welcome", "Welcome", "Greets everybody by name, with how long they have played here.",
-                Material.OAK_SIGN, viewer -> welcome(viewer)));
+        screens.register(core, ScreenKind.personal("welcome", "Welcome", "Greets everybody by name and says who else is on.",
+                Material.OAK_SIGN, viewer -> welcome(server, viewer)));
         screens.register(core, ScreenKind.personal("profile", "Your profile", "Everybody's own: playtime, how much of it active, and when they first came.",
                 Material.PLAYER_HEAD, viewer -> profile(server, viewer)));
         screens.register(core, ScreenKind.personal("playtime-you", "Your playtime", "Everybody's own time played on the network.",
@@ -204,15 +204,26 @@ public final class CoreScreens {
         return RainsCore.get().playtime();
     }
 
-    private static Component welcome(ScreenKind.Viewer viewer) {
+    /** Playtime only decides "Welcome" or "Welcome back" — a greeting that counts somebody's hours feels like being watched. */
+    private static Component welcome(Server server, ScreenKind.Viewer viewer) {
         Playtime playtime = playtime();
-        long minutes = playtime == null ? 0 : playtime.minutes(viewer.id());
-        String name = MINI.escapeTags(viewer.name());
-        if (minutes < 5) {
-            return MINI.deserialize("<gold><bold>Welcome, " + name + "!</bold></gold>\n<gray>Glad you're here. Try <white>/help</white>.");
+        boolean newcomer = playtime == null || playtime.minutes(viewer.id()) < 5;
+        int others = (int) visible(server).stream().filter(player -> !player.getUniqueId().equals(viewer.id())).count();
+        return MINI.deserialize(welcomeText(viewer.name(), RainsCore.get().serverName(), others, newcomer));
+    }
+
+    static String welcomeText(String name, String serverName, int others, boolean newcomer) {
+        String who = MINI.escapeTags(name);
+        String where = "<white>" + MINI.escapeTags(serverName == null || serverName.isBlank() ? "the server" : serverName) + "</white>";
+        StringBuilder text = new StringBuilder(newcomer
+                ? "<gold><bold>Welcome, " + who + "!</bold></gold>\n<gray>Glad you found " + where + "."
+                : "<gold><bold>Welcome back, " + who + "!</bold></gold>\n<gray>Good to see you on " + where + " again.");
+        text.append(others == 0 ? "\n<gray>It's quiet — you're the only one on."
+                : "\n<gray><white>" + others + "</white> other player" + (others == 1 ? "" : "s") + " on right now.");
+        if (newcomer) {
+            text.append("\n<gray>New here? Try <white>/help</white>.");
         }
-        return MINI.deserialize("<gold><bold>Welcome back, " + name + "!</bold></gold>\n<gray>You've played <white>"
-                + Times.describe(Duration.ofMinutes(minutes)) + "</white> here.");
+        return text.toString();
     }
 
     private static Component profile(Server server, ScreenKind.Viewer viewer) {
