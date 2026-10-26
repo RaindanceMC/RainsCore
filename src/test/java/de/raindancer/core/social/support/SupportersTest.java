@@ -95,8 +95,41 @@ class SupportersTest {
 
         Supporters reread = fresh();
 
-        assertThat(reread.of(player).orElseThrow()).isEqualTo(new Supporters.Supporter(player, first, 2, true));
+        assertThat(reread.of(player).orElseThrow()).isEqualTo(new Supporters.Supporter(player, first, 2, true, 0, 0, 1, false));
         assertThat(reread.isSupporter(gone)).isFalse();
         assertThat(reread.all()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("what they gave adds up, before fees and after, and survives a restart")
+    void amounts() {
+        Supporters supporters = fresh();
+        supporters.credit(player, 1, 500, 432, first);
+        supporters.credit(player, 2, 1000, 901, first.plusSeconds(60));
+        supporters.save();
+
+        Supporters.Supporter them = fresh().of(player).orElseThrow();
+
+        assertThat(them.coffees()).isEqualTo(3);
+        assertThat(them.cents()).isEqualTo(1500);
+        assertThat(them.netCents()).isEqualTo(1333);
+        assertThat(them.supports()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("a membership is remembered until it ends, and only for a supporter")
+    void membership() {
+        Supporters supporters = fresh();
+        supporters.member(player, true);
+        assertThat(supporters.of(player)).as("not a supporter yet").isEmpty();
+
+        supporters.credit(player, 1, 500, 430, first);
+        supporters.member(player, true);
+        supporters.save();
+        assertThat(fresh().of(player).orElseThrow().member()).isTrue();
+
+        supporters.member(player, false);
+        assertThat(supporters.of(player).orElseThrow().member()).isFalse();
+        assertThat(supporters.of(player).orElseThrow().supports()).isEqualTo(1);
     }
 }

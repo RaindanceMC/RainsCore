@@ -25,6 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *   &lt;uuid&gt;:
  *     since: 2026-10-26T10:00:00Z
  *     coffees: 3
+ *     cents: 1500        # what they gave, before fees, in the smallest unit of the currency
+ *     net-cents: 1281    # what reached the owner, as far as anybody could tell
+ *     supports: 2        # how many times they supported
+ *     member: true       # a membership running right now
  *     thanked: true
  * </pre>
  * A reload keeps what this server has not written yet; a document that cannot be read is never written over.
@@ -32,8 +36,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Supporters {
 
-    /** @param thanked whether they have been told, since their latest coffee */
-    public record Supporter(UUID player, Instant since, int coffees, boolean thanked) {
+    /**
+     * @param thanked  whether they have been told, since their latest coffee
+     * @param cents    everything they gave, before fees
+     * @param netCents what reached the owner after fees, as estimated when it arrived
+     */
+    public record Supporter(UUID player, Instant since, int coffees, boolean thanked, long cents, long netCents,
+                            int supports, boolean member) {
+
+        public Supporter(UUID player, Instant since, int coffees, boolean thanked) {
+            this(player, since, coffees, thanked, 0, 0, 1, false);
+        }
+
+        public Supporter(UUID player, Instant since, int coffees, boolean thanked, long cents, long netCents) {
+            this(player, since, coffees, thanked, cents, netCents, 1, false);
+        }
     }
 
     private final YamlStore store;
@@ -64,7 +81,9 @@ public final class Supporters {
                 try {
                     UUID who = UUID.fromString(rawId);
                     fresh.put(who, new Supporter(who, Instant.parse(theirs.getString("since", "")),
-                            Math.max(1, theirs.getInt("coffees", 1)), theirs.getBoolean("thanked")));
+                            Math.max(1, theirs.getInt("coffees", 1)), theirs.getBoolean("thanked"),
+                            Math.max(0, theirs.getLong("cents")), Math.max(0, theirs.getLong("net-cents")),
+                            Math.max(1, theirs.getInt("supports", 1)), theirs.getBoolean("member")));
                 } catch (IllegalArgumentException | DateTimeParseException handEdited) {
                     // one broken entry must not cost everybody else theirs
                 }
@@ -90,17 +109,35 @@ public final class Supporters {
 
     /** Adds {@code coffees} (at least one) and asks for a new thank-you. Held until {@link #save}. */
     public synchronized Supporter credit(UUID player, int coffees, Instant at) {
+        return credit(player, coffees, 0, 0, at);
+    }
+
+    /** The same, with what they gave: before fees and, estimated, after. */
+    public synchronized Supporter credit(UUID player, int coffees, long cents, long netCents, Instant at) {
         Supporter before = supporters.get(player);
         Supporter now = new Supporter(player, before == null ? at : before.since(),
-                (before == null ? 0 : before.coffees()) + Math.max(1, coffees), false);
+                (before == null ? 0 : before.coffees()) + Math.max(1, coffees), false,
+                (before == null ? 0 : before.cents()) + Math.max(0, cents),
+                (before == null ? 0 : before.netCents()) + Math.max(0, netCents),
+                (before == null ? 0 : before.supports()) + 1, before != null && before.member());
         put(now);
         return now;
+    }
+
+    /** A membership started, renewed or ended. Only for somebody who is a supporter already. */
+    public synchronized void member(UUID player, boolean member) {
+        Supporter before = supporters.get(player);
+        if (before != null && before.member() != member) {
+            put(new Supporter(player, before.since(), before.coffees(), before.thanked(), before.cents(),
+                    before.netCents(), before.supports(), member));
+        }
     }
 
     public synchronized void thanked(UUID player) {
         Supporter before = supporters.get(player);
         if (before != null && !before.thanked()) {
-            put(new Supporter(player, before.since(), before.coffees(), true));
+            put(new Supporter(player, before.since(), before.coffees(), true, before.cents(), before.netCents(),
+                    before.supports(), before.member()));
         }
     }
 
@@ -138,6 +175,10 @@ public final class Supporters {
                 String base = "players." + who;
                 yaml.set(base + ".since", supporter.since().toString());
                 yaml.set(base + ".coffees", supporter.coffees());
+                yaml.set(base + ".cents", supporter.cents());
+                yaml.set(base + ".net-cents", supporter.netCents());
+                yaml.set(base + ".supports", supporter.supports());
+                yaml.set(base + ".member", supporter.member());
                 yaml.set(base + ".thanked", supporter.thanked());
             });
         });

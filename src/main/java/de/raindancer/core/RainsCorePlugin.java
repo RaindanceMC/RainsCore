@@ -289,6 +289,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Vanish vanish;
     private de.raindancer.core.social.presence.Playtime playtime;
     private de.raindancer.core.social.support.Supporters supporters;
+    private de.raindancer.core.social.support.SupporterPermission supporterPermission;
     private de.raindancer.core.platform.network.NetworkBus.Subscription supportersWatch;
     private final de.raindancer.core.moderation.players.PingHistory pingHistory =
             new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
@@ -784,6 +785,12 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("supporters.yml")));
         supporters.load();
         supportersWatch = supporters.watch();
+        de.raindancer.core.social.support.SupporterPermission.permission(getServer().getPluginManager());
+        supporterPermission = new de.raindancer.core.social.support.SupporterPermission(this, supporters);
+        getServer().getPluginManager().registerEvents(supporterPermission, this);
+        // A coffee can arrive on any server of the network; whoever is online here gets the node within half a minute.
+        Scheduling.globalTimer(this, 20L * 30, 20L * 30, ignored -> getServer().getOnlinePlayers().forEach(online ->
+                Scheduling.entity(this, online, () -> supporterPermission.sync(online))));
         // Every player's inventory into the network's database, per server: staff see it from anywhere, and it
         // outlives the server's files. Not applied on join — inventories stay each server's own.
         savedInventories = new de.raindancer.core.data.inventory.SavedInventories(databases.core(), System::currentTimeMillis);
@@ -2517,6 +2524,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public de.raindancer.core.social.support.SupporterPermission supporterPermission() {
+        return supporterPermission;
+    }
+
+    @Override
     public de.raindancer.core.moderation.players.PingHistory pingHistory() {
         return pingHistory;
     }
@@ -2873,6 +2885,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (mentionCompletions != null) {
             mentionCompletions.forget(event.getPlayer().getUniqueId());
+        }
+        if (supporterPermission != null) {
+            supporterPermission.forget(event.getPlayer().getUniqueId());
         }
         Player player = event.getPlayer();
         if (settings.current().auditEnabled()) {

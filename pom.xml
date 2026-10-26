@@ -6,7 +6,7 @@
 
     <groupId>de.raindancer</groupId>
     <artifactId>RainsCore</artifactId>
-    <version>2.17.0</version>
+    <version>2.18.0</version>
     <packaging>jar</packaging>
 
     <name>RainsCore</name>

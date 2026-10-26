@@ -460,6 +460,9 @@ public interface RainsCore {
     /** Who has bought the owner a coffee, across the network — for whatever thanks them to ask. */
     de.raindancer.core.social.support.Supporters supporters();
 
+    /** Gives every supporter {@code rains.supporter}; {@code sync} a player to apply a change at once. */
+    de.raindancer.core.social.support.SupporterPermission supporterPermission();
+
     /** Everybody's ping over the last hour on this server, sampled every few seconds — also for a while after they left. */
     de.raindancer.core.moderation.players.PingHistory pingHistory();
 
