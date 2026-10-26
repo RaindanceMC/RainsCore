@@ -37,7 +37,7 @@ public final class CoreScreens {
     }
 
     public static void register(Screens screens, Plugin core, Server server) {
-        screens.register(core, ScreenKind.personal("welcome", "Welcome", "Greets everybody by name and says who else is on.",
+        screens.register(core, ScreenKind.personal("welcome", "Welcome", "Greets everybody by name: the time, who else is on, what's new and a tip.",
                 Material.OAK_SIGN, viewer -> welcome(server, viewer)));
         screens.register(core, ScreenKind.personal("profile", "Your profile", "Everybody's own: playtime, how much of it active, and when they first came.",
                 Material.PLAYER_HEAD, viewer -> profile(server, viewer)));
@@ -204,26 +204,17 @@ public final class CoreScreens {
         return RainsCore.get().playtime();
     }
 
-    /** Playtime only decides "Welcome" or "Welcome back" — a greeting that counts somebody's hours feels like being watched. */
+    /** Playtime only picks "Welcome" or "Welcome back"; the screen itself never shows it. */
     private static Component welcome(Server server, ScreenKind.Viewer viewer) {
         Playtime playtime = playtime();
         boolean newcomer = playtime == null || playtime.minutes(viewer.id()) < 5;
         int others = (int) visible(server).stream().filter(player -> !player.getUniqueId().equals(viewer.id())).count();
-        return MINI.deserialize(welcomeText(viewer.name(), RainsCore.get().serverName(), others, newcomer));
-    }
-
-    static String welcomeText(String name, String serverName, int others, boolean newcomer) {
-        String who = MINI.escapeTags(name);
-        String where = "<white>" + MINI.escapeTags(serverName == null || serverName.isBlank() ? "the server" : serverName) + "</white>";
-        StringBuilder text = new StringBuilder(newcomer
-                ? "<gold><bold>Welcome, " + who + "!</bold></gold>\n<gray>Glad you found " + where + "."
-                : "<gold><bold>Welcome back, " + who + "!</bold></gold>\n<gray>Good to see you on " + where + " again.");
-        text.append(others == 0 ? "\n<gray>It's quiet — you're the only one on."
-                : "\n<gray><white>" + others + "</white> other player" + (others == 1 ? "" : "s") + " on right now.");
-        if (newcomer) {
-            text.append("\n<gray>New here? Try <white>/help</white>.");
-        }
-        return text.toString();
+        var changelog = RainsCore.get().changelog();
+        List<ChangelogEntry> published = changelog == null ? List.of() : changelog.published();
+        var tips = WelcomeScreen.usable(WelcomeScreen.TIPS, command -> server.getCommandMap().getCommand(command) != null);
+        return MINI.deserialize(WelcomeScreen.text(new WelcomeScreen.Facts(viewer.name(), RainsCore.get().serverName(),
+                others, newcomer, ZonedDateTime.now(), published.isEmpty() ? null : published.getFirst().title(),
+                WelcomeScreen.tip(tips, Instant.now().getEpochSecond()))));
     }
 
     private static Component profile(Server server, ScreenKind.Viewer viewer) {
