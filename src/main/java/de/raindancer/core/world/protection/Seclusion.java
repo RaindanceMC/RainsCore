@@ -135,6 +135,12 @@ public final class Seclusion {
         hiddenFrom.clear();
     }
 
+    /** Whether {@code subject}'s body is hidden from {@code watcher} here — they stay on watcher's tab list. */
+    public boolean hides(UUID watcher, UUID subject) {
+        Set<UUID> hidden = hiddenFrom.get(watcher);
+        return hidden != null && hidden.contains(subject);
+    }
+
     /**
      * Forgets a player, both as a watcher and as somebody hidden.
      *

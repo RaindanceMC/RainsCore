@@ -278,6 +278,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private MovementProtectionListener movementProtection;
     private InteractionProtectionListener interactionProtection;
     private Seclusion seclusion;
+    private de.raindancer.core.ui.tablist.TabKeeper tabKeeper;
     private ResourcePacks resourcePacks;
     private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
     private de.raindancer.core.ui.profile.ProfileExtension ownNametagSwitch;
@@ -673,8 +674,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // walking towards each other generate a move event each per tick, and the answer only changes when
         // one of them crosses a border.
         seclusion = new Seclusion(this, land);
+        // Out of sight is not off the tab list: Bukkit's hide takes both, the keeper puts the entry back.
+        tabKeeper = new de.raindancer.core.ui.tablist.TabKeeper(new de.raindancer.core.ui.tablist.TabKeep());
+        tabKeeper.keep().keepListedWhile(seclusion::hides);
+        getServer().getOnlinePlayers().forEach(tabKeeper::inject);
         Scheduling.globalTimer(this, SECLUSION_PERIOD_TICKS, SECLUSION_PERIOD_TICKS,
-                task -> seclusion.refresh());
+                task -> {
+                    seclusion.refresh();
+                    tabKeeper.sweep();
+                });
 
         clickActions = new ClickActions(System::currentTimeMillis);
         // Deliberately empty: Core registers no commands at all, so it has no callback command to
@@ -901,6 +909,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // getOnlinePlayers(), so a vanished moderator was on it with their name, world and ping, in the
         // one place anybody looks to see who is about.
         tablists.hiddenPlayers(vanish::everybodyVanished);
+        tabKeeper.keep().vanished(vanish::everybodyVanished);
         inventoryViews = new InventoryViews(watcher -> {
             Player looking =
                     getServer().getPlayer(UUID.fromString(watcher));
@@ -2634,6 +2643,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return prompts;
     }
 
+    /** Keeps players on tab lists while only their body is hidden; a plugin hiding bodies adds its reason. */
+    public de.raindancer.core.ui.tablist.TabKeeper tabKeeper() {
+        return tabKeeper;
+    }
+
     @Override
     public Tablists tablists() {
         return tablists;
@@ -2735,6 +2749,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      */
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        tabKeeper.inject(event.getPlayer());
         offerOwnerHint(event.getPlayer());
         if (presence != null) {
             java.util.UUID id = event.getPlayer().getUniqueId();
@@ -2907,6 +2922,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         movementProtection.forget(player.getUniqueId());
         AnvilInput.forget(player.getUniqueId());
         interactionProtection.forget(player.getUniqueId());
+        tabKeeper.quit(player);
         seclusion.forget(player.getUniqueId());
         worldEntryPoints.forget(player.getUniqueId());
         if (combatListener != null) {
