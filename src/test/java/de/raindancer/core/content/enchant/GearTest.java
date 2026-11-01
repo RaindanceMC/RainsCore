@@ -187,4 +187,15 @@ class GearTest {
         assertThat(RainsEnchants.XP_SIPHON).isEqualTo("rainsenchants:xp_siphon");
         assertThat(RainsEnchants.XP_SIPHON).isNotEqualTo(RainsEnchants.TELEKINESIS);
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("fishing rods are their own gear — the fishing enchantments go on them and nothing else")
+    void fishingRods() {
+        org.assertj.core.api.Assertions.assertThat(Gear.FISHING_ROD.matches("fishing_rod")).isTrue();
+        for (String other : new String[]{"carrot_on_a_stick", "stick", "iron_sword", "bow", "trident"}) {
+            org.assertj.core.api.Assertions.assertThat(Gear.FISHING_ROD.matches(other)).as(other).isFalse();
+        }
+        org.assertj.core.api.Assertions.assertThat(Gear.FISHING_ROD.slot())
+                .isEqualTo(org.bukkit.inventory.EquipmentSlotGroup.MAINHAND);
+    }
 }

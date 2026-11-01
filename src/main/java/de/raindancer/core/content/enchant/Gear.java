@@ -38,6 +38,8 @@ public enum Gear {
     /** What can be sent at a target: bows, crossbows, tridents, and the axes and mace Thor throws. */
     SEEKING(EquipmentSlotGroup.MAINHAND, path -> Set.of("bow", "crossbow", "trident", "mace").contains(path)
             || path.endsWith("_axe") && !path.endsWith("_pickaxe")),
+    /** The fishing rod alone — and every rod RainsFishing makes, which is one underneath. */
+    FISHING_ROD(EquipmentSlotGroup.MAINHAND, "fishing_rod"::equals),
     /** Anything worn or held that can be enchanted at all — what is worth keeping through a death. */
     ANY_GEAR(EquipmentSlotGroup.ANY, path -> handTool(path) || path.endsWith("_helmet")
             || path.endsWith("_chestplate") || path.endsWith("_leggings") || path.endsWith("_boots")

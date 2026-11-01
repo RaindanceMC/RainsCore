@@ -1373,6 +1373,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.economy.Economies.clear();
         de.raindancer.core.social.economy.ItemValues.clear();
         de.raindancer.core.social.economy.ItemSales.clear();
+        de.raindancer.core.social.economy.Cash.clear();
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
@@ -2838,6 +2839,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.economy.Economies.forgetFrom(loader)
                 + de.raindancer.core.social.economy.ItemValues.forgetFrom(loader)
                 + de.raindancer.core.social.economy.ItemSales.forgetFrom(loader)
+                + de.raindancer.core.social.economy.Cash.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceModifiers.forgetFrom(loader)
                 + de.raindancer.core.social.economy.SaleStops.forgetFrom(loader)
                 + de.raindancer.core.social.roles.PlayerRoles.forgetFrom(loader)
@@ -2847,6 +2849,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.economy.PriceIndex.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Debts.forgetFrom(loader)
                 + de.raindancer.core.content.items.InsuredItems.forgetFrom(loader)
+                + de.raindancer.core.ui.board.Leaderboards.forgetFrom(loader)
                 + de.raindancer.core.social.desk.ServiceDesks.forgetFrom(loader)
                 + de.raindancer.core.social.presence.Away.forgetFrom(loader)
                 + de.raindancer.core.social.presence.PresenceLines.forgetFrom(loader)

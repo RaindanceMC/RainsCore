@@ -43,6 +43,16 @@ public final class RainsEnchants {
     /** Experience goes straight to the player, as Telekinesis does with drops. */
     public static final String XP_SIPHON = "rainsenchants:xp_siphon";
 
+    // Fishing: given out as shards like every other, and read by RainsFishing off the rod a fish is caught with.
+    /** Fish bite sooner. */
+    public static final String DEEP_BITE = "rainsenchants:deep_bite";
+    /** Sea chests bite more often. */
+    public static final String TREASURE_HUNTER = "rainsenchants:treasure_hunter";
+    /** Sometimes two fish come up at once. */
+    public static final String TWIN_CATCH = "rainsenchants:twin_catch";
+    /** Rarer fish and chests come up more often. */
+    public static final String MYTHIC_LURE = "rainsenchants:mythic_lure";
+
     private RainsEnchants() {
     }
 }
