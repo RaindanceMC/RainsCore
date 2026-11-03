@@ -7,12 +7,14 @@ import org.bukkit.block.Block;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.enchantment.EnchantItemEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityBreedEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
@@ -34,7 +36,7 @@ import java.util.logging.Logger;
  * What players do, told once to every plugin that listens: ores the world made mined, grown crops harvested, fish
  * caught, animals bred, trades, enchanting, advancements, raids, monsters and bosses killed, and minutes played while
  * not away. One place decides what counts — never an ore a player placed, never a melon from a farm of placed
- * blocks — so guild experience, quests and adventurer levels cannot be farmed three different ways.
+ * blocks, never a monster from a spawner or a spawn egg, never a breed of parents bought as eggs — so guild experience, quests and adventurer levels cannot be farmed three different ways.
  *
  * <p>Listeners are told on the thread of the event, usually the player's own; they should be quick.
  */
@@ -47,6 +49,14 @@ public final class Activities {
     private static final List<Listening> listening = new CopyOnWriteArrayList<>();
     private static final Set<EntityType> BOSSES = Set.of(EntityType.WITHER, EntityType.ENDER_DRAGON,
             EntityType.ELDER_GUARDIAN, EntityType.WARDEN);
+    /** Mobs a farm makes: a monster from these is not a fight. */
+    private static final Set<CreatureSpawnEvent.SpawnReason> FARMED = Set.of(CreatureSpawnEvent.SpawnReason.SPAWNER,
+            CreatureSpawnEvent.SpawnReason.SPAWNER_EGG, CreatureSpawnEvent.SpawnReason.DISPENSE_EGG);
+    /** Parents bought as eggs could be bred without end; nor do ones a command or a plugin made count. */
+    private static final Set<CreatureSpawnEvent.SpawnReason> NOT_RAISED = Set.of(
+            CreatureSpawnEvent.SpawnReason.SPAWNER, CreatureSpawnEvent.SpawnReason.SPAWNER_EGG,
+            CreatureSpawnEvent.SpawnReason.DISPENSE_EGG, CreatureSpawnEvent.SpawnReason.COMMAND,
+            CreatureSpawnEvent.SpawnReason.CUSTOM);
 
     private Activities() {
     }
@@ -129,7 +139,7 @@ public final class Activities {
         public void onKill(EntityDeathEvent event) {
             LivingEntity dead = event.getEntity();
             Player killer = dead.getKiller();
-            if (killer == null || dead instanceof Player) {
+            if (killer == null || dead instanceof Player || FARMED.contains(dead.getEntitySpawnReason())) {
                 return;
             }
             String what = dead.getType().getKey().getKey();
@@ -151,12 +161,18 @@ public final class Activities {
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onFish(PlayerFishEvent event) {
             if (event.getState() == PlayerFishEvent.State.CAUGHT_FISH) {
-                tell(event.getPlayer(), Activity.of(ActivityKind.FISH, 1));
+                String what = event.getCaught() instanceof Item caught
+                        ? caught.getItemStack().getType().getKey().getKey() : "";
+                tell(event.getPlayer(), Activity.of(ActivityKind.FISH, what));
             }
         }
 
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onBreed(EntityBreedEvent event) {
+            if (NOT_RAISED.contains(event.getMother().getEntitySpawnReason())
+                    || NOT_RAISED.contains(event.getFather().getEntitySpawnReason())) {
+                return;
+            }
             if (event.getBreeder() instanceof Player breeder) {
                 tell(breeder, Activity.of(ActivityKind.BREED, event.getEntityType().getKey().getKey()));
             }
@@ -164,12 +180,14 @@ public final class Activities {
 
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onTrade(PlayerTradeEvent event) {
-            tell(event.getPlayer(), Activity.of(ActivityKind.TRADE, 1));
+            tell(event.getPlayer(), Activity.of(ActivityKind.TRADE,
+                    event.getTrade().getResult().getType().getKey().getKey()));
         }
 
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onEnchant(EnchantItemEvent event) {
-            tell(event.getEnchanter(), Activity.of(ActivityKind.ENCHANT, event.whichButton() + 1));
+            tell(event.getEnchanter(), new Activity(ActivityKind.ENCHANT, String.valueOf(event.getExpLevelCost()),
+                    event.whichButton() + 1));
         }
 
         @EventHandler(priority = EventPriority.MONITOR)
