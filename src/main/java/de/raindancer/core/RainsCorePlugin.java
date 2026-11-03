@@ -660,6 +660,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new de.raindancer.core.content.items.NonIngredientListener(), this);
         // Where players put watched blocks, so mined ore is told from placed ore — see PlacedBlocks.
         getServer().getPluginManager().registerEvents(new de.raindancer.core.world.blocks.PlacedBlocks.Listener(), this);
+        // What players do, told once to every plugin — and the blocks whose "placed or grown?" decides it.
+        de.raindancer.core.world.blocks.PlacedBlocks.watch(this, de.raindancer.core.world.activity.Ores.watched());
+        getServer().getPluginManager().registerEvents(new de.raindancer.core.world.activity.Activities.Listener(), this);
         getServer().getPluginManager().registerEvents(new de.raindancer.core.world.blocks.BlockChanges.Listener(), this);
         // Eggs a shop sold hatch mobs but never set a spawner — see NotForSpawners.
         getServer().getPluginManager().registerEvents(new de.raindancer.core.content.items.NotForSpawnersListener(
@@ -870,7 +873,13 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         Scheduling.globalTimer(this, 20L * 60, 20L * 60, ignored -> {
             for (org.bukkit.entity.Player online : getServer().getOnlinePlayers()) {
-                playtime.minute(online.getUniqueId(), de.raindancer.core.social.presence.Away.isAway(online.getUniqueId()));
+                boolean away = de.raindancer.core.social.presence.Away.isAway(online.getUniqueId());
+                playtime.minute(online.getUniqueId(), away);
+                if (!away) {
+                    de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> de.raindancer.core.world.activity
+                            .Activities.tell(online, de.raindancer.core.world.activity.Activity.of(
+                                    de.raindancer.core.world.activity.ActivityKind.PLAY, 1)));
+                }
             }
         });
         long pingEvery = de.raindancer.core.moderation.players.PingHistory.EVERY.toSeconds() * 20;
@@ -1382,6 +1391,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.roles.PlayerRoles.clear();
         de.raindancer.core.data.loadout.SideData.clear();
         de.raindancer.core.world.blocks.PlacedBlocks.clear();
+        de.raindancer.core.world.activity.Activities.clear();
         de.raindancer.core.social.economy.EconomyLevers.clear();
         de.raindancer.core.social.economy.PriceIndex.clear();
         de.raindancer.core.social.economy.Debts.clear();
@@ -2847,6 +2857,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.roles.PlayerRoles.forgetFrom(loader)
                 + de.raindancer.core.data.loadout.SideData.forgetFrom(loader)
                 + de.raindancer.core.world.blocks.PlacedBlocks.forgetFrom(loader)
+                + de.raindancer.core.world.activity.Activities.forgetFrom(loader)
                 + de.raindancer.core.social.economy.EconomyLevers.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceIndex.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Debts.forgetFrom(loader)
