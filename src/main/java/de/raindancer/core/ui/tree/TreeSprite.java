@@ -2,11 +2,26 @@ package de.raindancer.core.ui.tree;
 
 /**
  * What a tree's title draws: a node's frame in each of its states, and each shape of line, dim or lit. A look (see
- * {@link TreeLook}) paints every one of them; the order here is the order of their characters in its font.
+ * {@link TreeLook}) paints every one of them; the order here is the order of their characters in its font, so new
+ * sprites only ever go at the end — a look painted before them keeps every character it has.
  */
 public enum TreeSprite {
     FRAME_LOCKED, FRAME_OPEN, FRAME_OWNED, FRAME_MAXED, FRAME_BARRED,
-    ACROSS_DIM, ACROSS_LIT, DOWN_DIM, DOWN_LIT, FALLING_DIM, FALLING_LIT, RISING_DIM, RISING_LIT;
+    ACROSS_DIM, ACROSS_LIT, DOWN_DIM, DOWN_LIT, FALLING_DIM, FALLING_LIT, RISING_DIM, RISING_LIT,
+    /** A branch's mastery badge: not yet earned, open to take, taken. */
+    MASTERY_LOCKED, MASTERY_OPEN, MASTERY_MAXED;
+
+    /** A node's frame; a mastery badge has its own, locked, open or taken. */
+    public static TreeSprite frame(NodeState state, boolean mastery) {
+        if (!mastery) {
+            return frame(state);
+        }
+        return switch (state) {
+            case OPEN -> MASTERY_OPEN;
+            case OWNED, MAXED -> MASTERY_MAXED;
+            case LOCKED, BARRED -> MASTERY_LOCKED;
+        };
+    }
 
     public static TreeSprite frame(NodeState state) {
         return switch (state) {

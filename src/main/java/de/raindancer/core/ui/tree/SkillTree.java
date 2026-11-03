@@ -37,7 +37,7 @@ import java.util.function.Predicate;
 public final class SkillTree {
 
     /** Why another rank of a node may not be taken, in the order they are asked. */
-    public enum Refusal { MAXED, BARRED, NEEDS, LEVEL, NO_POINTS }
+    public enum Refusal { MAXED, BARRED, NEEDS, UNFINISHED, LEVEL, NO_POINTS }
 
     private final List<TreeBranch> branches;
     private final Map<String, TreeNode> nodes;
@@ -107,18 +107,23 @@ public final class SkillTree {
                     n.getString("icon", "stone"), Math.max(1, n.getInt("ranks", 1)), Math.max(1, n.getInt("cost", 1)),
                     n.getBoolean("choice"), n.getBoolean("capstone"), Math.max(0, n.getInt("level", 0)),
                     Math.max(0, n.getInt("level-step", 0)), n.getStringList("requires"), n.getStringList("excludes"),
-                    effects);
+                    effects, n.getBoolean("mastery"));
             try {
-                TreeGrid.slot(node.column(), node.row());
+                TreeGrid.checkCanvas(node.column(), node.row());
             } catch (IllegalArgumentException outside) {
                 throw new IllegalArgumentException("Node " + id + ": " + outside.getMessage(), outside);
             }
             nodes.put(id, node);
         }
         Map<String, Set<Integer>> taken = new LinkedHashMap<>();
+        Set<String> withBadge = new HashSet<>();
         for (TreeNode node : nodes.values()) {
+            if (node.mastery() && !withBadge.add(node.branch())) {
+                throw new IllegalArgumentException("Branch " + node.branch() + " may have one mastery badge; "
+                        + node.id() + " is a second.");
+            }
             if (!taken.computeIfAbsent(node.branch(), b -> new HashSet<>())
-                    .add(TreeGrid.slot(node.column(), node.row()))) {
+                    .add(node.column() * (TreeGrid.MOST_ON_CANVAS + 1) + node.row())) {
                 throw new IllegalArgumentException("Node " + node.id() + " sits where another node of "
                         + node.branch() + " sits.");
             }
@@ -215,6 +220,30 @@ public final class SkillTree {
         return spent(here);
     }
 
+    /** The mastery badges of a branch: none or one. */
+    public List<TreeNode> masteries(String branch) {
+        return nodesOf(branch).stream().filter(TreeNode::mastery).toList();
+    }
+
+    /** Whether the branch has a badge and it is taken. */
+    public boolean mastered(Map<String, Integer> ranks, String branch) {
+        List<TreeNode> badges = masteries(branch);
+        return !badges.isEmpty() && badges.stream().allMatch(badge -> rank(ranks, badge.id()) >= badge.ranks());
+    }
+
+    /** For a badge: every other node of its branch that is not shut is at its last rank. */
+    private boolean finished(Map<String, Integer> ranks, TreeNode badge) {
+        for (TreeNode other : nodesOf(badge.branch())) {
+            if (other == badge || other.mastery() || barred(ranks, other)) {
+                continue;
+            }
+            if (rank(ranks, other.id()) < other.ranks()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public NodeState state(Map<String, Integer> ranks, TreeNode node) {
         int rank = rank(ranks, node.id());
         if (rank >= node.ranks()) {
@@ -225,6 +254,9 @@ public final class SkillTree {
         }
         if (barred(ranks, node)) {
             return NodeState.BARRED;
+        }
+        if (node.mastery()) {
+            return finished(ranks, node) ? NodeState.OPEN : NodeState.LOCKED;
         }
         return needsMet(ranks, node) ? NodeState.OPEN : NodeState.LOCKED;
     }
@@ -243,7 +275,10 @@ public final class SkillTree {
         if (rank == 0 && barred(ranks, node)) {
             return Optional.of(Refusal.BARRED);
         }
-        if (rank == 0 && !needsMet(ranks, node)) {
+        if (rank == 0 && node.mastery() && !finished(ranks, node)) {
+            return Optional.of(Refusal.UNFINISHED);
+        }
+        if (rank == 0 && !node.mastery() && !needsMet(ranks, node)) {
             return Optional.of(Refusal.NEEDS);
         }
         if (level < node.levelFor(rank + 1)) {

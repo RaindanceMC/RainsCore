@@ -21,7 +21,10 @@ FIRST_SPRITE = 0xE100
 FIRST_SPACE = 0xF100
 # The order of TreeSprite.
 SPRITES = ["frame_locked", "frame_open", "frame_owned", "frame_maxed", "frame_barred",
-           "across_dim", "across_lit", "down_dim", "down_lit", "falling_dim", "falling_lit", "rising_dim", "rising_lit"]
+           "across_dim", "across_lit", "down_dim", "down_lit", "falling_dim", "falling_lit", "rising_dim", "rising_lit",
+           "mastery_locked", "mastery_open", "mastery_maxed"]
+# A branch's mastery badge, in the order of TreeSprite after the lines.
+MASTERIES = ["locked", "open", "maxed"]
 FRAMES = ["locked", "open", "owned", "maxed", "barred"]
 
 
@@ -54,6 +57,17 @@ class Style:
             return (58, 44, 30), 255
         return None
 
+    def mastery(self, state, x, y):
+        """A mastery badge's pixel: the look's own frame (open, maxed or locked) under a five-pointed star crown.
+        Override for a look of its own."""
+        colour = {"locked": (110, 104, 96), "open": (150, 255, 180), "maxed": (255, 214, 90)}[state]
+        star = _star(x, y)
+        if star is not None:
+            return mix(colour, (255, 255, 240), star), 255
+        if _studs(x, y):
+            return mix(colour, (255, 255, 255), 0.35), 255
+        return self.frame({"locked": "locked", "open": "open", "maxed": "maxed"}[state], x, y)
+
     def frame(self, state, x, y):
         """A frame's pixel at (x, y) from its centre; None for nothing. The item sits on top of the middle."""
         r = math.hypot(x, y)
@@ -82,6 +96,27 @@ class Style:
         return None
 
 
+def _star(x, y):
+    """How bright a five-pointed star crowning a frame is at (x, y), or None outside it."""
+    dx, dy = x, y + 8.6
+    r = math.hypot(dx, dy)
+    if r > 4.2:
+        return None
+    a = math.atan2(dy, dx) + math.pi / 2
+    k = (a % (2 * math.pi / 5)) - math.pi / 5
+    if r > 4.2 - 2.4 * (abs(k) / (math.pi / 5)):
+        return None
+    return 0.6 - 0.4 * (dx + dy) / 4.2
+
+
+def _studs(x, y):
+    """Diamond studs on a frame's ring, left, right and below — what marks a badge from a node."""
+    for sx, sy in ((-10.2, 0.0), (10.2, 0.0), (0.0, 10.2)):
+        if abs(x - sx) + abs(y - sy) <= 1.8:
+            return True
+    return False
+
+
 def _image(paint):
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     px = img.load()
@@ -103,6 +138,8 @@ def sprites(style):
     out = {}
     for state in FRAMES:
         out["frame_" + state] = _image(lambda x, y, s=state: style.frame(s, x, y))
+    for state in MASTERIES:
+        out["mastery_" + state] = _image(lambda x, y, s=state: style.mastery(s, x, y))
     for lit in (False, True):
         tag = "_lit" if lit else "_dim"
         out["across" + tag] = _image(lambda x, y, l=lit: style.line(x + C, y, l))

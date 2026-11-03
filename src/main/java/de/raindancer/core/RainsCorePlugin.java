@@ -662,6 +662,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         getServer().getPluginManager().registerEvents(new de.raindancer.core.world.blocks.PlacedBlocks.Listener(), this);
         // What players do, told once to every plugin — and the blocks whose "placed or grown?" decides it.
         de.raindancer.core.world.blocks.PlacedBlocks.watch(this, de.raindancer.core.world.activity.Ores.watched());
+        de.raindancer.core.world.blocks.PlacedBlocks.watch(this, de.raindancer.core.world.activity.Terrain.watched());
         getServer().getPluginManager().registerEvents(new de.raindancer.core.world.activity.Activities.Listener(), this);
         getServer().getPluginManager().registerEvents(new de.raindancer.core.world.blocks.BlockChanges.Listener(), this);
         // Eggs a shop sold hatch mobs but never set a spawner — see NotForSpawners.
@@ -876,9 +877,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 boolean away = de.raindancer.core.social.presence.Away.isAway(online.getUniqueId());
                 playtime.minute(online.getUniqueId(), away);
                 if (!away) {
-                    de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> de.raindancer.core.world.activity
-                            .Activities.tell(online, de.raindancer.core.world.activity.Activity.of(
-                                    de.raindancer.core.world.activity.ActivityKind.PLAY, 1)));
+                    de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> {
+                        de.raindancer.core.world.activity.Activities.tell(online, de.raindancer.core.world.activity
+                                .Activity.of(de.raindancer.core.world.activity.ActivityKind.PLAY, 1));
+                        de.raindancer.core.world.activity.Activities.minute(online);
+                    });
                 }
             }
         });
@@ -1394,6 +1397,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.data.loadout.SideData.clear();
         de.raindancer.core.world.blocks.PlacedBlocks.clear();
         de.raindancer.core.world.activity.Activities.clear();
+        de.raindancer.core.ui.tree.Skills.clear();
         de.raindancer.core.social.economy.EconomyLevers.clear();
         de.raindancer.core.social.economy.PriceIndex.clear();
         de.raindancer.core.social.economy.Debts.clear();
@@ -2862,6 +2866,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.data.loadout.SideData.forgetFrom(loader)
                 + de.raindancer.core.world.blocks.PlacedBlocks.forgetFrom(loader)
                 + de.raindancer.core.world.activity.Activities.forgetFrom(loader)
+                + de.raindancer.core.ui.tree.Skills.forgetFrom(loader)
                 + de.raindancer.core.social.economy.EconomyLevers.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceIndex.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Debts.forgetFrom(loader)

@@ -30,4 +30,7 @@ assets/rainscore/textures/font/tree/falling_dim.png
 assets/rainscore/textures/font/tree/falling_lit.png
 assets/rainscore/textures/font/tree/rising_dim.png
 assets/rainscore/textures/font/tree/rising_lit.png
+assets/rainscore/textures/font/tree/mastery_locked.png
+assets/rainscore/textures/font/tree/mastery_open.png
+assets/rainscore/textures/font/tree/mastery_maxed.png
 assets/rainscore/font/tree.json

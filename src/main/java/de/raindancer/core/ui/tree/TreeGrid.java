@@ -34,10 +34,13 @@ public final class TreeGrid {
         return row * 2 * 9 + column * 2;
     }
 
-    /** The line between two nodes; it does not matter which is named first. */
+    /**
+     * The line between two nodes; it does not matter which is named first. Columns and rows are the canvas's — a tree
+     * may be bigger than the window ({@link TreeView}) — so the slot is the window's only when both are in it.
+     */
     public static Link link(int fromColumn, int fromRow, int toColumn, int toRow) {
-        check(fromColumn, fromRow);
-        check(toColumn, toRow);
+        checkCanvas(fromColumn, fromRow);
+        checkCanvas(toColumn, toRow);
         int dc = toColumn - fromColumn;
         int dr = toRow - fromRow;
         if (Math.abs(dc) > 1 || Math.abs(dr) > 1 || (dc == 0 && dr == 0)) {
@@ -61,6 +64,17 @@ public final class TreeGrid {
      */
     public static int spriteAscent(int slotRow) {
         return 13 - (26 + SLOT * slotRow - SPRITE / 2);
+    }
+
+    /** Largest column or row a canvas may use. */
+    public static final int MOST_ON_CANVAS = 255;
+
+    /** A place on a tree's canvas: any column and row from 0. */
+    public static void checkCanvas(int column, int row) {
+        if (column < 0 || row < 0 || column > MOST_ON_CANVAS || row > MOST_ON_CANVAS) {
+            throw new IllegalArgumentException("A tree's canvas runs from (0,0) to (" + MOST_ON_CANVAS + ","
+                    + MOST_ON_CANVAS + "); (" + column + "," + row + ") is outside it.");
+        }
     }
 
     private static void check(int column, int row) {

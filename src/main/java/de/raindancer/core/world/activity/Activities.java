@@ -33,9 +33,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * What players do, told once to every plugin that listens: ores the world made mined, grown crops harvested, fish
- * caught, animals bred, trades, enchanting, advancements, raids, monsters and bosses killed, and minutes played while
- * not away. One place decides what counts — never an ore a player placed, never a melon from a farm of placed
+ * What players do, told once to every plugin that listens: ores, stone, dirt and logs the world made mined, dug and
+ * chopped, grown crops harvested, berries, mushrooms and flowers foraged, fish caught, animals bred and tamed, trades,
+ * crafting, smelting, cooking, brewing, building, anvil work, enchanting, advancements, biomes first found, raids,
+ * monsters and bosses killed, and minutes played and blocks travelled while not away. One place decides what counts — never an ore a player placed, never a melon from a farm of placed
  * blocks, never a monster from a spawner or a spawn egg, never a breed of parents bought as eggs — so guild experience, quests and adventurer levels cannot be farmed three different ways.
  *
  * <p>Listeners are told on the thread of the event, usually the player's own; they should be quick.
@@ -91,6 +92,23 @@ public final class Activities {
         }
     }
 
+    private static final TravelMeter travel = new TravelMeter();
+
+    /**
+     * Once a minute for each player who is not away, on their own thread: the blocks they walked, sprinted, swum and
+     * climbed since the last time. Core's minute timer calls this.
+     */
+    public static void minute(Player player) {
+        long centimetres = 0;
+        for (org.bukkit.Statistic statistic : List.of(org.bukkit.Statistic.WALK_ONE_CM,
+                org.bukkit.Statistic.SPRINT_ONE_CM, org.bukkit.Statistic.SWIM_ONE_CM,
+                org.bukkit.Statistic.WALK_UNDER_WATER_ONE_CM, org.bukkit.Statistic.CLIMB_ONE_CM)) {
+            centimetres += player.getStatistic(statistic);
+        }
+        long blocks = travel.since(player.getUniqueId(), centimetres);
+        tell(player, Activity.of(ActivityKind.TRAVEL, blocks));
+    }
+
     public static int forgetFrom(ClassLoader loader) {
         int before = listening.size();
         listening.removeIf(each -> each.owner() != null && each.owner().getClass().getClassLoader() == loader);
@@ -104,13 +122,17 @@ public final class Activities {
     /** Turns the game's events into activities. Registered once by Core, which also watches {@link Ores#watched()}. */
     public static final class Listener implements org.bukkit.event.Listener {
 
+        static final RecentSpots spots = new RecentSpots(600_000L, 512);
+        /** Who last worked each brewing stand: a brew has no player of its own. */
+        private final Map<String, java.util.UUID> brewers = new java.util.concurrent.ConcurrentHashMap<>();
+
         /** A break's "was it placed?", read before PlacedBlocks takes the mark off at MONITOR. */
         private final Map<BlockBreakEvent, Boolean> placed = Collections.synchronizedMap(new WeakHashMap<>());
 
         @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
         public void beforeBreak(BlockBreakEvent event) {
             Material type = event.getBlock().getType();
-            if (Ores.oreOf(type).isPresent() || Ores.GROWN_BLOCKS.contains(type)) {
+            if (Ores.oreOf(type).isPresent() || Ores.GROWN_BLOCKS.contains(type) || Terrain.kindOf(type).isPresent()) {
                 placed.put(event, PlacedBlocks.isPlaced(event.getBlock()));
             }
         }
@@ -124,6 +146,13 @@ public final class Activities {
             if (ore.isPresent()) {
                 if (Boolean.FALSE.equals(wasPlaced)) {
                     tell(event.getPlayer(), Activity.of(ActivityKind.MINE, ore.get()));
+                }
+                return;
+            }
+            var terrain = Terrain.kindOf(type);
+            if (terrain.isPresent()) {
+                if (Boolean.FALSE.equals(wasPlaced)) {
+                    tell(event.getPlayer(), Activity.of(terrain.get(), type.getKey().getKey()));
                 }
                 return;
             }
@@ -195,6 +224,112 @@ public final class Activities {
             for (Player hero : event.getWinners()) {
                 tell(hero, Activity.of(ActivityKind.RAID, 1));
             }
+        }
+    
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onPick(org.bukkit.event.player.PlayerHarvestBlockEvent event) {
+            int picked = event.getItemsHarvested().stream().mapToInt(org.bukkit.inventory.ItemStack::getAmount).sum();
+            tell(event.getPlayer(), new Activity(ActivityKind.FORAGE,
+                    event.getHarvestedBlock().getType().getKey().getKey(), Math.max(1, picked)));
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onCraft(org.bukkit.event.inventory.CraftItemEvent event) {
+            if (!(event.getWhoClicked() instanceof Player crafter)) {
+                return;
+            }
+            org.bukkit.inventory.ItemStack[] matrix = event.getInventory().getMatrix();
+            List<Material> ingredients = new java.util.ArrayList<>();
+            List<Integer> stacks = new java.util.ArrayList<>();
+            for (org.bukkit.inventory.ItemStack each : matrix) {
+                if (each != null && !each.isEmpty()) {
+                    ingredients.add(each.getType());
+                    stacks.add(each.getAmount());
+                }
+            }
+            if (!Crafts.counts(ingredients)) {
+                return;
+            }
+            org.bukkit.inventory.ItemStack result = event.getRecipe().getResult();
+            int times = event.isShiftClick() ? Crafts.times(stacks) : 1;
+            tell(crafter, new Activity(ActivityKind.CRAFT, result.getType().getKey().getKey(),
+                    (long) times * result.getAmount()));
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onTakeOut(org.bukkit.event.inventory.FurnaceExtractEvent event) {
+            Material item = event.getItemType();
+            tell(event.getPlayer(), new Activity(item.isEdible() ? ActivityKind.COOK : ActivityKind.SMELT,
+                    item.getKey().getKey(), event.getItemAmount()));
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onStandClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+            if (event.getView().getTopInventory() instanceof org.bukkit.inventory.BrewerInventory stand
+                    && stand.getLocation() != null && event.getWhoClicked() instanceof Player brewer) {
+                brewers.put(spot(stand.getLocation()), brewer.getUniqueId());
+            }
+            if (event.getView() instanceof org.bukkit.inventory.view.AnvilView anvil && event.getRawSlot() == 2
+                    && event.getCurrentItem() != null && !event.getCurrentItem().isEmpty()
+                    && event.getWhoClicked() instanceof Player smith
+                    && (smith.getGameMode() == org.bukkit.GameMode.CREATIVE || smith.getLevel() >= anvil.getRepairCost())) {
+                tell(smith, new Activity(ActivityKind.REPAIR, event.getCurrentItem().getType().getKey().getKey(),
+                        Math.max(1, anvil.getRepairCost())));
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onBrew(org.bukkit.event.inventory.BrewEvent event) {
+            java.util.UUID who = brewers.get(spot(event.getBlock().getLocation()));
+            Player brewer = who == null ? null : org.bukkit.Bukkit.getPlayer(who);
+            if (brewer == null) {
+                return;
+            }
+            int bottles = 0;
+            for (int slot = 0; slot < 3; slot++) {
+                org.bukkit.inventory.ItemStack bottle = event.getContents().getItem(slot);
+                if (bottle != null && !bottle.isEmpty()) {
+                    bottles++;
+                }
+            }
+            org.bukkit.inventory.ItemStack ingredient = event.getContents().getIngredient();
+            tell(brewer, new Activity(ActivityKind.BREW,
+                    ingredient == null ? "" : ingredient.getType().getKey().getKey(), bottles));
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onPlace(org.bukkit.event.block.BlockPlaceEvent event) {
+            Block block = event.getBlockPlaced();
+            if (spots.firstTime(event.getPlayer().getUniqueId(), block.getWorld().getName(), block.getX(), block.getY(),
+                    block.getZ(), System.currentTimeMillis())) {
+                tell(event.getPlayer(), Activity.of(ActivityKind.BUILD, block.getType().getKey().getKey()));
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onTame(org.bukkit.event.entity.EntityTameEvent event) {
+            if (event.getOwner() instanceof Player owner) {
+                tell(owner, Activity.of(ActivityKind.TAME, event.getEntityType().getKey().getKey()));
+            }
+        }
+
+        /** A biome first entered: the game's own Adventuring Time remembers it, so it counts once a player, ever. */
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onCriterion(com.destroystokyo.paper.event.player.PlayerAdvancementCriterionGrantEvent event) {
+            if (event.getAdvancement().getKey().getKey().equals("adventure/adventuring_time")) {
+                tell(event.getPlayer(), Activity.of(ActivityKind.EXPLORE, event.getCriterion()));
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+            java.util.UUID id = event.getPlayer().getUniqueId();
+            spots.forget(id);
+            travel.forget(id);
+        }
+
+        private static String spot(org.bukkit.Location at) {
+            return at.getWorld().getName() + ':' + at.getBlockX() + ':' + at.getBlockY() + ':' + at.getBlockZ();
         }
     }
 }

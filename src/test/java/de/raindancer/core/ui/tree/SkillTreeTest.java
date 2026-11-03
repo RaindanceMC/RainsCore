@@ -102,8 +102,8 @@ class SkillTreeTest {
         String head = "branches: {a: {title: A}}\nnodes:\n";
         assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: b, at: [0, 0]}", EFFECTS::contains))
                 .hasMessageContaining("no known branch");
-        assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: a, at: [5, 0]}", EFFECTS::contains))
-                .hasMessageContaining("x");
+        assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: a, at: [5]}", EFFECTS::contains))
+                .hasMessageContaining("at: [column, row]");
         assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: a, at: [0, 0]}\n  y: {branch: a, at: [0, 0]}",
                 EFFECTS::contains)).hasMessageContaining("sits where");
         assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: a, at: [0, 0]}\n  y: {branch: a, at: [2, 0], requires: [x]}",
@@ -112,5 +112,60 @@ class SkillTreeTest {
                 EFFECTS::contains)).hasMessageContaining("flying");
         assertThatThrownBy(() -> SkillTree.read(head + "  x: {branch: a, at: [0, 0], excludes: [nope]}",
                 EFFECTS::contains)).hasMessageContaining("nope");
+    }
+
+    @Test
+    @DisplayName("a tree is a canvas: nodes beyond five columns and three rows are fine, still joined only to neighbours")
+    void canvas() {
+        SkillTree big = SkillTree.read("""
+                branches: {a: {title: A}}
+                nodes:
+                  x: {branch: a, at: [0, 0]}
+                  y: {branch: a, at: [9, 6]}
+                  z: {branch: a, at: [10, 7], requires: [y]}
+                """, EFFECTS::contains);
+        assertThat(big.node("z").orElseThrow().column()).isEqualTo(10);
+        assertThatThrownBy(() -> SkillTree.read("branches: {a: {title: A}}\nnodes:\n  x: {branch: a, at: [-1, 0]}",
+                EFFECTS::contains)).hasMessageContaining("x");
+    }
+
+    private static final String MASTERED = """
+            branches: {a: {title: A}, b: {title: B}}
+            nodes:
+              root: {branch: a, at: [0, 1], ranks: 2}
+              left: {branch: a, at: [1, 0], requires: [root], choice: true, excludes: [right]}
+              right: {branch: a, at: [1, 2], requires: [root], choice: true, excludes: [left]}
+              middle: {branch: a, at: [1, 1], requires: [root], ranks: 3}
+              badge: {branch: a, at: [2, 1], requires: [middle], mastery: true, effects: {gold: 5}}
+              other: {branch: b, at: [0, 0]}
+            """;
+
+    @Test
+    @DisplayName("a mastery badge opens once every other node of its branch not shut by a choice is at its last rank")
+    void mastery() {
+        SkillTree tree = SkillTree.read(MASTERED, EFFECTS::contains);
+        TreeNode badge = tree.node("badge").orElseThrow();
+        assertThat(badge.mastery()).isTrue();
+        var some = java.util.Map.of("root", 2, "middle", 3);
+        assertThat(tree.state(some, badge)).as("neither side of the choice yet").isEqualTo(NodeState.LOCKED);
+        assertThat(tree.refusal(some, badge, 99, 99)).contains(SkillTree.Refusal.UNFINISHED);
+        var most = java.util.Map.of("root", 2, "middle", 2, "left", 1);
+        assertThat(tree.refusal(most, badge, 99, 99)).as("middle not at its last rank").contains(SkillTree.Refusal.UNFINISHED);
+        var all = java.util.Map.of("root", 2, "middle", 3, "left", 1);
+        assertThat(tree.state(all, badge)).isEqualTo(NodeState.OPEN);
+        assertThat(tree.refusal(all, badge, 99, 99)).isEmpty();
+        assertThat(tree.mastered(all, "a")).isFalse();
+        var done = java.util.Map.of("root", 2, "middle", 3, "left", 1, "badge", 1);
+        assertThat(tree.mastered(done, "a")).isTrue();
+        assertThat(tree.mastered(done, "b")).as("a branch without a badge is never mastered").isFalse();
+        assertThat(tree.masteries("a")).extracting(TreeNode::id).containsExactly("badge");
+    }
+
+    @Test
+    @DisplayName("a badge in no branch's end, or two in one branch, is refused")
+    void masteryChecked() {
+        assertThatThrownBy(() -> SkillTree.read("branches: {a: {title: A}}\nnodes:\n  x: {branch: a, at: [0, 0], mastery: true}\n"
+                + "  y: {branch: a, at: [1, 0], mastery: true, requires: [x]}", EFFECTS::contains))
+                .hasMessageContaining("one mastery");
     }
 }
