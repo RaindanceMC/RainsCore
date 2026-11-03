@@ -91,6 +91,11 @@ def _image(paint):
             if got:
                 rgb, a = got
                 px[xx, yy] = tuple(clamp(c) for c in rgb) + (clamp(a),)
+    # The game measures a bitmap glyph by its last column that is not fully transparent, and moves the pen that far
+    # and one more. TreeGlyphs counts on SIZE + 1 for every sprite, so the last column always holds a pixel — of an
+    # alpha so low that the text shader throws it away.
+    if all(px[SIZE - 1, yy][3] == 0 for yy in range(SIZE)):
+        px[SIZE - 1, 0] = (0, 0, 0, 1)
     return img
 
 

@@ -58,6 +58,10 @@ public abstract class TreeMenu extends Menu {
     /** A click on a node. Call {@link #reopen()} once its state has changed. */
     protected abstract void onNode(Node node, InventoryClickEvent event);
 
+    /** A click on the chrome's middle button, the page's summary. Nothing by default. */
+    protected void onSummary(InventoryClickEvent event) {
+    }
+
     protected TreeLook look() {
         return TreeLook.BRASS;
     }
@@ -185,6 +189,10 @@ public abstract class TreeMenu extends Menu {
                     event -> turnTo(page + 1));
         }
         ItemStack summary = current().summary();
-        set(chromeRow + MenuLayout.CHROME_PAGE, summary != null ? summary : Icons.pageCounter(page + 1, pages));
+        if (summary != null) {
+            set(chromeRow + MenuLayout.CHROME_PAGE, summary, this::onSummary);
+        } else {
+            set(chromeRow + MenuLayout.CHROME_PAGE, Icons.pageCounter(page + 1, pages));
+        }
     }
 }
