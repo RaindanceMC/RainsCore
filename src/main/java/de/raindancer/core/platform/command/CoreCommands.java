@@ -267,6 +267,22 @@ public final class CoreCommands {
         return true;
     }
 
+    private static final AtomicBoolean GIVE_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /give} that knows every plugin's items as well as vanilla's ({@code /give Ada fishing:rod-void}); what
+     * is not a plugin's goes to {@code minecraft:give} as typed. Vanilla's permission. One per server, taken by the
+     * first plugin that asks; vanilla's own stays reachable as {@code /minecraft:give}.
+     */
+    public static boolean give(Commands registrar) {
+        if (!GIVE_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register("give", "Give items: vanilla's, and every plugin's own (fishing:rod-void).",
+                List.of(), new de.raindancer.core.content.items.GiveCommand());
+        return true;
+    }
+
     private static final AtomicBoolean NETWORK_TAKEN = new AtomicBoolean();
 
     /**
