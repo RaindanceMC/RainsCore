@@ -152,6 +152,39 @@ public final class LuckPermsGroups implements PermissionGroups {
     }
 
     @Override
+    public int putOnDuty(String group, java.util.Collection<String> alwaysOn) {
+        String name = key(group);
+        if (name.isEmpty()) {
+            return 0;
+        }
+        GroupManager groups = luckPerms.getGroupManager();
+        Group found = groups.getGroup(name);
+        if (found == null) {
+            found = groups.loadGroup(name).join().orElse(null);
+        }
+        if (found == null) {
+            return 0;
+        }
+        java.util.List<PermissionNode> free = new java.util.ArrayList<>();
+        for (PermissionNode node : found.getNodes(net.luckperms.api.node.NodeType.PERMISSION)) {
+            if (node.getContexts().isEmpty() && !alwaysOn.contains(node.getPermission())) {
+                free.add(node);
+            }
+        }
+        if (free.isEmpty()) {
+            return 0;
+        }
+        for (PermissionNode node : free) {
+            found.data().remove(node);
+            found.data().add(PermissionNode.builder(node.getPermission()).value(node.getValue())
+                    .withContext(Duty.POWERS, Duty.ON).build());
+        }
+        groups.saveGroup(found).join();
+        log.info("Put {} permission(s) of the LuckPerms group {} on duty (rains:powers=on).", free.size(), name);
+        return free.size();
+    }
+
+    @Override
     public boolean exists(String group) {
         String name = key(group);
         if (name.isEmpty()) {

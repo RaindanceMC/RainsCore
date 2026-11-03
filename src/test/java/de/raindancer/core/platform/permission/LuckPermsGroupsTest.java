@@ -141,4 +141,57 @@ class LuckPermsGroupsTest {
         verify(permission).value(false);
         verify(permission).withContext(Duty.DEV, Duty.ON);
     }
+
+    private static PermissionNode node(String key, boolean contextFree) {
+        PermissionNode node = mock(PermissionNode.class);
+        when(node.getPermission()).thenReturn(key);
+        when(node.getKey()).thenReturn(key);
+        when(node.getValue()).thenReturn(true);
+        net.luckperms.api.context.ImmutableContextSet contexts = mock(net.luckperms.api.context.ImmutableContextSet.class);
+        when(contexts.isEmpty()).thenReturn(contextFree);
+        when(node.getContexts()).thenReturn(contexts);
+        return node;
+    }
+
+    @Test
+    @DisplayName("putting a group on duty moves its context-free powers under rains:powers=on, keeping the always-on ones")
+    void putOnDuty() {
+        Group mod = mock(Group.class);
+        NodeMap data = mock(NodeMap.class);
+        DataMutateResult ok = mock(DataMutateResult.class);
+        when(ok.wasSuccessful()).thenReturn(true);
+        when(data.add(any(Node.class))).thenReturn(ok);
+        when(data.remove(any(Node.class))).thenReturn(ok);
+        when(mod.data()).thenReturn(data);
+        PermissionNode ban = node("rains.moderation.ban", true);
+        PermissionNode chat = node("rains.moderation.staffchat", true);
+        PermissionNode built = node("worldedit.*", false);
+        when(mod.getNodes(net.luckperms.api.node.NodeType.PERMISSION)).thenReturn(java.util.List.of(ban, chat, built));
+        when(groupManager.getGroup("mod")).thenReturn(mod);
+
+        int moved = new LuckPermsGroups(luckPerms).putOnDuty("mod", java.util.Set.of("rains.moderation.staffchat"));
+
+        assertThat(moved).isEqualTo(1);
+        verify(data).remove(ban);
+        verify(data, never()).remove(chat);
+        verify(data, never()).remove(built);
+        verify(permission).withContext(Duty.POWERS, Duty.ON);
+        verify(groupManager).saveGroup(mod);
+    }
+
+    @Test
+    @DisplayName("a group already on duty, or missing, is not written")
+    void alreadyOnDuty() {
+        Group mod = mock(Group.class);
+        PermissionNode onDuty = node("rains.moderation.ban", false);
+        when(mod.getNodes(net.luckperms.api.node.NodeType.PERMISSION)).thenReturn(java.util.List.of(onDuty));
+        when(groupManager.getGroup("mod")).thenReturn(mod);
+        when(groupManager.getGroup("nobody")).thenReturn(null);
+        when(groupManager.loadGroup("nobody")).thenReturn(CompletableFuture.completedFuture(java.util.Optional.empty()));
+
+        LuckPermsGroups groups = new LuckPermsGroups(luckPerms);
+        assertThat(groups.putOnDuty("mod", java.util.Set.of())).isZero();
+        assertThat(groups.putOnDuty("nobody", java.util.Set.of())).isZero();
+        verify(groupManager, never()).saveGroup(any());
+    }
 }

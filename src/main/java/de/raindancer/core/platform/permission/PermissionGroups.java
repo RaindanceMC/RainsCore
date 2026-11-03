@@ -85,6 +85,17 @@ public interface PermissionGroups {
 
     boolean exists(String group);
 
+    /**
+     * Puts a group's powers on duty: every permission it holds without a context moves under
+     * {@code rains:powers=on} (see {@link Duty}), except those in {@code alwaysOn}. Nodes that already have a
+     * context are left alone. For a server whose staff groups were made before their powers needed admin mode.
+     *
+     * @return how many permissions moved; 0 for a group that does not exist, or groups without contexts
+     */
+    default int putOnDuty(String group, java.util.Collection<String> alwaysOn) {
+        return 0;
+    }
+
     /** Puts them directly in the group. @return whether that changed anything */
     boolean join(UUID who, String group);
 
