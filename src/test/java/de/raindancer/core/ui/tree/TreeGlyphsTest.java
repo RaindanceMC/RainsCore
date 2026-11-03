@@ -24,7 +24,7 @@ class TreeGlyphsTest {
             }
             int index = c - TreeGlyphs.FIRST_SPRITE;
             sprites.add(new int[]{index / TreeGlyphs.ROWS_PER_SPRITE, index % TreeGlyphs.ROWS_PER_SPRITE, x});
-            x += TreeGrid.SPRITE + 1;
+            x += TreeSprite.values()[index / TreeGlyphs.ROWS_PER_SPRITE].size() + 1;
         }
         return new Played(sprites, x);
     }
@@ -43,6 +43,21 @@ class TreeGlyphsTest {
         assertThat(played.sprites().get(1)).containsExactly(TreeSprite.ACROSS_LIT.ordinal(), 0, TreeGrid.spriteX(1));
         assertThat(played.sprites().get(2)).containsExactly(TreeSprite.FRAME_OPEN.ordinal(), 4, TreeGrid.spriteX(8));
         assertThat(played.sprites().get(3)).containsExactly(TreeSprite.FALLING_DIM.ordinal(), 3, TreeGrid.spriteX(3));
+        assertThat(played.end()).isEqualTo(TreeGlyphs.START);
+    }
+
+    @Test
+    @DisplayName("a mastery badge is bigger and still centred on its slot; what comes after it lands where it should")
+    void badges() {
+        String glyphs = TreeGlyphs.draw(List.of(
+                new TreeGlyphs.Placement(TreeSprite.MASTERY_MAXED, 2, 4),
+                new TreeGlyphs.Placement(TreeSprite.FRAME_OPEN, 2, 6)));
+        Played played = play(glyphs);
+        assertThat(played.sprites().get(0)).containsExactly(TreeSprite.MASTERY_MAXED.ordinal(), 2,
+                TreeGrid.spriteX(4, TreeSprite.MASTERY_SIZE));
+        assertThat(TreeGrid.spriteX(4, TreeSprite.MASTERY_SIZE) + TreeSprite.MASTERY_SIZE / 2)
+                .as("centred where a frame is").isEqualTo(TreeGrid.spriteX(4) + TreeGrid.SPRITE / 2);
+        assertThat(played.sprites().get(1)).containsExactly(TreeSprite.FRAME_OPEN.ordinal(), 2, TreeGrid.spriteX(6));
         assertThat(played.end()).isEqualTo(TreeGlyphs.START);
     }
 

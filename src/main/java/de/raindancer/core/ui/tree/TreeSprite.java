@@ -42,6 +42,14 @@ public enum TreeSprite {
         };
     }
 
+    /** A mastery badge's side, in pixels: it spreads into the free slots around it, so the item fits inside it. */
+    public static final int MASTERY_SIZE = 40;
+
+    /** Its side, in pixels: {@link TreeGrid#SPRITE} but for a mastery badge. */
+    public int size() {
+        return name().startsWith("MASTERY_") ? MASTERY_SIZE : TreeGrid.SPRITE;
+    }
+
     /** The file name its painting is written under, {@code frame_owned}. */
     public String file() {
         return name().toLowerCase(java.util.Locale.ROOT);

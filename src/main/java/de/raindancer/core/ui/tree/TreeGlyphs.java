@@ -41,9 +41,10 @@ public final class TreeGlyphs {
         StringBuilder out = new StringBuilder();
         int pen = START;
         for (Placement placement : placements) {
-            int x = TreeGrid.spriteX(placement.slotColumn());
+            int size = placement.sprite().size();
+            int x = TreeGrid.spriteX(placement.slotColumn(), size);
             out.append(move(x - pen)).append(character(placement.sprite(), placement.slotRow()));
-            pen = x + TreeGrid.SPRITE + 1;
+            pen = x + size + 1;
         }
         return out.append(move(START - pen)).toString();
     }

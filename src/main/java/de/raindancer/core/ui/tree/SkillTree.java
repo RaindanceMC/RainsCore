@@ -104,7 +104,7 @@ public final class SkillTree {
                 }
             }
             TreeNode node = new TreeNode(id, branch, at.get(0), at.get(1), n.getString("title", id),
-                    n.getString("icon", "stone"), Math.max(1, n.getInt("ranks", 1)), Math.max(1, n.getInt("cost", 1)),
+                    n.getString("icon", "stone"), Math.max(1, n.getInt("ranks", 1)), Math.max(0, n.getInt("cost", 1)),
                     n.getBoolean("choice"), n.getBoolean("capstone"), Math.max(0, n.getInt("level", 0)),
                     Math.max(0, n.getInt("level-step", 0)), n.getStringList("requires"), n.getStringList("excludes"),
                     effects, n.getBoolean("mastery"));

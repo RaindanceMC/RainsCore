@@ -55,7 +55,12 @@ public final class TreeGrid {
 
     /** Where a sprite on this slot column starts, from the window's left edge. */
     public static int spriteX(int slotColumn) {
-        return 16 + SLOT * slotColumn - SPRITE / 2;
+        return spriteX(slotColumn, SPRITE);
+    }
+
+    /** Where a sprite {@code size} pixels wide, centred on this slot column, starts. */
+    public static int spriteX(int slotColumn, int size) {
+        return 16 + SLOT * slotColumn - size / 2;
     }
 
     /**
@@ -63,7 +68,12 @@ public final class TreeGrid {
      * glyph's top is drawn {@code ascent} above it; the sprite's top is 13 pixels above its slot's centre.
      */
     public static int spriteAscent(int slotRow) {
-        return 13 - (26 + SLOT * slotRow - SPRITE / 2);
+        return spriteAscent(slotRow, SPRITE);
+    }
+
+    /** The ascent that centres a sprite {@code size} pixels high on this slot row. */
+    public static int spriteAscent(int slotRow, int size) {
+        return 13 - (26 + SLOT * slotRow - size / 2);
     }
 
     /** Largest column or row a canvas may use. */

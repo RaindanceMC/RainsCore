@@ -8,7 +8,7 @@ import java.util.Map;
  *
  * @param column    on its tree's canvas, from 0, left to right
  * @param row       from 0, top to bottom
- * @param cost      points per rank
+ * @param cost      points per rank; 0 for a node that is earned rather than bought, like a mastery badge
  * @param choice    one side of a choice: taking it shuts what it {@code excludes}
  * @param capstone  the end of its branch
  * @param level     the level its first rank needs, 0 for none
