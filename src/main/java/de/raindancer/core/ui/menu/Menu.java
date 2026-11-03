@@ -223,6 +223,11 @@ public abstract class Menu implements InventoryHolder {
         return Backdrop.house(layout.rows());
     }
 
+    /** What a page draws over its painting before the title: nothing, unless it draws in the title itself. */
+    protected Component overlay() {
+        return Component.empty();
+    }
+
     /** Whether this viewer sees the painted window. */
     protected boolean designed() {
         return viewer != null && MenuStyle.wearing(viewer.getUniqueId()) && backdrop() != null;
@@ -244,7 +249,7 @@ public abstract class Menu implements InventoryHolder {
                 title = !pagePlain.contains("\u2026") && TitleFont.width(pagePlain) <= TitleFont.BUDGET ? page : title();
             }
         }
-        return backdrop().frame(title);
+        return backdrop().frame(title, overlay());
     }
 
     private static final net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer PLAIN =

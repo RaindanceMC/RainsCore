@@ -1,0 +1,610 @@
+{
+ "providers": [
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_locked.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue100"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_locked.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue101"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_locked.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue102"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_locked.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue103"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_locked.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue104"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_open.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue105"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_open.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue106"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_open.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue107"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_open.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue108"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_open.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue109"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_owned.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue10a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_owned.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue10b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_owned.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue10c"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_owned.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue10d"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_owned.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue10e"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_maxed.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue10f"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_maxed.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue110"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_maxed.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue111"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_maxed.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue112"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_maxed.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue113"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_barred.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue114"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_barred.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue115"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_barred.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue116"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_barred.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue117"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/frame_barred.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue118"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_dim.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue119"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_dim.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue11a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_dim.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue11b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_dim.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue11c"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_dim.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue11d"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_lit.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue11e"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_lit.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue11f"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_lit.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue120"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_lit.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue121"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/across_lit.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue122"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_dim.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue123"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_dim.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue124"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_dim.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue125"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_dim.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue126"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_dim.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue127"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_lit.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue128"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_lit.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue129"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_lit.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue12a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_lit.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue12b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/down_lit.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue12c"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_dim.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue12d"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_dim.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue12e"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_dim.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue12f"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_dim.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue130"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_dim.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue131"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_lit.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue132"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_lit.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue133"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_lit.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue134"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_lit.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue135"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/falling_lit.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue136"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_dim.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue137"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_dim.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue138"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_dim.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue139"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_dim.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue13a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_dim.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue13b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_lit.png",
+   "ascent": 0,
+   "height": 26,
+   "chars": [
+    "\ue13c"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_lit.png",
+   "ascent": -18,
+   "height": 26,
+   "chars": [
+    "\ue13d"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_lit.png",
+   "ascent": -36,
+   "height": 26,
+   "chars": [
+    "\ue13e"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_lit.png",
+   "ascent": -54,
+   "height": 26,
+   "chars": [
+    "\ue13f"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/tree/rising_lit.png",
+   "ascent": -72,
+   "height": 26,
+   "chars": [
+    "\ue140"
+   ]
+  },
+  {
+   "type": "space",
+   "advances": {
+    "\uf100": -1,
+    "\uf108": 1,
+    "\uf101": -2,
+    "\uf109": 2,
+    "\uf102": -4,
+    "\uf10a": 4,
+    "\uf103": -8,
+    "\uf10b": 8,
+    "\uf104": -16,
+    "\uf10c": 16,
+    "\uf105": -32,
+    "\uf10d": 32,
+    "\uf106": -64,
+    "\uf10e": 64,
+    "\uf107": -128,
+    "\uf10f": 128
+   }
+  }
+ ]
+}

@@ -52,8 +52,19 @@ public record Backdrop(Key font, String glyphs, TextColor ink, Key titleFont) {
     }
 
     public Component frame(Component title) {
-        return Component.text(glyphs).font(font).color(NamedTextColor.WHITE)
-                .append(legible(title.font(titleFont).colorIfAbsent(ink)));
+        return frame(title, Component.empty());
+    }
+
+    /**
+     * The painting, then {@code overlay} drawn over it — a run in another font that starts and ends where the
+     * title's text does, such as a skill tree's frames and lines — then the title.
+     */
+    public Component frame(Component title, Component overlay) {
+        Component painting = Component.text(glyphs).font(font).color(NamedTextColor.WHITE);
+        if (!Component.empty().equals(overlay)) {
+            painting = painting.append(overlay.colorIfAbsent(NamedTextColor.WHITE));
+        }
+        return painting.append(legible(title.font(titleFont).colorIfAbsent(ink)));
     }
 
     /**
