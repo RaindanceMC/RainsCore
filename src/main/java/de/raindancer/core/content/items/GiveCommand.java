@@ -44,7 +44,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Typing helps: players and selectors are vanilla's own argument, the item is suggested by key or by name with its
  * coloured name as the tooltip ({@code void} finds {@code fishing:rod-void}), then one, a stack and more. A mistyped
- * item gets "Did you mean fishing:rod-void?" and a button that runs the corrected give. Vanilla's permission, so
+ * item gets "Did you mean fishing:rod-void?" and a button that runs the corrected give. {@code /give <player> search
+ * <words>} opens a page of every item that answers, vanilla's and the plugins', to pick one and say how many. Vanilla's permission, so
  * nobody gets more or less than before.
  */
 public final class GiveCommand {
@@ -82,6 +83,10 @@ public final class GiveCommand {
     private static int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         CommandSender sender = context.getSource().getSender();
         String rest = GiveCatalogue.joined(StringArgumentType.getString(context, "item").trim());
+        if (rest.toLowerCase(Locale.ROOT).startsWith("search")
+                && (rest.length() == 6 || Character.isWhitespace(rest.charAt(6)))) {
+            return search(context, rest.substring(6).strip());
+        }
         String targets = rangeOf(context, "targets");
         List<String> args = new ArrayList<>();
         args.add(targets);
@@ -109,6 +114,29 @@ public final class GiveCommand {
                 return players.size();
             }
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** {@code /give <player> search <words>}: the results page, for whoever typed it. */
+    private static int search(CommandContext<CommandSourceStack> context, String words) throws CommandSyntaxException {
+        if (!(context.getSource().getSender() instanceof Player viewer)) {
+            throw new SimpleCommandExceptionType(MessageComponentSerializer.message().serialize(
+                    Component.text("A search opens a page: run it as a player."))).create();
+        }
+        if (words.isBlank()) {
+            viewer.sendMessage(GiveText.usage());
+            return 0;
+        }
+        List<Player> players = context.getArgument("targets", PlayerSelectorArgumentResolver.class)
+                .resolve(context.getSource());
+        Map<String, String> names = new java.util.LinkedHashMap<>();
+        for (String key : vanillaItems()) {
+            names.put(key, de.raindancer.core.ui.choose.Catalogue.readable(key.substring("minecraft:".length())));
+        }
+        for (String key : ourKeys()) {
+            names.put(key, plainName(key) + " " + key.substring(key.indexOf(':') + 1).replace('-', ' '));
+        }
+        new GiveSearchMenu(viewer, players, words, names).open();
         return Command.SINGLE_SUCCESS;
     }
 
@@ -173,7 +201,12 @@ public final class GiveCommand {
         return stacks;
     }
 
-    private static Optional<ItemStack> make(String key, int amount) {
+    static Optional<ItemStack> make(String key, int amount) {
+        if (key.startsWith("minecraft:")) {
+            Material material = Material.matchMaterial(key);
+            return material == null || !material.isItem() ? Optional.empty()
+                    : Optional.of(new ItemStack(material, amount));
+        }
         Optional<ItemStack> made = ItemGivers.make(key, amount);
         if (made.isPresent()) {
             return made;
@@ -199,6 +232,12 @@ public final class GiveCommand {
                 return amounts.buildFuture();
             }
             return builder.buildFuture();
+        }
+        if (typed.toLowerCase(Locale.ROOT).startsWith("search ")) {
+            return builder.buildFuture();
+        }
+        if (!typed.isEmpty() && "search".startsWith(typed.toLowerCase(Locale.ROOT))) {
+            builder.suggest("search", tooltip("Look for an item by name and pick it from a page"));
         }
         List<String> keys = ourKeys();
         // By key first, then by name: "void" finds fishing:rod-void and fishing:bait-voidlure, "fish" every fish.

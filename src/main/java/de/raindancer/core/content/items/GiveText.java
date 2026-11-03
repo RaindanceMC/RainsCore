@@ -47,10 +47,12 @@ public final class GiveText {
     public static Component usage() {
         return MINI.deserialize("<" + Style.itemLore() + ">Usage: <" + Style.itemName() + "><shape></" + Style.itemName()
                         + "> <" + Style.itemLore() + ">— e.g. <" + Style.itemName() + "><ours></" + Style.itemName()
-                        + "> <" + Style.itemLore() + ">or <" + Style.itemName() + "><vanilla>",
+                        + "> <" + Style.itemLore() + ">or <" + Style.itemName() + "><vanilla></" + Style.itemName()
+                        + "> <" + Style.itemLore() + ">— or look one up: <" + Style.itemName() + "><search>",
                 Placeholder.unparsed("shape", "/give <player> <item> [amount]"),
                 Placeholder.unparsed("ours", "/give @s fishing:rod-void"),
-                Placeholder.unparsed("vanilla", "/give @s diamond 64"));
+                Placeholder.unparsed("vanilla", "/give @s diamond 64"),
+                Placeholder.unparsed("search", "/give @s search diamond"));
     }
 
     private static String who(List<String> names) {
