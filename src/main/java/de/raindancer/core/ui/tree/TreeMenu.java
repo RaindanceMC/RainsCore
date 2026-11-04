@@ -243,9 +243,18 @@ public abstract class TreeMenu extends Menu {
         }
     }
 
-    /** Slots of the chrome row the window scrolls up and down with; left and right share the page arrows'. */
+    /**
+     * Slots of the chrome row the window scrolls up and down with; left and right share the page arrows'. Up and down
+     * mirror them around the page button, so help moves to 7.
+     */
     static final int CHROME_UP = 2;
-    static final int CHROME_DOWN = 7;
+    static final int CHROME_DOWN = 6;
+    static final int CHROME_TREE_HELP = 7;
+
+    @Override
+    protected int helpSlot() {
+        return CHROME_TREE_HELP;
+    }
 
     @Override
     protected void paintPagingChrome(int chromeRow) {

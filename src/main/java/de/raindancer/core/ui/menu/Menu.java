@@ -431,6 +431,11 @@ public abstract class Menu implements InventoryHolder {
 
     // ------------------------------------------------------------------------- chrome
 
+    /** Where on the chrome row the help button goes; a page that needs slot 6 for something else moves it. */
+    protected int helpSlot() {
+        return MenuLayout.CHROME_HELP;
+    }
+
     private void paintChrome() {
         writingChrome = true;
         try {
@@ -450,7 +455,7 @@ public abstract class Menu implements InventoryHolder {
                 paintPagingChrome(row);
                 List<String> help = helpLines();
                 if (!help.isEmpty()) {
-                    set(row + MenuLayout.CHROME_HELP, Icons.help(help), this::onHelp);
+                    set(row + helpSlot(), Icons.help(help), this::onHelp);
                 }
             }
             if (pendingDanger != null) {

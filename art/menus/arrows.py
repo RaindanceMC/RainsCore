@@ -17,9 +17,9 @@ N = 16
 SS = 16  # the shapes are drawn this much bigger and thresholded back to crisp pixels
 
 LIGHT = (255, 236, 160)
-MID = (232, 180, 64)
-DARK = (176, 116, 36)
-EDGE = (44, 26, 10, 200)
+MID = (226, 172, 60)
+DARK = (168, 110, 34)
+SHADOW = (20, 12, 6, 170)
 
 
 def mask(draw):
@@ -44,43 +44,24 @@ def turned(cells, quarter_turns):
     return cells
 
 
-def symmetric(cells):
-    """The shape made exactly mirror-symmetric top to bottom, so every direction is the same arrow turned."""
-    top = {(x, y) for x, y in cells if y < N // 2}
-    return top | {(x, N - 1 - y) for x, y in top}
-
-
 def paint(cells):
-    """Brass shaded from its own edges inwards — darker rim, bright middle — and an even dark edge around it, so
-    no direction looks lit differently from another."""
+    """Brass lit from the top left, darker down the bottom-right edges, a soft shadow below and right of it."""
     img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
     px = img.load()
-    depth = {}
-    frontier = [c for c in cells if any((c[0] + a, c[1] + b) not in cells for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
-    for c in frontier:
-        depth[c] = 1
-    while frontier:
-        nxt = []
-        for x, y in frontier:
-            for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                c = (x + a, y + b)
-                if c in cells and c not in depth:
-                    depth[c] = depth[(x, y)] + 1
-                    nxt.append(c)
-        frontier = nxt
-    for (x, y), d in depth.items():
-        px[x, y] = (DARK if d == 1 else MID if d == 2 else LIGHT) + (255,)
-    for y in range(N):
-        for x in range(N):
-            if (x, y) not in cells and any((x + a, y + b) in cells for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                px[x, y] = EDGE
+    for x, y in cells:
+        if (x + 1, y + 1) not in cells and x + 1 < N and y + 1 < N:
+            px[x + 1, y + 1] = SHADOW
+    for x, y in cells:
+        lit = (x, y - 1) not in cells or (x - 1, y) not in cells
+        low = (x, y + 1) not in cells or (x + 1, y) not in cells
+        px[x, y] = (LIGHT if lit and not low else DARK if low and not lit else MID) + (255,)
     return img
 
 
 def shapes():
-    r = symmetric(mask(right))
+    r = mask(right)
     return {
-        "arrow_back": symmetric(mask(back)),
+        "arrow_back": mask(back),
         "arrow_left": {(N - 1 - x, y) for x, y in r},
         "arrow_right": r,
         "arrow_up": turned(r, 3),
@@ -116,7 +97,7 @@ def preview(path):
         (0, 53, 176, 72))
     painted = {name: paint(cells) for name, cells in shapes().items()}
     for column, name in ((0, "arrow_back"), (2, "arrow_up"), (3, "arrow_left"), (5, "arrow_right"),
-                         (7, "arrow_down")):
+                         (6, "arrow_down")):
         row.alpha_composite(painted[name], (8 + 18 * column, 1))
     row.resize((row.width * 5, row.height * 5), Image.NEAREST).save(path)
 
