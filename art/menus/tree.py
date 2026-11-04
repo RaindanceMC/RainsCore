@@ -16,8 +16,8 @@ from PIL import Image
 
 SIZE = 26
 C = (SIZE - 1) / 2.0
-# A mastery badge spreads into the free slots around it (TreeSprite.MASTERY_SIZE), so the item fits inside it.
-MASTERY_SIZE = 40
+# TreeSprite.MASTERY_SIZE; every sprite may have a size of its own, a mastery badge has a frame's.
+MASTERY_SIZE = SIZE
 ROWS = 5
 FIRST_SPRITE = 0xE100
 FIRST_SPACE = 0xF100
@@ -32,10 +32,6 @@ FRAMES = ["locked", "open", "owned", "maxed", "barred"]
 
 def clamp(v):
     return int(max(0, min(255, round(v))))
-
-
-def shade(c, f):
-    return tuple(v * f for v in c)
 
 
 def mix(a, b, t):
@@ -64,26 +60,15 @@ class Style:
         return None
 
     def mastery(self, state, x, y):
-        """A mastery badge's pixel: two five-pointed stars as clean pixel art — a bigger one behind, turned a little,
-        and a smaller one over it, each with a dark outline — the item in the middle. Override for a look of its own."""
-        back_fill, front_fill, front_light, outline = {
-            "locked": ((78, 76, 72), (112, 108, 102), (140, 136, 128), (30, 28, 26)),
-            "open": ((40, 132, 84), (88, 206, 134), (170, 245, 196), (14, 52, 32)),
-            "maxed": ((196, 128, 30), (250, 204, 70), (255, 240, 170), (86, 50, 10)),
-        }[state]
-        front, front_edge = star_shape(x, y, FRONT_SCALE)
-        back, back_edge = star_shape(x, y, 1.0, BACK_TURN)
-        alpha = 215 if state == "locked" else 255
-        if front:
-            if front_edge < 1.0:
-                return outline, 255
-            # one highlight: the upper-left half of the front star
-            return (front_light if x + y < -2 else front_fill), alpha
-        if back:
-            if back_edge < 1.0 or front_edge < 1.0:
-                return outline, 255
-            return back_fill, alpha
-        return None
+        """A mastery badge's pixel: the look's own frame (open, maxed or locked) under a five-pointed star crown.
+        Override for a look of its own."""
+        colour = {"locked": (110, 104, 96), "open": (150, 255, 180), "maxed": (255, 214, 90)}[state]
+        star = _star(x, y)
+        if star is not None:
+            return mix(colour, (255, 255, 240), star), 255
+        if _studs(x, y):
+            return mix(colour, (255, 255, 255), 0.35), 255
+        return self.frame({"locked": "locked", "open": "open", "maxed": "maxed"}[state], x, y)
 
     def frame(self, state, x, y):
         """A frame's pixel at (x, y) from its centre; None for nothing. The item sits on top of the middle."""
@@ -113,37 +98,25 @@ class Style:
         return None
 
 
-STAR_OUTER = 19.6
-STAR_INNER = 10.6
-# The badge is two stars: a bigger one behind, turned a little, and a smaller one over it.
-BACK_TURN = math.radians(15)
-FRONT_SCALE = 0.8
+def _star(x, y):
+    """How bright a five-pointed star crowning a frame is at (x, y), or None outside it."""
+    dx, dy = x, y + 8.6
+    r = math.hypot(dx, dy)
+    if r > 4.2:
+        return None
+    a = math.atan2(dy, dx) + math.pi / 2
+    k = (a % (2 * math.pi / 5)) - math.pi / 5
+    if r > 4.2 - 2.4 * (abs(k) / (math.pi / 5)):
+        return None
+    return 0.6 - 0.4 * (dx + dy) / 4.2
 
 
-def _star_points(scale=1.0, turn=0.0):
-    points = []
-    for k in range(10):
-        a = -math.pi / 2 + turn + k * math.pi / 5
-        r = (STAR_OUTER if k % 2 == 0 else STAR_INNER) * scale
-        points.append((r * math.cos(a), r * math.sin(a) + 0.6))
-    return points
-
-
-def star_shape(x, y, scale=1.0, turn=0.0):
-    """Whether (x, y) from a sprite's centre is inside a five-pointed star of that size and turn, and how far it is
-    from its edge (inside or out)."""
-    points = _star_points(scale, turn)
-    inside = False
-    nearest = 1e9
-    for i in range(len(points)):
-        x1, y1 = points[i]
-        x2, y2 = points[(i + 1) % len(points)]
-        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
-            inside = not inside
-        dx, dy = x2 - x1, y2 - y1
-        t = max(0.0, min(1.0, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
-        nearest = min(nearest, math.hypot(x - (x1 + t * dx), y - (y1 + t * dy)))
-    return inside, nearest
+def _studs(x, y):
+    """Diamond studs on a frame's ring, left, right and below — what marks a badge from a node."""
+    for sx, sy in ((-10.2, 0.0), (10.2, 0.0), (0.0, 10.2)):
+        if abs(x - sx) + abs(y - sy) <= 1.8:
+            return True
+    return False
 
 
 def size_of(name):

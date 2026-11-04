@@ -47,12 +47,13 @@ class TreeGlyphsTest {
     }
 
     @Test
-    @DisplayName("a mastery badge is bigger and still centred on its slot; what comes after it lands where it should")
+    @DisplayName("a mastery badge is a frame's size, centred on its slot; what comes after it lands where it should")
     void badges() {
         String glyphs = TreeGlyphs.draw(List.of(
                 new TreeGlyphs.Placement(TreeSprite.MASTERY_MAXED, 2, 4),
                 new TreeGlyphs.Placement(TreeSprite.FRAME_OPEN, 2, 6)));
         Played played = play(glyphs);
+        assertThat(TreeSprite.MASTERY_MAXED.size()).as("the item sits in its frame like any node").isEqualTo(TreeGrid.SPRITE);
         assertThat(played.sprites().get(0)).containsExactly(TreeSprite.MASTERY_MAXED.ordinal(), 2,
                 TreeGrid.spriteX(4, TreeSprite.MASTERY_SIZE));
         assertThat(TreeGrid.spriteX(4, TreeSprite.MASTERY_SIZE) + TreeSprite.MASTERY_SIZE / 2)

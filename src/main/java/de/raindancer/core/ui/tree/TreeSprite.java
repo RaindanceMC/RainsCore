@@ -42,8 +42,8 @@ public enum TreeSprite {
         };
     }
 
-    /** A mastery badge's side, in pixels: it spreads into the free slots around it, so the item fits inside it. */
-    public static final int MASTERY_SIZE = 40;
+    /** A mastery badge's side, in pixels: a frame's, so the item sits in it like in any node. */
+    public static final int MASTERY_SIZE = TreeGrid.SPRITE;
 
     /** Its side, in pixels: {@link TreeGrid#SPRITE} but for a mastery badge. */
     public int size() {

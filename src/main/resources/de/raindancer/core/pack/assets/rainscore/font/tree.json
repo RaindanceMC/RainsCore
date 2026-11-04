@@ -588,8 +588,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_locked.png",
-   "ascent": 7,
-   "height": 40,
+   "ascent": 0,
+   "height": 26,
    "chars": [
     "\ue141"
    ]
@@ -597,8 +597,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_locked.png",
-   "ascent": -11,
-   "height": 40,
+   "ascent": -18,
+   "height": 26,
    "chars": [
     "\ue142"
    ]
@@ -606,8 +606,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_locked.png",
-   "ascent": -29,
-   "height": 40,
+   "ascent": -36,
+   "height": 26,
    "chars": [
     "\ue143"
    ]
@@ -615,8 +615,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_locked.png",
-   "ascent": -47,
-   "height": 40,
+   "ascent": -54,
+   "height": 26,
    "chars": [
     "\ue144"
    ]
@@ -624,8 +624,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_locked.png",
-   "ascent": -65,
-   "height": 40,
+   "ascent": -72,
+   "height": 26,
    "chars": [
     "\ue145"
    ]
@@ -633,8 +633,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_open.png",
-   "ascent": 7,
-   "height": 40,
+   "ascent": 0,
+   "height": 26,
    "chars": [
     "\ue146"
    ]
@@ -642,8 +642,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_open.png",
-   "ascent": -11,
-   "height": 40,
+   "ascent": -18,
+   "height": 26,
    "chars": [
     "\ue147"
    ]
@@ -651,8 +651,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_open.png",
-   "ascent": -29,
-   "height": 40,
+   "ascent": -36,
+   "height": 26,
    "chars": [
     "\ue148"
    ]
@@ -660,8 +660,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_open.png",
-   "ascent": -47,
-   "height": 40,
+   "ascent": -54,
+   "height": 26,
    "chars": [
     "\ue149"
    ]
@@ -669,8 +669,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_open.png",
-   "ascent": -65,
-   "height": 40,
+   "ascent": -72,
+   "height": 26,
    "chars": [
     "\ue14a"
    ]
@@ -678,8 +678,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_maxed.png",
-   "ascent": 7,
-   "height": 40,
+   "ascent": 0,
+   "height": 26,
    "chars": [
     "\ue14b"
    ]
@@ -687,8 +687,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_maxed.png",
-   "ascent": -11,
-   "height": 40,
+   "ascent": -18,
+   "height": 26,
    "chars": [
     "\ue14c"
    ]
@@ -696,8 +696,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_maxed.png",
-   "ascent": -29,
-   "height": 40,
+   "ascent": -36,
+   "height": 26,
    "chars": [
     "\ue14d"
    ]
@@ -705,8 +705,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_maxed.png",
-   "ascent": -47,
-   "height": 40,
+   "ascent": -54,
+   "height": 26,
    "chars": [
     "\ue14e"
    ]
@@ -714,8 +714,8 @@
   {
    "type": "bitmap",
    "file": "rainscore:font/tree/mastery_maxed.png",
-   "ascent": -65,
-   "height": 40,
+   "ascent": -72,
+   "height": 26,
    "chars": [
     "\ue14f"
    ]
