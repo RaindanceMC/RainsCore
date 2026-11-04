@@ -225,7 +225,7 @@ public final class Icons {
 
     public static ItemStack back(String where) {
         String to = where == null ? word("menu.previous-menu", "the previous menu") : where;
-        return of(Material.ARROW, "<" + Style.itemName() + ">" + word("menu.back", "Back"),
+        return arrow(Arrow.BACK, "<" + Style.itemName() + ">" + word("menu.back", "Back"),
                 "<" + Style.itemLore() + ">" + word("menu.back-to", "Back to <where>",
                         "where", to));
     }
@@ -252,16 +252,62 @@ public final class Icons {
     }
 
     public static ItemStack previousPage(int page, int pages) {
-        return of(Material.SPECTRAL_ARROW,
+        return arrow(Arrow.LEFT,
                 "<" + Style.itemName() + ">" + word("menu.previous-page", "Previous page"),
                 "<" + Style.itemLore() + ">" + pageOf(page, pages));
     }
 
     public static ItemStack nextPage(int page, int pages) {
-        return of(Material.SPECTRAL_ARROW,
+        return arrow(Arrow.RIGHT,
                 "<" + Style.itemName() + ">" + word("menu.next-page", "Next page"),
                 "<" + Style.itemLore() + ">" + pageOf(page, pages));
     }
+
+    /** A button that is an arrow: Core's painted one for a viewer wearing the pack, the vanilla arrow otherwise. */
+    public static ItemStack arrow(Arrow way, String name, String... lore) {
+        return arrow(way, name, List.of(lore));
+    }
+
+    public static ItemStack arrow(Arrow way, String name, List<String> lore) {
+        return pointing(of(way.vanilla(), name, lore), way);
+    }
+
+    /** Marks a stack as this arrow, so a menu shows it as Core's painted one to a viewer wearing the pack. */
+    public static ItemStack pointing(ItemStack item, Arrow way) {
+        if (item == null || way == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(ARROW, org.bukkit.persistence.PersistentDataType.STRING, way.tag());
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /**
+     * The stack as this viewer should see it: a marked arrow as Core's painted icon if they wear the pack, anything
+     * else as it is. {@link Menu} does this for everything it places; call it for a stack put in an inventory some
+     * other way.
+     */
+    public static ItemStack forViewer(ItemStack item, UUID viewer) {
+        if (item == null || !item.hasItemMeta()) {
+            return item;
+        }
+        String tag = item.getItemMeta().getPersistentDataContainer()
+                .get(ARROW, org.bukkit.persistence.PersistentDataType.STRING);
+        java.util.Optional<Arrow> shown = Arrow.shown(tag, tag != null && MenuStyle.wearing(viewer));
+        if (shown.isEmpty()) {
+            return item;
+        }
+        ItemStack painted = item.clone();
+        ItemMeta meta = painted.getItemMeta();
+        meta.setItemModel(shown.get().model());
+        painted.setItemMeta(meta);
+        return painted;
+    }
+
+    private static final org.bukkit.NamespacedKey ARROW = new org.bukkit.NamespacedKey(MenuStyle.NAMESPACE, "arrow");
 
     private static String pageOf(int page, int pages) {
         return word("menu.page-of", "Page <page> of <pages>", "page", page, "pages", pages);

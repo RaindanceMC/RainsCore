@@ -266,7 +266,7 @@ public abstract class Menu implements InventoryHolder {
         if (!allowed) {
             return;
         }
-        getInventory().setItem(slot, item);
+        getInventory().setItem(slot, viewer == null ? item : Icons.forViewer(item, viewer.getUniqueId()));
         if (handler != null) {
             handlers.put(slot, handler);
         }

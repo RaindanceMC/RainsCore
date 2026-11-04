@@ -2,6 +2,7 @@ package de.raindancer.core.ui.tree;
 
 import de.raindancer.core.ui.chat.Brand;
 import de.raindancer.core.ui.menu.Backdrop;
+import de.raindancer.core.ui.menu.Arrow;
 import de.raindancer.core.ui.menu.Icons;
 import de.raindancer.core.ui.menu.Menu;
 import de.raindancer.core.ui.menu.MenuLayout;
@@ -252,25 +253,25 @@ public abstract class TreeMenu extends Menu {
         current();
         // Left and right scroll the canvas while there is more of it that way, then turn the page.
         if (view.canScrollLeft()) {
-            set(chromeRow + MenuLayout.CHROME_PREVIOUS, scrollIcon("◀ Left", view.hiddenLeft(), "column"),
+            set(chromeRow + MenuLayout.CHROME_PREVIOUS, scrollIcon(Arrow.LEFT, "◀ Left", view.hiddenLeft(), "column"),
                     event -> scroll(event.isShiftClick() ? -TreeGrid.COLUMNS : -1, 0));
         } else if (pages > 1) {
             set(chromeRow + MenuLayout.CHROME_PREVIOUS, Icons.previousPage(Math.floorMod(page - 1, pages) + 1, pages),
                     event -> turnTo(page - 1));
         }
         if (view.canScrollRight()) {
-            set(chromeRow + MenuLayout.CHROME_NEXT, scrollIcon("Right ▶", view.hiddenRight(), "column"),
+            set(chromeRow + MenuLayout.CHROME_NEXT, scrollIcon(Arrow.RIGHT, "Right ▶", view.hiddenRight(), "column"),
                     event -> scroll(event.isShiftClick() ? TreeGrid.COLUMNS : 1, 0));
         } else if (pages > 1) {
             set(chromeRow + MenuLayout.CHROME_NEXT, Icons.nextPage(Math.floorMod(page + 1, pages) + 1, pages),
                     event -> turnTo(page + 1));
         }
         if (view.canScrollUp()) {
-            set(chromeRow + CHROME_UP, scrollIcon("▲ Up", view.hiddenUp(), "row"),
+            set(chromeRow + CHROME_UP, scrollIcon(Arrow.UP, "▲ Up", view.hiddenUp(), "row"),
                     event -> scroll(0, event.isShiftClick() ? -TreeGrid.ROWS : -1));
         }
         if (view.canScrollDown()) {
-            set(chromeRow + CHROME_DOWN, scrollIcon("▼ Down", view.hiddenDown(), "row"),
+            set(chromeRow + CHROME_DOWN, scrollIcon(Arrow.DOWN, "▼ Down", view.hiddenDown(), "row"),
                     event -> scroll(0, event.isShiftClick() ? TreeGrid.ROWS : 1));
         }
         ItemStack summary = current().summary();
@@ -281,8 +282,8 @@ public abstract class TreeMenu extends Menu {
         }
     }
 
-    private static ItemStack scrollIcon(String title, int hidden, String unit) {
-        return Icons.of(Material.ARROW, "<white>" + title, java.util.List.of(
+    private static ItemStack scrollIcon(Arrow way, String title, int hidden, String unit) {
+        return Icons.arrow(way, "<white>" + title, java.util.List.of(
                 "<gray>" + hidden + " more " + unit + (hidden == 1 ? "" : "s") + " that way.",
                 "<dark_gray>Shift-click for a whole window."));
     }
