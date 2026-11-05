@@ -21,8 +21,8 @@ public final class NameSearch {
     private static final java.util.Set<String> FILLER = java.util.Set.of("of", "the", "a", "an");
 
     /**
-     * Lower is closer: 0 the whole name, 1 a name that starts with it, 2 anywhere else, 3 only with a typo. Empty for
-     * no match.
+     * Lower is closer: 0 the whole name, 1 a name that starts with it, 2 anywhere else; with a typo the same again
+     * behind them — 3 the whole name, 4 starting with it, 5 anywhere else. Empty for no match.
      */
     public static Optional<Integer> score(String typed, String name) {
         List<String> wanted = new ArrayList<>(words(typed));
@@ -45,12 +45,28 @@ public final class NameSearch {
             return Optional.empty();
         }
         if (misspelt) {
-            return Optional.of(3);
+            if (words.size() == wanted.size() && matchesInOrder(wanted, words)) {
+                return Optional.of(3);
+            }
+            return Optional.of(close(wanted.getFirst(), words.getFirst()) ? 4 : 5);
         }
         if (String.join(" ", words).equals(String.join(" ", wanted))) {
             return Optional.of(0);
         }
         return Optional.of(words.getFirst().startsWith(wanted.getFirst()) ? 1 : 2);
+    }
+
+    private static boolean close(String typed, String word) {
+        return word.startsWith(typed) || word.equals(roman(typed)) || nearly(typed, word);
+    }
+
+    private static boolean matchesInOrder(List<String> wanted, List<String> words) {
+        for (int i = 0; i < wanted.size(); i++) {
+            if (!close(wanted.get(i), words.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** A typo of the word, or of its start as long as what was typed — "diamnd" of diamond, "enchan" of enchanted. */

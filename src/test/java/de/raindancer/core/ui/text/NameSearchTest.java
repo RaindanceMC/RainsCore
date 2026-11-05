@@ -57,6 +57,18 @@ class NameSearchTest {
     }
 
     @Test
+    @DisplayName("among typos, as among the real spellings: the whole name first, then one starting with it, then the rest")
+    void typosRankLikeSpellings() {
+        int whole = NameSearch.score("diamnd", "Diamond").orElseThrow();
+        int start = NameSearch.score("diamnd", "Diamond Sword").orElseThrow();
+        int later = NameSearch.score("diamnd", "Deepslate Diamond Ore").orElseThrow();
+        assertThat(whole).isLessThan(start);
+        assertThat(start).isLessThan(later);
+        assertThat(whole).as("still after every real spelling")
+                .isGreaterThan(NameSearch.score("diamond", "Block of Diamond").orElseThrow());
+    }
+
+    @Test
     @DisplayName("a typo ranks below the real spelling")
     void typosRankLast() {
         assertThat(NameSearch.score("diamnd", "Diamond").orElseThrow())
