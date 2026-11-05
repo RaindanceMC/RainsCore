@@ -859,6 +859,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 () -> screenRule.kinds(settings.current().staffOnlyScreens()));
         screens.start();
         startNetworkWhitelist();
+        startLeaveScreens();
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
                 getDataFolder().toPath().resolve("maintenance.yml"), System::currentTimeMillis);
         maintenance.load();
@@ -1064,8 +1065,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 org.bukkit.entity.Player online = getServer().getPlayer(player);
                 if (online != null && de.raindancer.core.moderation.punishment.Punishments.banned(exported)) {
                     de.raindancer.core.platform.util.Scheduling.entity(this, online, () -> online.kick(
-                            net.kyori.adventure.text.Component.text("You are banned: "
-                                    + exported.getOrDefault("ban.reason", "no reason given"))));
+                            punishmentGuard.joinRefusal(player).orElseGet(() -> de.raindancer.core.ui.screen.LeaveScreen.framed(
+                                    net.kyori.adventure.text.Component.text("You are banned: "
+                                            + exported.getOrDefault("ban.reason", "no reason given"),
+                                            net.kyori.adventure.text.format.NamedTextColor.RED)))));
                 }
             });
             log.info("Server link: player names and styles are taken from the other server.");
@@ -1873,6 +1876,17 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.platform.permission.PermissionGroups groups() {
         return groups;
+    }
+
+    private void startLeaveScreens() {
+        var screens = settingsFor(SettingsSchema.of(
+                de.raindancer.core.ui.screen.LeaveScreenSettings.class,
+                de.raindancer.core.ui.screen.LeaveScreenSettings.DEFAULTS),
+                getDataFolder().toPath().resolve("config.yml"));
+        de.raindancer.core.ui.screen.LeaveScreen.configure(() -> {
+            String title = screens.current().title();
+            return title == null || title.isBlank() ? serverName() : title.strip();
+        }, () -> screens.current().footer());
     }
 
     private void startNetworkWhitelist() {

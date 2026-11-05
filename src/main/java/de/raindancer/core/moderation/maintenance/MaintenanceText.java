@@ -1,5 +1,6 @@
 package de.raindancer.core.moderation.maintenance;
 
+import de.raindancer.core.ui.screen.LeaveScreen;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -80,12 +81,12 @@ public final class MaintenanceText {
      */
     public static Component closed(String reason, long backAt, long now) {
         if (isUpdate(reason)) {
-            return MINI.deserialize("<gold>Hey you!</gold> <white>We're updating the server and expect to be back "
-                    + whenBack(backAt, now) + ". Please try again then!");
+            return LeaveScreen.framed(MINI.deserialize("<gold><bold>We're updating</bold></gold>\n\n<gray>We'll be back <white>"
+                    + whenBack(backAt, now) + "</white>. Join again then!"));
         }
-        String why = reason == null || reason.isBlank() ? "" : "\n\n<white>" + MINI.escapeTags(reason);
-        return MINI.deserialize("<gold><bold>The server is under maintenance</bold></gold>" + why
-                + "\n\n<gray>Please come back a little later.");
+        String why = reason == null || reason.isBlank() ? "" : "\n\n<white>" + MINI.escapeTags(reason.strip());
+        return LeaveScreen.framed(MINI.deserialize("<gold><bold>Under maintenance</bold></gold>" + why
+                + "\n\n<gray>Come back a little later."));
     }
 
     /** "in about 3 minutes", "any moment now", "soon". */

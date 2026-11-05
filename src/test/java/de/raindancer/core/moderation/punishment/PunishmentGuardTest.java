@@ -155,7 +155,20 @@ class PunishmentGuardTest {
                     .containsIgnoringCase("does not expire");
             assertThat(screen)
                     .as("and not a duration, which is what a very large number would read as")
-                    .doesNotContain("Time left");
+                    .doesNotContain("Ends in");
+        }
+
+        @Test
+        @DisplayName("the ban screen comes in the server's join/kick frame")
+        void framed() {
+            punishments.punish(ALICE, PunishmentKind.BAN, MOD, "griefing", null);
+            try {
+                de.raindancer.core.ui.screen.LeaveScreen.configure(() -> "Lilly's SMP", () -> "discord.gg/x");
+                assertThat(plain(guard.joinRefusal(ALICE).orElseThrow()))
+                        .startsWith("✦ LILLY'S SMP ✦").contains("griefing").endsWith("discord.gg/x");
+            } finally {
+                de.raindancer.core.ui.screen.LeaveScreen.configure(() -> "", () -> "");
+            }
         }
 
         @Test

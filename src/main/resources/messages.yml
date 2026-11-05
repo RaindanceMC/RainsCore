@@ -31,12 +31,12 @@ punishment:
 
   # The full screen a banned player sees instead of joining. \n is a new line.
   banned:
-    heading: "<red><bold>You are banned from this server.</bold>"
+    heading: "<red><bold>You are banned</bold>"
     # <reason> is what the moderator typed.
-    reason: "<gray><reason>"
-    permanent: "<dark_gray>This ban does not expire."
+    reason: "<gray>Reason: <white><reason>"
+    permanent: "<gray>This ban does not expire."
     # <time> reads like "2 days, 4 hours".
-    temporary: "<dark_gray>Time left: <time>"
+    temporary: "<gray>Ends in <white><time>"
 
   # One line in chat when a muted player tries to talk.
   # <reason> is the moderator's; <time> only appears in the temporary version.
@@ -49,7 +49,7 @@ punishment:
 
   # Shown under the ban reason, if the owner set an appeal address in the
   # settings. Left out entirely when they have not.
-  appeal: "<gray><message>"
+  appeal: "<dark_gray><message>"
 
   # How a length is written out. <count> is the number.
   length:

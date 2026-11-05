@@ -2,6 +2,7 @@ package de.raindancer.core.moderation.punishment;
 
 import de.raindancer.core.ui.chat.Style;
 import de.raindancer.core.ui.text.Text;
+import de.raindancer.core.ui.screen.LeaveScreen;
 import net.kyori.adventure.text.Component;
 import de.raindancer.core.ui.messages.Messages;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -128,7 +129,7 @@ public final class PunishmentGuard {
 
     /** The screen a banned player is shown, or empty when they may join. */
     public Optional<Component> joinRefusal(UUID player) {
-        return stopping(player, PunishmentKind.BAN).map(this::banScreen);
+        return stopping(player, PunishmentKind.BAN).map(this::banScreen).map(LeaveScreen::framed);
     }
 
     /** What a muted player is told when they try to talk. */
@@ -200,16 +201,15 @@ public final class PunishmentGuard {
      */
     private Component builtInBanScreen(Punishment ban) {
         StringBuilder built = new StringBuilder();
-        built.append("<").append(Style.bad()).append("><b>You are banned from this server.</b>\n\n");
-        built.append("<gray>").append(escape(ban.reason())).append("\n");
-        built.append("<dark_gray>");
+        built.append("<").append(Style.bad()).append("><b>You are banned</b>\n\n");
+        built.append("<gray>Reason: <white>").append(escape(ban.reason())).append("</white>\n");
         if (ban.isPermanent()) {
             built.append("This ban does not expire.");
         } else {
-            built.append("Time left: ").append(remaining(ban));
+            built.append("Ends in <white>").append(remaining(ban)).append("</white>");
         }
         if (!appealMessage.isEmpty()) {
-            built.append("\n\n<gray>").append(escape(appealMessage));
+            built.append("\n\n<dark_gray>").append(escape(appealMessage));
         }
         return MINI.deserialize(built.toString());
     }
