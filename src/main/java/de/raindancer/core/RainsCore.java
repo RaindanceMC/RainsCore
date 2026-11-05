@@ -223,6 +223,14 @@ public interface RainsCore {
     Grants grants();
 
     /**
+     * The network's whitelist (2.38.0): one list in the core database, checked by RainsNetworkProxy at the door and
+     * mirrored into every taking-part server's vanilla list. Empty on a fake core, or before it is up.
+     */
+    default java.util.Optional<de.raindancer.core.moderation.whitelist.NetworkWhitelist> whitelist() {
+        return java.util.Optional.empty();
+    }
+
+    /**
      * Gives somebody their granted permissions now, rather than at their next login.
      *
      * <p>What a promotion needs: a moderator told they are a moderator, whose commands then all refuse

@@ -411,7 +411,24 @@ public final class CoreSchema {
             // offline instead of vanishing (NULL while it runs).
             "ALTER TABLE network_server ADD COLUMN tps REAL",
             "ALTER TABLE network_server ADD COLUMN mspt REAL",
-            "ALTER TABLE network_server ADD COLUMN stopped_at INTEGER");
+            "ALTER TABLE network_server ADD COLUMN stopped_at INTEGER",
+
+            // The network's whitelist (2.38.0): what the proxy checks at the door before any server sees a player,
+            // and what every backend's vanilla list mirrors.
+            """
+            CREATE TABLE whitelist (
+                player   TEXT    PRIMARY KEY,
+                name     TEXT    NOT NULL,
+                added_at INTEGER NOT NULL,
+                added_by TEXT
+            )""",
+            // Which servers brought their own vanilla list in already — once each, or a player taken off since would
+            // come back with the next start of a server that was down. "(document)" is the old network document.
+            """
+            CREATE TABLE whitelist_joined (
+                server TEXT    PRIMARY KEY,
+                at     INTEGER NOT NULL
+            )""");
 
     /**
      * What was done.

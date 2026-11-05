@@ -1881,15 +1881,28 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 de.raindancer.core.moderation.whitelist.WhitelistSettings.DEFAULTS),
                 getDataFolder().toPath().resolve("config.yml"));
         var listener = new de.raindancer.core.moderation.whitelist.WhitelistListener(this);
-        var shared = de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("whitelist.yml"));
-        var whitelist = new de.raindancer.core.moderation.whitelist.NetworkWhitelist(shared, network.serverId(), listener);
+        // 2.x kept the list in this document; brought into the table once, never written again.
+        var former = de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("whitelist.yml"));
+        var whitelist = new de.raindancer.core.moderation.whitelist.NetworkWhitelist(
+                new de.raindancer.core.moderation.whitelist.WhitelistTable(databases.core(), System::currentTimeMillis),
+                former, network.serverId(), listener, () -> bus().publish(WHITELIST_TOPIC, "all"));
         listener.feeding(whitelist);
         getServer().getPluginManager().registerEvents(listener, this);
         whitelist.taking(false);
-        // Another server changed the list.
-        shared.onChange(whitelist::reload);
+        // Another server changed the list, or this one may have missed that.
+        bus().subscribe(WHITELIST_TOPIC, event -> whitelist.reload());
+        bus().onResync(whitelist::reload);
         whitelistSettings.onChange(now -> Scheduling.async(this, () -> whitelist.taking(now.shared())));
         Scheduling.async(this, () -> whitelist.taking(whitelistSettings.current().shared()));
+        networkWhitelist = whitelist;
+    }
+
+    private static final String WHITELIST_TOPIC = "core.whitelist";
+    private volatile de.raindancer.core.moderation.whitelist.NetworkWhitelist networkWhitelist;
+
+    @Override
+    public java.util.Optional<de.raindancer.core.moderation.whitelist.NetworkWhitelist> whitelist() {
+        return java.util.Optional.ofNullable(networkWhitelist);
     }
 
     private void startGroups() {
