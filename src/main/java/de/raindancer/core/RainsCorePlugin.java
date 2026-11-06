@@ -307,6 +307,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Inventories inventories;
     private Databases databases;
     private Combat combat;
+    private de.raindancer.core.world.companion.CompanionService companions;
     private StructureLocator structures;
     /** Whether this is the first start on this server — no config.yml existed yet. */
     private boolean firstRun;
@@ -963,6 +964,20 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // shooting across a boundary is ordinary. So the message goes out on their own thread.
         combatListener.tellOn((player, task) -> Scheduling.entity(this, player, task));
         getServer().getPluginManager().registerEvents(combatListener, this);
+        companions = new de.raindancer.core.world.companion.CompanionService(this, getServer(), combat,
+                vanish::isVanished);
+        getServer().getPluginManager().registerEvents(
+                new de.raindancer.core.world.companion.CompanionListener(companions), this);
+        vanish.onChange((who, hidden) -> {
+            if (hidden) {
+                companions.ownerVanished(who);
+                return;
+            }
+            Player back = getServer().getPlayer(who);
+            if (back != null) {
+                Scheduling.entity(this, back, () -> companions.ownerRevealed(back));
+            }
+        });
 
         chunks = new ChunkHolds(new BukkitChunkLoader(this));
         // A world by name, or null when it is not loaded — the seam that keeps every rule about
@@ -1365,6 +1380,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     @Override
     public void onDisable() {
+        if (companions != null) {
+            companions.clear();
+        }
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
         if (menusSwitch != null) {
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
@@ -2671,6 +2689,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public Combat combat() {
         return combat;
+    }
+
+    @Override
+    public de.raindancer.core.world.companion.CompanionService companions() {
+        return companions;
     }
 
     @Override

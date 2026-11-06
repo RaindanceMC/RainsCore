@@ -622,6 +622,14 @@ public interface RainsCore {
     Combat combat();
 
     /**
+     * Companions — mobs a plugin summons for a player (pets, mounts, helpers), driven and kept safe by Core; the
+     * plugin only says what one is and hears what happens to it. Since 2.42.0.
+     */
+    default de.raindancer.core.world.companion.CompanionService companions() {
+        throw new UnsupportedOperationException("this core has no companions");
+    }
+
+    /**
      * Weighted loot tables, by tier — what comes out of a chest and how often. An entry may be a
      * plain material or one of {@link #items()}, so a supply drop can contain a real custom item.
      */
