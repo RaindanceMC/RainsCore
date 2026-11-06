@@ -29,7 +29,15 @@ public final class MobControlListener implements Listener {
 
     private final Land land;
 
+    /** A companion — somebody's pet monster — counts as its owner, never as a monster at a claim's border. */
+    private final java.util.function.Predicate<java.util.UUID> companion;
+
     public MobControlListener(Land land) {
+        this(land, id -> false);
+    }
+
+    public MobControlListener(Land land, java.util.function.Predicate<java.util.UUID> companion) {
+        this.companion = companion == null ? id -> false : companion;
         this.land = land;
     }
 
@@ -125,7 +133,11 @@ public final class MobControlListener implements Listener {
 
     /** One answer for the whole package — see {@link InteractionClassifier#isHostile}. */
     private boolean isHostile(Entity entity) {
-        return InteractionClassifier.isHostile(entity);
+        return InteractionClassifier.isHostile(entity) && !isCompanion(entity);
+    }
+
+    private boolean isCompanion(Entity entity) {
+        return entity != null && entity.getUniqueId() != null && companion.test(entity.getUniqueId());
     }
 
     /** Stops hostile mobs at the border when MONSTER_ENTRY is denied. */
@@ -215,6 +227,11 @@ public final class MobControlListener implements Listener {
             return;
         }
         Entity damager = event.getDamager();
+        // A pet's bite is its owner's: Combat rules on it, not this flag.
+        if (isCompanion(damager) || damager instanceof Projectile shot && shot.getShooter() instanceof Entity from
+                && isCompanion(from)) {
+            return;
+        }
         // Only mob-caused damage; player damage is covered by PvP and the permission checks.
         if (damager instanceof Player) {
             return;

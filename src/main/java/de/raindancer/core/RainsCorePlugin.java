@@ -653,7 +653,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         getServer().getPluginManager().registerEvents(interactionProtection, this);
         EnvironmentProtectionListener environmentProtection = new EnvironmentProtectionListener(land);
         getServer().getPluginManager().registerEvents(environmentProtection, this);
-        getServer().getPluginManager().registerEvents(new MobControlListener(land), this);
+        getServer().getPluginManager().registerEvents(new MobControlListener(land,
+                id -> combat != null && combat.companions().isCompanion(id)), this);
         getServer().getPluginManager().registerEvents(
                 new BoundItemListener(), this);
         // Coins, banknotes and tokens are never worth their material — see NonIngredients.

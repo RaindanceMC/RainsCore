@@ -154,4 +154,29 @@ class MobEntryTest {
 
         assertThat(event.isCancelled()).isFalse();
     }
+
+    @Test
+    @DisplayName("somebody's pet monster walks in: it counts as its owner, not as a monster")
+    void aCompanionIsNotStopped() {
+        FakeArea claim = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_ENTRY, false);
+        provider.inside = claim;
+        java.util.UUID petId = java.util.UUID.randomUUID();
+        LivingEntity pet = (LivingEntity) Proxy.newProxyInstance(
+                Zombie.class.getClassLoader(), new Class<?>[]{Zombie.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getType" -> EntityType.ZOMBIE;
+                    case "getUniqueId" -> petId;
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> method.getReturnType().isPrimitive()
+                            ? (method.getReturnType() == boolean.class ? false : 0)
+                            : null;
+                });
+        MobControlListener withPets = new MobControlListener(land, petId::equals);
+
+        EntityMoveEvent event = new EntityMoveEvent(pet, at(99), at(100));
+        withPets.onEntityMove(event);
+
+        assertThat(event.isCancelled()).isFalse();
+    }
 }

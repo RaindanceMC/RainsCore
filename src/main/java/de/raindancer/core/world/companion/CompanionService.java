@@ -67,6 +67,7 @@ public final class CompanionService {
     private final Map<UUID, ScheduledTask> brains = new ConcurrentHashMap<>();
     private final Map<UUID, List<Companion>> hidden = new ConcurrentHashMap<>();
     private final Grudges grudges = new Grudges();
+    private final java.util.Set<UUID> hidingOthers = ConcurrentHashMap.newKeySet();
     private final CompanionBrain brain;
 
     public CompanionService(Plugin core, Server server, Combat combat, Predicate<UUID> vanished) {
@@ -131,14 +132,25 @@ public final class CompanionService {
     private boolean place(Companion companion, Player owner) {
         CompanionSpec spec = companion.spec();
         Location at = beside(owner);
+        // Bound before it is added, so a claim's spawn and entry rules already see a companion, not a monster.
         Entity made = owner.getWorld().spawn(at, spec.type().getEntityClass(), CreatureSpawnEvent.SpawnReason.CUSTOM,
-                entity -> prepare(entity, spec));
+                entity -> {
+                    combat.companions().bind(entity.getUniqueId(), companion.owner());
+                    prepare(entity, spec);
+                });
         if (!(made instanceof Mob mob) || !made.isValid()) {
+            combat.companions().release(made.getUniqueId());
             made.remove();
             return false;
         }
         companion.mob(mob.getUniqueId());
         companion.gone = false;
+        companion.rigParts = spec.rig() == null ? java.util.List.of() : RigDisplays.spawn(mob, spec.rig());
+        for (UUID viewer : hidingOthers) {
+            if (!viewer.equals(companion.owner()) && server.getPlayer(viewer) instanceof Player hider) {
+                shown(hider, companion, false);
+            }
+        }
         byMob.put(mob.getUniqueId(), companion);
         combat.companions().bind(mob.getUniqueId(), companion.owner());
         brains.put(companion.id(), Scheduling.entityTimer(core, mob, 1, 1, task -> brain.tick(companion, mob),
@@ -182,10 +194,17 @@ public final class CompanionService {
             boss.getBossBar().setVisible(false);
             boss.getBossBar().removeAll();
         }
+        if (spec.rig() != null) {
+            entity.setInvisible(true);
+        }
+        entity.setSilent(spec.silent() || spec.rig() != null);
         if (entity instanceof LivingEntity living) {
             AttributeInstance scale = living.getAttribute(Attribute.SCALE);
             if (scale != null) {
-                scale.setBaseValue(spec.scaleFor(entity.getBoundingBox().getHeight()));
+                double mobHeight = entity.getBoundingBox().getHeight();
+                // an invisible carrier only lends its body: sized to the rig, not kept below its wild size
+                scale.setBaseValue(spec.rig() == null ? spec.scaleFor(mobHeight)
+                        : Math.max(0.2, Math.min(4, spec.height() * 1.8 * 0.7 / Math.max(0.1, mobHeight))));
             }
             dress(living, spec);
             living.setHealth(maxHealth(living));
@@ -210,6 +229,7 @@ public final class CompanionService {
     public void update(Companion companion, CompanionSpec spec) {
         companion.spec(spec);
         mobOf(companion).ifPresent(mob -> Scheduling.entity(core, mob, () -> {
+            mob.setSilent(spec.silent() || spec.rig() != null);
             double share = mob.getHealth() / Math.max(1, maxHealth(mob));
             dress(mob, spec);
             mob.setHealth(Math.max(1, Math.min(maxHealth(mob), share * maxHealth(mob))));
@@ -220,6 +240,50 @@ public final class CompanionService {
     public void heal(Companion companion, double amount) {
         mobOf(companion).ifPresent(mob -> Scheduling.entity(core, mob,
                 () -> mob.setHealth(Math.min(maxHealth(mob), mob.getHealth() + amount))));
+    }
+
+    // ------------------------------------------------------------------ who sees them
+
+    /**
+     * Whether this player sees other players' companions — off hides them, sound and all, for this player only (a
+     * mob's sounds cannot be muted for one listener; hiding it can). Their own are always shown.
+     */
+    public void seeOthers(Player viewer, boolean see) {
+        if (see) {
+            hidingOthers.remove(viewer.getUniqueId());
+        } else {
+            hidingOthers.add(viewer.getUniqueId());
+        }
+        for (Companion companion : all()) {
+            if (!companion.owner().equals(viewer.getUniqueId())) {
+                shown(viewer, companion, see);
+            }
+        }
+    }
+
+    public boolean seesOthers(UUID viewer) {
+        return !hidingOthers.contains(viewer);
+    }
+
+    private void shown(Player viewer, Companion companion, boolean see) {
+        java.util.List<UUID> entities = new java.util.ArrayList<>(companion.rigParts.stream()
+                .filter(java.util.Objects::nonNull).toList());
+        if (companion.mob() != null) {
+            entities.add(companion.mob());
+        }
+        Scheduling.entity(core, viewer, () -> {
+            for (UUID id : entities) {
+                Entity entity = server.getEntity(id);
+                if (entity == null) {
+                    continue;
+                }
+                if (see) {
+                    viewer.showEntity(core, entity);
+                } else {
+                    viewer.hideEntity(core, entity);
+                }
+            }
+        });
     }
 
     // ------------------------------------------------------------------ taking away
@@ -239,6 +303,14 @@ public final class CompanionService {
     }
 
     private void takeMob(Companion companion) {
+        java.util.List<UUID> parts = companion.rigParts;
+        companion.rigParts = java.util.List.of();
+        for (UUID part : parts) {
+            Entity display = part == null ? null : server.getEntity(part);
+            if (display != null) {
+                Scheduling.entity(core, display, display::remove);
+            }
+        }
         UUID mob = companion.mob();
         if (mob != null) {
             byMob.remove(mob);
@@ -288,6 +360,7 @@ public final class CompanionService {
     public void ownerLeft(UUID owner) {
         of(owner).forEach(companion -> remove(companion, CompanionHooks.Gone.OWNER_LEFT));
         hidden.remove(owner);
+        hidingOthers.remove(owner);
     }
 
     /** Its owner vanished: every companion goes, and comes back with them. */

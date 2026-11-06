@@ -66,4 +66,11 @@ class CompanionSpecTest {
         assertThat(CompanionSpec.fitsSmallBody(de.raindancer.core.ui.effect.ParticleShape.TRAIL)).isTrue();
         assertThat(CompanionSpec.fitsSmallBody(de.raindancer.core.ui.effect.ParticleShape.WINGS)).isFalse();
     }
+
+    @Test
+    @DisplayName("a companion can be muted; it is loud by default")
+    void silent() {
+        assertThat(CompanionSpec.of(EntityType.WITHER).silent()).isFalse();
+        assertThat(CompanionSpec.of(EntityType.WITHER).silent(true).silent()).isTrue();
+    }
 }

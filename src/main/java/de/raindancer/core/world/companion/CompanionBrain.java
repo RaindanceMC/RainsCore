@@ -77,6 +77,9 @@ final class CompanionBrain {
             de.raindancer.core.ui.effect.ParticleShows.at(mob.getLocation(), mob.getYaw(), spec.particle(), null, null,
                     4, spec.particleShape(), tick, 48, viewer -> true, null);
         }
+        if (!companion.rigParts.isEmpty()) {
+            RigDisplays.follow(server, mob, companion, spec, tick);
+        }
         if (mob.getPassengers().contains(owner)) {
             carry(companion, mob, owner, spec);
             return;

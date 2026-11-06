@@ -27,6 +27,7 @@ public final class Companion {
     final Wandering wandering = new Wandering();
     volatile org.bukkit.Location exploring;
     volatile org.bukkit.Location stayAt;
+    volatile java.util.List<UUID> rigParts = java.util.List.of();
 
     Companion(Plugin plugin, UUID owner, CompanionSpec spec, CompanionHooks hooks) {
         this.plugin = plugin;
