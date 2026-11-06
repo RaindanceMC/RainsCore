@@ -46,6 +46,7 @@ final class CompanionBrain {
     private final Server server;
     private final Targeting targeting = new Targeting();
     private final Map<UUID, Companion> missiles = new ConcurrentHashMap<>();
+    private final java.util.Random random = new java.util.Random();
 
     CompanionBrain(CompanionService service, Combat combat, Grudges grudges, Server server) {
         this.service = service;
@@ -106,6 +107,7 @@ final class CompanionBrain {
             LivingEntity chosen = choose(companion, mob, owner, spec);
             companion.target = chosen == null ? null : chosen.getUniqueId();
         }
+        boolean idle = companion.wandering.ownerIdle(vec(there), tick);
         LivingEntity target = alive(companion.target, mob, owner);
         if (target == null) {
             companion.target = null;
@@ -114,16 +116,21 @@ final class CompanionBrain {
         double fall = spec.flies() ? 0 : mob.getVelocity().getY();
         if (target != null) {
             push = fight(companion, mob, target, spec, tick, fall);
+        } else if (!fleeing && (companion.staying() || idle) && spec.wanderRadius() > 0) {
+            push = explore(companion, mob, companion.staying() ? stayPoint(companion, mob) : there, spec, tick, fall);
         } else if (companion.staying()) {
             push = new Steering.Vec(0, fall, 0);
         } else {
+            companion.exploring = null;
             Location aim = there.clone();
             if (spec.flies()) {
                 aim.add(0, 1.5, 0);
             }
             push = Steering.towards(vec(here), vec(aim), spec.speed(), fleeing ? 1.5 : FOLLOW_REACH, spec.flies(), fall);
         }
-        move(mob, push, target != null ? target.getLocation() : there, spec);
+        Location lookAt = target != null ? target.getLocation()
+                : companion.exploring != null ? companion.exploring : there;
+        move(mob, push, lookAt, spec);
     }
 
     // ------------------------------------------------------------------ fighting
@@ -270,6 +277,33 @@ final class CompanionBrain {
             return null;
         }
         return living;
+    }
+
+    // ------------------------------------------------------------------ exploring
+
+    /** Where it was told to stay — its own spot when told. */
+    private static Location stayPoint(Companion companion, Mob mob) {
+        if (companion.stayAt == null) {
+            companion.stayAt = mob.getLocation().clone();
+        }
+        return companion.stayAt;
+    }
+
+    /** Off to a spot near its anchor now and then; there, it looks about until it sets off again. */
+    private Steering.Vec explore(Companion companion, Mob mob, Location anchor, CompanionSpec spec, long tick,
+                                 double fall) {
+        Location spot = companion.exploring;
+        if (spot != null && (spot.getWorld() != mob.getWorld()
+                || spot.distanceSquared(anchor) > Math.pow(spec.wanderRadius() + 2, 2))) {
+            spot = null;
+        }
+        if (spot == null || (tick % 20 == 0 && mob.getLocation().distanceSquared(spot) < 2.5
+                && Wandering.setsOff(spec.wanderEagerness(), spec.wanderRadius(), random))) {
+            Steering.Vec next = Wandering.spot(vec(anchor), spec.wanderRadius(), spec.flies(), random);
+            spot = new Location(mob.getWorld(), next.x(), next.y(), next.z());
+            companion.exploring = spot;
+        }
+        return Steering.towards(vec(mob.getLocation()), vec(spot), spec.speed() * 0.55, 0.8, spec.flies(), fall);
     }
 
     // ------------------------------------------------------------------ moving

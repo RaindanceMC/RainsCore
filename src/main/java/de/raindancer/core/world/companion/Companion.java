@@ -24,6 +24,9 @@ public final class Companion {
     volatile long ticks;
     volatile double unreportedRide;
     volatile boolean gone;
+    final Wandering wandering = new Wandering();
+    volatile org.bukkit.Location exploring;
+    volatile org.bukkit.Location stayAt;
 
     Companion(Plugin plugin, UUID owner, CompanionSpec spec, CompanionHooks hooks) {
         this.plugin = plugin;
@@ -72,6 +75,7 @@ public final class Companion {
 
     public void stay(boolean on) {
         staying = on;
+        stayAt = null;
     }
 
     public boolean isGone() {
