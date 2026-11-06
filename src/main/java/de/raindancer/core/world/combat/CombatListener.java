@@ -391,6 +391,13 @@ public final class CombatListener implements Listener {
                     ? new Responsible(owner.kind(), owner.id(), true)
                     : orElse(owner, thing);
         }
+        if (thing instanceof Entity bound && combat.companions().isCompanion(bound.getUniqueId())) {
+            // A pet a plugin made that the server does not know as tamed — the same as a wolf.
+            UUID owner = combat.companions().ownerOf(bound.getUniqueId()).orElse(null);
+            if (owner != null) {
+                return new Responsible(Attack.Fighter.PLAYER, owner, true);
+            }
+        }
         if (thing instanceof Entity entity) {
             return kindOf(entity) == Attack.Fighter.MOB
                     ? Responsible.mob(entity.getUniqueId()) : Responsible.NOBODY;

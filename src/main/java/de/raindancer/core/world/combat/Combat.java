@@ -64,6 +64,8 @@ public final class Combat {
      */
     private final List<Asked> alsoAsked = new CopyOnWriteArrayList<>();
 
+    private final Companions companions = new Companions();
+
     /** An extra rule, and the plugin it belongs to — null for one added without saying. */
     private record Asked(String plugin, Function<Attack, Verdict> rule) {
     }
@@ -102,6 +104,11 @@ public final class Combat {
         boolean isEmpty() {
             return pvp == null && playersOnMobs == null && mobsOnPlayers == null;
         }
+    }
+
+    /** Mobs bound to a player that are not tamed — each counts as its owner, like a tamed wolf. */
+    public Companions companions() {
+        return companions;
     }
 
     // ------------------------------------------------------------------------ what is allowed

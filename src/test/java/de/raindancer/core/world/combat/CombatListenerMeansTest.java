@@ -29,10 +29,11 @@ class CombatListenerMeansTest {
 
     private final List<Attack> seen = new ArrayList<>();
     private CombatListener listener;
+    private Combat combat;
 
     @BeforeEach
     void setUp() {
-        Combat combat = new Combat();
+        combat = new Combat();
         combat.alsoAsk(attack -> {
             seen.add(attack);
             return null;
@@ -124,5 +125,41 @@ class CombatListenerMeansTest {
         when(wolf.getLocation()).thenReturn(at);
 
         assertThat(hit(wolf).means()).isEqualTo(Attack.Means.OTHER);
+    }
+
+    @Test
+    @DisplayName("a mob a plugin bound to a player is that player attacking, like a tamed wolf")
+    void companion() {
+        org.bukkit.entity.Fox fox = mock(org.bukkit.entity.Fox.class);
+        UUID foxId = UUID.randomUUID();
+        when(fox.getUniqueId()).thenReturn(foxId);
+        Location at = somewhere();
+        when(fox.getLocation()).thenReturn(at);
+        combat.companions().bind(foxId, ALICE);
+
+        Attack attack = hit(fox);
+
+        assertThat(attack.attacker()).isEqualTo(Attack.Fighter.PLAYER);
+        assertThat(attack.attackerId()).isEqualTo(ALICE);
+        assertThat(attack.throughPet()).isTrue();
+        assertThat(attack.means()).isEqualTo(Attack.Means.OTHER);
+    }
+
+    @Test
+    @DisplayName("a snowball a companion threw is its owner's too")
+    void companionsProjectile() {
+        org.bukkit.entity.Snowman golem = mock(org.bukkit.entity.Snowman.class);
+        UUID golemId = UUID.randomUUID();
+        when(golem.getUniqueId()).thenReturn(golemId);
+        combat.companions().bind(golemId, ALICE);
+        org.bukkit.entity.Snowball ball = mock(org.bukkit.entity.Snowball.class);
+        when(ball.getShooter()).thenReturn(golem);
+        Location at = somewhere();
+        when(ball.getLocation()).thenReturn(at);
+
+        Attack attack = hit(ball);
+
+        assertThat(attack.attackerId()).isEqualTo(ALICE);
+        assertThat(attack.throughPet()).isTrue();
     }
 }
