@@ -57,17 +57,22 @@ public final class ChangelogCommand implements BasicCommand {
                     say(sender, "<red>/changelog publish <id>");
                     return;
                 }
-                switch (changelog.publish(args[1])) {
-                    case UNKNOWN -> say(sender, "<red>No entry called " + MINI.escapeTags(args[1]) + ".");
-                    case ALREADY -> say(sender, "<yellow>That one is out already.");
-                    case PUBLISHED, NOT_SAVED -> announce(changelog, args[1], sender, zone);
-                }
+                String id = args[1];
+                Scheduling.async(core(), () -> {
+                    switch (changelog.publish(id)) {
+                        case UNKNOWN -> say(sender, "<red>No entry called " + MINI.escapeTags(id) + ".");
+                        case ALREADY -> say(sender, "<yellow>That one is out already.");
+                        case PUBLISHED, NOT_SAVED -> announce(changelog, id, sender, zone);
+                    }
+                });
             }
             case "reload" -> {
-                changelog.reload();
-                say(sender, "<green>changelog.yml read: " + changelog.drafts().size() + " draft(s), "
-                        + changelog.published().size() + " published.");
-                changelog.problems().forEach(problem -> say(sender, "<red>" + MINI.escapeTags(problem)));
+                Scheduling.async(core(), () -> {
+                    changelog.reload();
+                    say(sender, "<green>changelog.yml read: " + changelog.drafts().size() + " draft(s), "
+                            + changelog.published().size() + " published.");
+                    changelog.problems().forEach(problem -> say(sender, "<red>" + MINI.escapeTags(problem)));
+                });
             }
             default -> {
                 List<ChangelogEntry> published = changelog.published();
@@ -85,7 +90,7 @@ public final class ChangelogCommand implements BasicCommand {
         ChangelogEntry entry = changelog.entry(id).orElseThrow();
         for (Player online : Bukkit.getOnlinePlayers()) {
             changelog.seen(online.getUniqueId());
-            Scheduling.entity(Bukkit.getPluginManager().getPlugin("RainsCore"), online,
+            Scheduling.entity(core(), online,
                     () -> online.sendMessage(ChangelogView.render(List.of(entry), "What's new", zone)));
         }
         if (!(sender instanceof Player)) {
@@ -97,6 +102,10 @@ public final class ChangelogCommand implements BasicCommand {
             audit.by(player.getUniqueId(), player.getName());
         }
         RainsCore.get().audit().record(audit);
+    }
+
+    private static org.bukkit.plugin.Plugin core() {
+        return Bukkit.getPluginManager().getPlugin("RainsCore");
     }
 
     private static void say(CommandSender sender, String miniMessage) {

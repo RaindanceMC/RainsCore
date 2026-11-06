@@ -157,6 +157,20 @@ class ThreadingRulesTest {
         }
 
         @Test
+        @DisplayName("/changelog publish and reload reach the database off the server's threads")
+        void changelogCommandIsAsync() throws IOException {
+            String command = code("ui/changelog/ChangelogCommand.java");
+            for (String call : new String[] {"changelog.publish(", "changelog.reload()"}) {
+                int at = command.indexOf(call);
+                assertThat(at).as(call + " has moved or gone").isNotNegative();
+                String before = command.substring(Math.max(0, at - 300), at);
+                assertThat(before).as(call + " reads or writes the changelog in the database; from the console that "
+                        + "ran on the thread ticking the world and Core's own guard logged it as an error")
+                        .contains("Scheduling.async(");
+            }
+        }
+
+        @Test
         @DisplayName("the audit journal is written off the server's threads")
         void theAuditTimerIsAsync() throws IOException {
             String plugin = code("RainsCorePlugin.java");
