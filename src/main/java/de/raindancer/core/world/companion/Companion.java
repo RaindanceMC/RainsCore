@@ -27,6 +27,12 @@ public final class Companion {
     final Wandering wandering = new Wandering();
     volatile org.bukkit.Location exploring;
     volatile org.bukkit.Location stayAt;
+    volatile long lastHurt;
+    volatile int cooldown;
+    int side = 1;
+    final Legs.State legs = new Legs.State();
+    final Progress chase = new Progress();
+    final java.util.Map<UUID, Long> gaveUp = new java.util.concurrent.ConcurrentHashMap<>();
 
     Companion(Plugin plugin, UUID owner, CompanionSpec spec, CompanionHooks hooks) {
         this.plugin = plugin;

@@ -64,6 +64,8 @@ public final class CompanionService {
     private final Predicate<UUID> vanished;
     private final Map<UUID, Companion> byId = new ConcurrentHashMap<>();
     private final Map<UUID, Companion> byMob = new ConcurrentHashMap<>();
+    /** Mobs let go of but not yet taken out of the world — until then nothing may hurt or kill them. */
+    private final java.util.Set<UUID> leaving = ConcurrentHashMap.newKeySet();
     private final Map<UUID, ScheduledTask> brains = new ConcurrentHashMap<>();
     private final Map<UUID, List<Companion>> hidden = new ConcurrentHashMap<>();
     private final Grudges grudges = new Grudges();
@@ -304,11 +306,18 @@ public final class CompanionService {
         }
         Entity entity = mob == null ? null : server.getEntity(mob);
         if (entity != null) {
+            leaving.add(mob);
             Scheduling.entity(core, entity, () -> {
                 entity.eject();
                 entity.remove();
+                leaving.remove(mob);
             });
         }
+    }
+
+    /** A companion's mob on its way out — beaten, sent home — which is still in the world this tick. */
+    boolean isLeaving(UUID mob) {
+        return mob != null && leaving.contains(mob);
     }
 
     private void tell(Companion companion, CompanionHooks.Gone why) {

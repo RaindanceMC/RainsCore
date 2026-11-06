@@ -68,6 +68,19 @@ class CompanionSpecTest {
     }
 
     @Test
+    @DisplayName("it fights balanced and mends a little unless told otherwise; mending is never negative")
+    void tacticsAndMending() {
+        CompanionSpec wolf = CompanionSpec.of(EntityType.WOLF);
+        assertThat(wolf.tactic()).isEqualTo(Tactic.BALANCED);
+        assertThat(wolf.regenPerSecond()).isGreaterThan(0);
+        assertThat(wolf.tactic(Tactic.HIT_AND_RUN).tactic()).isEqualTo(Tactic.HIT_AND_RUN);
+        assertThat(wolf.tactic(null).tactic()).isEqualTo(Tactic.BALANCED);
+        assertThat(wolf.regenPerSecond(1.5).regenPerSecond()).isEqualTo(1.5);
+        assertThat(wolf.regenPerSecond(-2).regenPerSecond()).isZero();
+        assertThat(wolf.regenPerSecond(2).wander(3, 0.2).tactic(Tactic.CAUTIOUS).regenPerSecond()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("a companion can be muted; it is loud by default")
     void silent() {
         assertThat(CompanionSpec.of(EntityType.WITHER).silent()).isFalse();

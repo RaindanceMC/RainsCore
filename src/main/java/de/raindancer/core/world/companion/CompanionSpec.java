@@ -18,12 +18,15 @@ import org.bukkit.entity.EntityType;
  * @param wanderEagerness how often, 0 to 1
  * @param silent     makes no sound at all — its owner muted it
  * @param particle   a particle effect it wears (Core's {@code ParticleShows} names), empty for none
+ * @param tactic     how it goes about a fight, its owner's choice
+ * @param regenPerSecond half hearts it mends a second once it has been out of fights a while near its owner
  */
 public record CompanionSpec(EntityType type, double height, boolean flies, boolean baby, Fighting fighting,
                             Stance stance, double health, double damage, double speed, double fleesBelow,
                             EntityType missile, boolean rideable, int attackTicks, Component name,
                             String particle, de.raindancer.core.ui.effect.ParticleShape particleShape,
-                            double wanderRadius, double wanderEagerness, boolean silent) {
+                            double wanderRadius, double wanderEagerness, boolean silent, Tactic tactic,
+                            double regenPerSecond) {
 
     public static final double LARGEST_SCALE = 0.95;
     public static final double FASTEST = 1.5;
@@ -43,6 +46,8 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
         particle = particle == null ? "" : particle;
         wanderRadius = Math.max(0, Math.min(24, wanderRadius));
         wanderEagerness = Math.max(0, Math.min(1, wanderEagerness));
+        tactic = tactic == null ? Tactic.BALANCED : tactic;
+        regenPerSecond = Math.max(0, regenPerSecond);
         particleShape = particleShape == null || !fitsSmallBody(particleShape)
                 ? de.raindancer.core.ui.effect.ParticleShape.AURA : particleShape;
     }
@@ -53,20 +58,20 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
     }
 
     public CompanionSpec silent(boolean v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, v);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, v, tactic, regenPerSecond);
     }
 
     public CompanionSpec wander(double radius, double eagerness) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, radius, eagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, radius, eagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec particle(String v, de.raindancer.core.ui.effect.ParticleShape shape) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, v, shape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, v, shape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public static CompanionSpec of(EntityType type) {
         return new CompanionSpec(type, 0.4, false, false, Fighting.MELEE, Stance.DEFENSIVE, 20, 3, 0.3, 0,
-                EntityType.SNOWBALL, true, 20, Component.empty(), "", null, 6, 0.5, false);
+                EntityType.SNOWBALL, true, 20, Component.empty(), "", null, 6, 0.5, false, Tactic.BALANCED, 0.5);
     }
 
     /** The scale that makes a mob {@code mobHeight} blocks tall stand {@link #height} players tall. */
@@ -78,54 +83,62 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
     }
 
     public CompanionSpec height(double v) {
-        return new CompanionSpec(type, v, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, v, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec flies(boolean v) {
-        return new CompanionSpec(type, height, v, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, v, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec baby(boolean v) {
-        return new CompanionSpec(type, height, flies, v, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, v, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec fighting(Fighting v) {
-        return new CompanionSpec(type, height, flies, baby, v, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, v, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec stance(Stance v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, v, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, v, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec health(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, v, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, v, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec damage(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, v, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, v, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec speed(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, v, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, v, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec fleesBelow(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, v, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, v, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec missile(EntityType v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, v, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, v, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec rideable(boolean v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, v, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, v, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec attackTicks(int v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, v, name, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, v, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
     }
 
     public CompanionSpec name(Component v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, v, particle, particleShape, wanderRadius, wanderEagerness, silent);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, v, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond);
+    }
+
+    public CompanionSpec tactic(Tactic v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, v, regenPerSecond);
+    }
+
+    public CompanionSpec regenPerSecond(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, v);
     }
 }

@@ -98,6 +98,11 @@ public final class CompanionListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHurt(EntityDamageEvent event) {
         Optional<Companion> companion = of(event.getEntity());
+        if (companion.isEmpty() && companions.isLeaving(event.getEntity().getUniqueId())) {
+            // beaten by one hit, a second in the same tick would kill it before it is gone
+            event.setCancelled(true);
+            return;
+        }
         if (companion.isEmpty() || !(event.getEntity() instanceof LivingEntity living)) {
             return;
         }
@@ -105,6 +110,7 @@ public final class CompanionListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        companion.get().lastHurt = companion.get().ticks;
         if (event.getFinalDamage() >= living.getHealth()) {
             event.setCancelled(true);
             companions.beaten(companion.get());
@@ -131,7 +137,7 @@ public final class CompanionListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(EntityDeathEvent event) {
-        if (of(event.getEntity()).isPresent()) {
+        if (of(event.getEntity()).isPresent() || companions.isLeaving(event.getEntity().getUniqueId())) {
             event.getDrops().clear();
             event.setDroppedExp(0);
             return;

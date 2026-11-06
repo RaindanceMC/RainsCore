@@ -63,4 +63,62 @@ class TargetingTest {
         Targeting.Candidate struck = new Targeting.Candidate(Targeting.Kind.ANIMAL, false, true, true);
         assertThat(rule.attacks(Stance.AGGRESSIVE, struck, true)).isTrue();
     }
+
+    private static Targeting.Seen seen(String name, int rank, double health, double distance) {
+        return new Targeting.Seen(java.util.UUID.nameUUIDFromBytes(name.getBytes()), rank == 3, rank == 2, rank == 1,
+                health, distance, false);
+    }
+
+    @Test
+    @DisplayName("whatever hurts its owner comes first, then what goes for them, then what they hit")
+    void priority() {
+        Targeting.Seen hurter = seen("hurter", 3, 1, 12);
+        Targeting.Seen threat = seen("threat", 2, 1, 6);
+        Targeting.Seen struck = seen("struck", 1, 1, 3);
+        Targeting.Seen near = seen("near", 0, 0.1, 1);
+        assertThat(Targeting.pick(java.util.List.of(near, struck, threat, hurter), null)).contains(hurter);
+        assertThat(Targeting.pick(java.util.List.of(near, struck, threat), null)).contains(threat);
+        assertThat(Targeting.pick(java.util.List.of(near, struck), null)).contains(struck);
+    }
+
+    @Test
+    @DisplayName("among the rest, the weakest, then the closest")
+    void weakestThenClosest() {
+        Targeting.Seen weak = seen("weak", 0, 0.2, 9);
+        Targeting.Seen strong = seen("strong", 0, 1, 2);
+        Targeting.Seen strongNearer = seen("strongNearer", 0, 0.95, 1);
+        assertThat(Targeting.pick(java.util.List.of(strong, weak), null)).contains(weak);
+        assertThat(Targeting.pick(java.util.List.of(strong, strongNearer), null)).contains(strongNearer);
+        assertThat(Targeting.pick(java.util.List.of(), null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("it sticks with its foe unless something more pressing turns up")
+    void sticky() {
+        Targeting.Seen current = seen("current", 0, 1, 8);
+        Targeting.Seen weaker = seen("weaker", 0, 0.3, 2);
+        assertThat(Targeting.pick(java.util.List.of(weaker, current), current.id())).contains(current);
+        Targeting.Seen hurter = seen("hurter", 3, 1, 12);
+        assertThat(Targeting.pick(java.util.List.of(weaker, current, hurter), current.id())).contains(hurter);
+    }
+
+    @Test
+    @DisplayName("a foe its owner's other companions will finish anyway is left to them while there is another")
+    void noOverkill() {
+        java.util.UUID weakling = java.util.UUID.randomUUID();
+        Targeting.Seen covered = new Targeting.Seen(weakling, false, false, false, 0.2, 2, true);
+        Targeting.Seen other = seen("other", 0, 1, 8);
+        assertThat(Targeting.pick(java.util.List.of(covered, other), null)).contains(other);
+        assertThat(Targeting.pick(java.util.List.of(covered), null)).contains(covered);
+        Targeting.Seen urgent = new Targeting.Seen(weakling, true, false, false, 0.2, 2, true);
+        assertThat(Targeting.pick(java.util.List.of(urgent, other), null)).contains(other);
+    }
+
+    @Test
+    @DisplayName("enough companions on one foe: the rest are counted, the first ones keep it")
+    void claims() {
+        assertThat(Targeting.covered(4, java.util.List.of(3.0, 2.0))).isTrue();
+        assertThat(Targeting.covered(4, java.util.List.of(3.0))).isFalse();
+        assertThat(Targeting.covered(4, java.util.List.of())).isFalse();
+    }
 }

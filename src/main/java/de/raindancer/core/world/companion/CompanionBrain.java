@@ -6,7 +6,6 @@ import org.bukkit.Input;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Server;
-import org.bukkit.block.Block;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.damage.DamageType;
 import org.bukkit.entity.ArmorStand;
@@ -38,7 +37,14 @@ final class CompanionBrain {
     private static final double FOLLOW_REACH = 2.5;
     private static final double LOOK_AROUND = 10;
     private static final double SEEN_FROM = 16;
-    private static final double RANGED_KEEP = 7;
+    /** Ticks stuck on the way to its owner before it is brought to them. */
+    private static final long STUCK_FOLLOWING = 100;
+    /** Ticks stuck on the way to a spot before it picks another. */
+    private static final long STUCK_EXPLORING = 60;
+    /** Ticks it leaves a foe alone that it could not get at. */
+    private static final long GIVE_UP_FOR = 400;
+    /** A companion sitting by its owner gets up only once they are this much further than it follows. */
+    private static final double SETTLED_SLACK = 1.5;
 
     private final CompanionService service;
     private final Combat combat;
@@ -47,6 +53,7 @@ final class CompanionBrain {
     private final Targeting targeting = new Targeting();
     private final Map<UUID, Companion> missiles = new ConcurrentHashMap<>();
     private final java.util.Random random = new java.util.Random();
+    private final Legs legs = new Legs(random);
 
     CompanionBrain(CompanionService service, Combat combat, Grudges grudges, Server server) {
         this.service = service;
@@ -84,9 +91,7 @@ final class CompanionBrain {
         Location here = mob.getLocation();
         Location there = owner.getLocation();
         if (here.distanceSquared(there) > CATCH_UP * CATCH_UP) {
-            Location beside = there.clone().add(there.getDirection().setY(0).normalize().multiply(-1.5));
-            mob.teleportAsync(beside);
-            companion.target = null;
+            bringBack(companion, mob, there);
             return;
         }
         if (tick % 40 == 0) {
@@ -100,66 +105,161 @@ final class CompanionBrain {
             mend(companion, mob, owner, spec);
         }
         double share = mob.getHealth() / Math.max(1, CompanionService.maxHealth(mob));
-        boolean fleeing = spec.fleesBelow() > 0 && share < spec.fleesBelow();
+        if (tick % 20 == 0) {
+            recover(companion, mob, owner, spec, tick, share);
+        }
+        boolean fleeing = share < Tactics.turnsBack(spec.fleesBelow(), spec.tactic());
         if (fleeing) {
             companion.target = null;
         } else if (tick % 10 == 0) {
-            LivingEntity chosen = choose(companion, mob, owner, spec);
+            LivingEntity chosen = choose(companion, mob, owner, spec, tick);
+            if (chosen == null || !chosen.getUniqueId().equals(companion.target)) {
+                companion.chase.reset();
+            }
             companion.target = chosen == null ? null : chosen.getUniqueId();
         }
         boolean idle = companion.wandering.ownerIdle(vec(there), tick);
-        LivingEntity target = alive(companion.target, mob, owner);
+        LivingEntity target = alive(companion.target, mob, owner, spec);
         if (target == null) {
             companion.target = null;
         }
-        Steering.Vec push;
-        double fall = spec.flies() ? 0 : mob.getVelocity().getY();
+        double vigour = Recovery.vigour(share);
         if (target != null) {
-            push = fight(companion, mob, target, spec, tick, fall);
+            fight(companion, mob, owner, target, spec, tick, vigour);
         } else if (!fleeing && (companion.staying() || idle) && spec.wanderRadius() > 0) {
-            push = explore(companion, mob, companion.staying() ? stayPoint(companion, mob) : there, spec, tick, fall);
+            explore(companion, mob, owner, companion.staying() ? stayPoint(companion, mob) : there, spec, tick,
+                    share, vigour);
         } else if (companion.staying()) {
-            push = new Steering.Vec(0, fall, 0);
+            companion.exploring = null;
+            legs.rest(companion, mob, spec, tick, owner.getEyeLocation(), vigour, true);
         } else {
             companion.exploring = null;
-            Location aim = there.clone();
-            if (spec.flies()) {
-                aim.add(0, 1.5, 0);
-            }
-            push = Steering.towards(vec(here), vec(aim), spec.speed(), fleeing ? 1.5 : FOLLOW_REACH, spec.flies(), fall);
+            follow(companion, mob, owner, spec, tick, fleeing, vigour, idle);
         }
-        Location lookAt = target != null ? target.getLocation()
-                : companion.exploring != null ? companion.exploring : there;
-        move(mob, push, lookAt, spec);
+    }
+
+    // ------------------------------------------------------------------ following
+
+    private void follow(Companion companion, Mob mob, Player owner, CompanionSpec spec, long tick, boolean fleeing,
+                        double vigour, boolean idle) {
+        Location there = owner.getLocation();
+        Location aim = there.clone();
+        if (spec.flies()) {
+            aim.add(0, 1.5, 0);
+        }
+        double reach = fleeing ? 1.5 : FOLLOW_REACH;
+        double flat = Math.hypot(aim.getX() - mob.getX(), aim.getZ() - mob.getZ());
+        if (flat <= reach + (companion.legs.pose == Resting.Pose.STAND ? 0 : SETTLED_SLACK)
+                && (!spec.flies() || Math.abs(aim.getY() - mob.getY()) < 2)) {
+            legs.rest(companion, mob, spec, tick, owner.getEyeLocation(), vigour, idle);
+            return;
+        }
+        double speed = fleeing ? spec.speed() * 1.2 : spec.speed() * vigour * (flat > 8 ? 1.3 : 1);
+        long stuck = legs.go(companion, mob, aim, reach, speed, spec, tick, owner.getEyeLocation());
+        if (stuck > STUCK_FOLLOWING) {
+            bringBack(companion, mob, there);
+        }
+    }
+
+    /** Beside its owner at once — when it fell too far behind or got stuck on the way. */
+    private static void bringBack(Companion companion, Mob mob, Location there) {
+        Location beside = there.clone().add(there.getDirection().setY(0).normalize().multiply(-1.5));
+        if (!beside.getBlock().isPassable() || !beside.clone().add(0, 1, 0).getBlock().isPassable()) {
+            beside = there.clone();
+        }
+        mob.teleportAsync(beside);
+        companion.target = null;
+        companion.exploring = null;
+        companion.legs.course = null;
+        companion.legs.progress.reset();
+    }
+
+    // ------------------------------------------------------------------ mending
+
+    /** Once a second: a little health back, once it has been out of fights a while near its owner. */
+    private void recover(Companion companion, Mob mob, Player owner, CompanionSpec spec, long tick, double share) {
+        if (share >= 1) {
+            return;
+        }
+        long calm = tick - Math.max(companion.lastAttack, companion.lastHurt);
+        double amount = Recovery.mends(calm, mob.getLocation().distanceSquared(owner.getLocation()),
+                spec.regenPerSecond());
+        if (amount <= 0) {
+            return;
+        }
+        double max = CompanionService.maxHealth(mob);
+        mob.setHealth(Math.min(max, mob.getHealth() + amount));
+        if (tick % 80 == 0) {
+            mob.getWorld().spawnParticle(Particle.HEART, mob.getLocation().add(0, mob.getHeight() + 0.3, 0), 1,
+                    0.15, 0.1, 0.15);
+        }
     }
 
     // ------------------------------------------------------------------ fighting
 
-    private Steering.Vec fight(Companion companion, Mob mob, LivingEntity target, CompanionSpec spec, long tick,
-                               double fall) {
+    private void fight(Companion companion, Mob mob, Player owner, LivingEntity target, CompanionSpec spec,
+                       long tick, double vigour) {
         Location here = mob.getLocation();
         Location there = target.getLocation();
         double distance = here.distance(there);
-        boolean ready = tick - companion.lastAttack >= spec.attackTicks();
-        if (spec.fighting() == Fighting.RANGED) {
-            if (ready && distance <= 16 && mob.hasLineOfSight(target)) {
-                shoot(companion, mob, target, spec);
-                companion.lastAttack = tick;
-            }
-            return distance > RANGED_KEEP + 2
-                    ? Steering.towards(vec(here), vec(there), spec.speed(), RANGED_KEEP, spec.flies(), fall)
-                    : new Steering.Vec(0, fall, 0);
-        }
+        boolean ready = tick - companion.lastAttack >= Math.max(companion.cooldown, 5);
         double reach = mob.getWidth() / 2 + target.getWidth() / 2 + 1.0;
-        if (ready && distance <= reach) {
+        if (spec.fighting() == Fighting.RANGED) {
+            boolean sees = mob.hasLineOfSight(target);
+            if (ready && distance <= 16 && sees) {
+                shoot(companion, mob, target, spec);
+                attacked(companion, spec, tick);
+            }
+            if (sees) {
+                companion.chase.reset();
+            } else if (companion.chase.stuck(distance + 1000, tick, Tactics.patience(spec.tactic()))) {
+                giveUp(companion, target, tick);
+            }
+        } else if (ready && distance <= reach && Math.abs(there.getY() - here.getY()) < 2) {
             target.damage(spec.damage(), DamageSource.builder(DamageType.MOB_ATTACK)
                     .withCausingEntity(mob).withDirectEntity(mob).build());
             mob.swingMainHand();
-            companion.lastAttack = tick;
+            attacked(companion, spec, tick);
+            if (random.nextDouble() < 0.3) {
+                companion.side = -companion.side;
+            }
         }
-        Location aim = spec.flies() ? there.clone().add(0, target.getHeight() / 2, 0) : there;
-        return Steering.towards(vec(here), vec(aim), spec.speed() * 1.15, Math.max(0.3, reach - 0.4), spec.flies(),
-                fall);
+        if (random.nextInt(120) == 0) {
+            companion.side = -companion.side;
+        }
+        Tactics.Plan plan = Tactics.plan(new Tactics.Situation(vec(here), vec(there), vec(owner.getLocation()), reach,
+                ready, companion.side, spec.fighting(), spec.tactic()));
+        Location aim = new Location(mob.getWorld(), plan.aim().x(), plan.aim().y(), plan.aim().z());
+        if (spec.flies()) {
+            aim.setY(spec.fighting() == Fighting.RANGED ? Math.max(there.getY() + 2.5, here.getY() - 0.5)
+                    : there.getY() + target.getHeight() / 2);
+        }
+        long stuck = legs.go(companion, mob, aim, plan.reach(), spec.speed() * plan.pace() * Math.max(0.8, vigour),
+                spec, tick, target.getEyeLocation());
+        if (stuck > 0 && random.nextInt(40) == 0) {
+            companion.side = -companion.side;
+        }
+        boolean melee = spec.fighting() != Fighting.RANGED;
+        if (melee && Math.hypot(there.getX() - here.getX(), there.getZ() - here.getZ()) > reach + 2.5
+                && (plan.aim().equals(vec(there)) || stuck > 0)) {
+            if (companion.chase.stuck(distance, tick, Tactics.patience(spec.tactic()))) {
+                giveUp(companion, target, tick);
+            }
+        } else if (melee) {
+            companion.chase.reset();
+        }
+    }
+
+    private void attacked(Companion companion, CompanionSpec spec, long tick) {
+        companion.lastAttack = tick;
+        companion.cooldown = Tactics.cooldown(spec.attackTicks(), random);
+    }
+
+    /** It cannot get at it: leave it alone for a while. */
+    private static void giveUp(Companion companion, LivingEntity target, long tick) {
+        companion.gaveUp.put(target.getUniqueId(), tick + GIVE_UP_FOR);
+        companion.target = null;
+        companion.chase.reset();
     }
 
     private void shoot(Companion companion, Mob mob, LivingEntity target, CompanionSpec spec) {
@@ -206,40 +306,61 @@ final class CompanionBrain {
         mob.setHealth(Math.min(CompanionService.maxHealth(mob), mob.getHealth() + spec.damage() / 2));
     }
 
-    private LivingEntity choose(Companion companion, Mob mob, Player owner, CompanionSpec spec) {
+    // ------------------------------------------------------------------ choosing a foe
+
+    private LivingEntity choose(Companion companion, Mob mob, Player owner, CompanionSpec spec, long tick) {
         long now = System.currentTimeMillis();
         boolean pvp = combat.isPvpAllowed(mob.getWorld().getName());
-        LivingEntity current = alive(companion.target, mob, owner);
-        if (current != null && wanted(companion, owner, spec, current, now, pvp)) {
-            return current;
-        }
+        companion.gaveUp.values().removeIf(until -> until <= tick);
+        java.util.Map<UUID, LivingEntity> found = new java.util.LinkedHashMap<>();
         for (UUID remembered : new UUID[]{grudges.hurtBy(owner.getUniqueId(), now).orElse(null),
-                grudges.struck(owner.getUniqueId(), now).orElse(null)}) {
-            LivingEntity foe = alive(remembered, mob, owner);
-            if (foe != null && wanted(companion, owner, spec, foe, now, pvp)) {
-                return foe;
+                grudges.struck(owner.getUniqueId(), now).orElse(null), companion.target}) {
+            LivingEntity foe = alive(remembered, mob, owner, spec);
+            if (foe != null) {
+                found.put(foe.getUniqueId(), foe);
             }
         }
-        if (spec.stance() != Stance.AGGRESSIVE) {
-            return null;
-        }
-        LivingEntity nearest = null;
-        double best = Double.MAX_VALUE;
-        for (Entity near : owner.getNearbyEntities(LOOK_AROUND, LOOK_AROUND / 2, LOOK_AROUND)) {
-            if (near instanceof LivingEntity living && near instanceof Enemy
-                    && wanted(companion, owner, spec, living, now, pvp)) {
-                double distance = near.getLocation().distanceSquared(owner.getLocation());
-                if (distance < best) {
-                    best = distance;
-                    nearest = living;
+        if (spec.stance() == Stance.AGGRESSIVE) {
+            for (Entity near : owner.getNearbyEntities(LOOK_AROUND, LOOK_AROUND / 2, LOOK_AROUND)) {
+                if (near instanceof LivingEntity living && (near instanceof Enemy
+                        || (near instanceof Mob hunter && owner.equals(hunter.getTarget())))) {
+                    found.putIfAbsent(near.getUniqueId(), living);
                 }
             }
         }
-        return nearest;
+        java.util.List<Targeting.Seen> wanted = new java.util.ArrayList<>();
+        Location here = mob.getLocation();
+        for (LivingEntity foe : found.values()) {
+            if (companion.gaveUp.containsKey(foe.getUniqueId()) || !wanted(owner, spec, foe, now, pvp)) {
+                continue;
+            }
+            wanted.add(new Targeting.Seen(foe.getUniqueId(),
+                    grudges.hurtOwner(owner.getUniqueId(), foe.getUniqueId(), now),
+                    foe instanceof Mob hunter && owner.equals(hunter.getTarget()),
+                    grudges.ownerStruck(owner.getUniqueId(), foe.getUniqueId(), now),
+                    foe.getHealth() / Math.max(1, CompanionService.maxHealth(foe)),
+                    foe.getLocation().distance(here), covered(companion, foe)));
+        }
+        return Targeting.pick(wanted, companion.target).map(seen -> found.get(seen.id())).orElse(null);
     }
 
-    private boolean wanted(Companion companion, Player owner, CompanionSpec spec, LivingEntity other, long now,
-                           boolean pvp) {
+    /**
+     * Whether the owner's other companions on this foe will finish it without this one. On its own foe, only those
+     * that ranked before it count — so of three on a weak foe the first stay and the last moves on, not all of them.
+     */
+    private boolean covered(Companion companion, LivingEntity foe) {
+        boolean own = foe.getUniqueId().equals(companion.target);
+        java.util.List<Double> others = new java.util.ArrayList<>();
+        for (Companion other : service.of(companion.owner())) {
+            if (other != companion && foe.getUniqueId().equals(other.target)
+                    && (!own || other.id().compareTo(companion.id()) < 0)) {
+                others.add(other.spec().damage());
+            }
+        }
+        return Targeting.covered(foe.getHealth(), others);
+    }
+
+    private boolean wanted(Player owner, CompanionSpec spec, LivingEntity other, long now, boolean pvp) {
         return targeting.attacks(spec.stance(), new Targeting.Candidate(kind(owner, other),
                 grudges.hurtOwner(owner.getUniqueId(), other.getUniqueId(), now),
                 grudges.ownerStruck(owner.getUniqueId(), other.getUniqueId(), now), spared(other)), pvp);
@@ -267,13 +388,15 @@ final class CompanionBrain {
                 || (other instanceof Tameable tame && tame.isTamed()) || other.customName() != null;
     }
 
-    private LivingEntity alive(UUID id, Mob mob, Player owner) {
+    /** Alive, here, and no further from the owner than its tactic lets it chase. */
+    private LivingEntity alive(UUID id, Mob mob, Player owner, CompanionSpec spec) {
         if (id == null) {
             return null;
         }
+        double leash = Tactics.leash(spec.tactic());
         if (!(server.getEntity(id) instanceof LivingEntity living) || !living.isValid() || living.isDead()
                 || living.getWorld() != mob.getWorld()
-                || living.getLocation().distanceSquared(owner.getLocation()) > CATCH_UP * CATCH_UP) {
+                || living.getLocation().distanceSquared(owner.getLocation()) > leash * leash) {
             return null;
         }
         return living;
@@ -289,24 +412,40 @@ final class CompanionBrain {
         return companion.stayAt;
     }
 
-    /** Off to a spot near its anchor now and then; there, it looks about until it sets off again. */
-    private Steering.Vec explore(Companion companion, Mob mob, Location anchor, CompanionSpec spec, long tick,
-                                 double fall) {
+    /**
+     * Off to a spot near its anchor now and then; there, it looks about — and settles down — until it sets off again.
+     * Hurt, it keeps near enough its owner to mend, and sets off less often.
+     */
+    private void explore(Companion companion, Mob mob, Player owner, Location anchor, CompanionSpec spec, long tick,
+                         double share, double vigour) {
+        double radius = companion.staying() ? spec.wanderRadius()
+                : Recovery.roam(spec.wanderRadius(), share, spec.regenPerSecond());
         Location spot = companion.exploring;
         if (spot != null && (spot.getWorld() != mob.getWorld()
-                || spot.distanceSquared(anchor) > Math.pow(spec.wanderRadius() + 2, 2))) {
+                || spot.distanceSquared(anchor) > Math.pow(radius + 2, 2))) {
             spot = null;
         }
-        if (spot == null || (tick % 20 == 0 && mob.getLocation().distanceSquared(spot) < 2.5
-                && Wandering.setsOff(spec.wanderEagerness(), spec.wanderRadius(), random))) {
-            Steering.Vec next = Wandering.spot(vec(anchor), spec.wanderRadius(), spec.flies(), random);
+        boolean there = spot != null && Math.hypot(spot.getX() - mob.getX(), spot.getZ() - mob.getZ()) < 1.2
+                && (!spec.flies() || Math.abs(spot.getY() - mob.getY()) < 1.5);
+        if (spot == null || (there && tick % 20 == 0
+                && Wandering.setsOff(spec.wanderEagerness() * vigour
+                        * (companion.legs.pose == Resting.Pose.STAND ? 1 : 0.3), radius, random))) {
+            Steering.Vec next = Wandering.spot(vec(anchor), radius, spec.flies(), random);
             spot = new Location(mob.getWorld(), next.x(), next.y(), next.z());
             companion.exploring = spot;
+            there = false;
         }
-        return Steering.towards(vec(mob.getLocation()), vec(spot), spec.speed() * 0.55, 0.8, spec.flies(), fall);
+        if (there) {
+            legs.rest(companion, mob, spec, tick, owner.getEyeLocation(), vigour, true);
+            return;
+        }
+        long stuck = legs.go(companion, mob, spot, 0.8, spec.speed() * 0.55 * vigour, spec, tick, spot);
+        if (stuck > STUCK_EXPLORING) {
+            companion.exploring = null;
+        }
     }
 
-    // ------------------------------------------------------------------ moving
+    // ------------------------------------------------------------------ carrying
 
     private void carry(Companion companion, Mob mob, Player rider, CompanionSpec spec) {
         Input input = rider.getCurrentInput();
@@ -314,7 +453,7 @@ final class CompanionBrain {
         Steering.Vec push = Steering.ridden(new Steering.Input(input.isForward(), input.isBackward(), input.isLeft(),
                         input.isRight(), input.isJump()), rider.getYaw(), rider.getPitch(), speed, spec.flies(),
                 mob.getVelocity().getY(), mob.isOnGround());
-        push = stepUp(mob, push, spec);
+        push = Legs.stepUp(mob, push, spec);
         if (mob instanceof EnderDragon) {
             Location next = mob.getLocation().add(push.x(), push.y(), push.z());
             next.setYaw(rider.getYaw() + 180);
@@ -334,41 +473,7 @@ final class CompanionBrain {
         }
     }
 
-    private void move(Mob mob, Steering.Vec push, Location lookAt, CompanionSpec spec) {
-        push = stepUp(mob, push, spec);
-        boolean moving = Math.hypot(push.x(), push.z()) > 0.01;
-        float yaw = moving ? Steering.yawOf(push) : yawTowards(mob.getLocation(), lookAt);
-        if (mob instanceof EnderDragon) {
-            Location next = mob.getLocation().add(push.x(), push.y(), push.z());
-            next.setYaw(yaw + 180);
-            next.setPitch(0);
-            mob.teleportAsync(next, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN,
-                    TeleportFlag.EntityState.RETAIN_PASSENGERS);
-            return;
-        }
-        mob.setVelocity(new Vector(push.x(), push.y(), push.z()));
-        mob.setRotation(yaw, 0);
-        mob.setBodyYaw(yaw);
-    }
-
-    /** A walker blocked by one block ahead hops it. */
-    private static Steering.Vec stepUp(Mob mob, Steering.Vec push, CompanionSpec spec) {
-        if (spec.flies() || !mob.isOnGround() || Math.hypot(push.x(), push.z()) < 0.05) {
-            return push;
-        }
-        Vector ahead = new Vector(push.x(), 0, push.z()).normalize().multiply(mob.getWidth() / 2 + 0.4);
-        Block front = mob.getLocation().add(ahead).getBlock();
-        if (front.isSolid() && front.getRelative(0, 1, 0).isPassable()) {
-            return new Steering.Vec(push.x(), Steering.JUMP, push.z());
-        }
-        return push;
-    }
-
-    private static float yawTowards(Location from, Location to) {
-        return Steering.yawOf(new Steering.Vec(to.getX() - from.getX(), 0, to.getZ() - from.getZ()));
-    }
-
     private static Steering.Vec vec(Location at) {
-        return new Steering.Vec(at.getX(), at.getY(), at.getZ());
+        return Legs.vec(at);
     }
 }
