@@ -24,6 +24,12 @@ import org.bukkit.entity.EntityType;
  * @param ability    what it does when its rider swings, or null for nothing
  * @param abilityPower how hard that hits or heals, 1 as it comes
  * @param abilityHaste how much sooner it is ready again, 1 as it comes
+ * @param lifesteal  the share of the damage it deals that mends it, 0 to 1
+ * @param toughness  the share of the damage it takes that it shrugs off, 0 to 0.8
+ * @param thorns     the share of the damage it takes that goes back to whoever dealt it, 0 to 1
+ * @param auras      potion effects (keys like {@code speed}) with their amplifier, kept on its owner while near
+ * @param collectRadius how far round it it fetches loose drops and experience to its owner; 0 never
+ * @param spotRadius how far round its owner it marks monsters, for the owner's eyes only; 0 never
  */
 public record CompanionSpec(EntityType type, double height, boolean flies, boolean baby, Fighting fighting,
                             Stance stance, double health, double damage, double speed, double fleesBelow,
@@ -31,7 +37,9 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
                             String particle, de.raindancer.core.ui.effect.ParticleShape particleShape,
                             double wanderRadius, double wanderEagerness, boolean silent, Tactic tactic,
                             double regenPerSecond, double grumpiness, CompanionAbility ability,
-                            double abilityPower, double abilityHaste) {
+                            double abilityPower, double abilityHaste, double lifesteal, double toughness,
+                            double thorns, java.util.Map<String, Integer> auras, double collectRadius,
+                            double spotRadius) {
 
     public static final double LARGEST_SCALE = 0.95;
     public static final double FASTEST = 1.5;
@@ -56,6 +64,12 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
         grumpiness = Math.max(0, Math.min(1, grumpiness));
         abilityPower = Math.max(0.1, Math.min(10, abilityPower));
         abilityHaste = Math.max(0.25, Math.min(4, abilityHaste));
+        lifesteal = Math.max(0, Math.min(1, lifesteal));
+        toughness = Math.max(0, Math.min(0.8, toughness));
+        thorns = Math.max(0, Math.min(1, thorns));
+        auras = auras == null ? java.util.Map.of() : java.util.Map.copyOf(auras);
+        collectRadius = Math.max(0, Math.min(16, collectRadius));
+        spotRadius = Math.max(0, Math.min(48, spotRadius));
         particleShape = particleShape == null || !fitsSmallBody(particleShape)
                 ? de.raindancer.core.ui.effect.ParticleShape.AURA : particleShape;
     }
@@ -72,26 +86,39 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
                 regenPerSecond, grumpiness, null, 1, 1);
     }
 
+    /** The shape before the knacks (lifesteal to spotting), kept so plugins built against it still link. */
+    public CompanionSpec(EntityType type, double height, boolean flies, boolean baby, Fighting fighting,
+                         Stance stance, double health, double damage, double speed, double fleesBelow,
+                         EntityType missile, boolean rideable, int attackTicks, Component name,
+                         String particle, de.raindancer.core.ui.effect.ParticleShape particleShape,
+                         double wanderRadius, double wanderEagerness, boolean silent, Tactic tactic,
+                         double regenPerSecond, double grumpiness, CompanionAbility ability,
+                         double abilityPower, double abilityHaste) {
+        this(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable,
+                attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic,
+                regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, 0, 0, 0, java.util.Map.of(), 0, 0);
+    }
+
     /** Wings are drawn the size of a player and would hang in the air over a small pet. */
     public static boolean fitsSmallBody(de.raindancer.core.ui.effect.ParticleShape shape) {
         return shape != null && !shape.isWings();
     }
 
     public CompanionSpec silent(boolean v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, v, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, v, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec wander(double radius, double eagerness) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, radius, eagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, radius, eagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec particle(String v, de.raindancer.core.ui.effect.ParticleShape shape) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, v, shape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, v, shape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public static CompanionSpec of(EntityType type) {
         return new CompanionSpec(type, 0.4, false, false, Fighting.MELEE, Stance.DEFENSIVE, 20, 3, 0.3, 0,
-                EntityType.SNOWBALL, true, 20, Component.empty(), "", null, 6, 0.5, false, Tactic.BALANCED, 0.5, 0, null, 1, 1);
+                EntityType.SNOWBALL, true, 20, Component.empty(), "", null, 6, 0.5, false, Tactic.BALANCED, 0.5, 0, null, 1, 1, 0, 0, 0, java.util.Map.of(), 0, 0);
     }
 
     /** The scale that makes a mob {@code mobHeight} blocks tall stand {@link #height} players tall. */
@@ -103,78 +130,102 @@ public record CompanionSpec(EntityType type, double height, boolean flies, boole
     }
 
     public CompanionSpec height(double v) {
-        return new CompanionSpec(type, v, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, v, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec flies(boolean v) {
-        return new CompanionSpec(type, height, v, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, v, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec baby(boolean v) {
-        return new CompanionSpec(type, height, flies, v, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, v, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec fighting(Fighting v) {
-        return new CompanionSpec(type, height, flies, baby, v, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, v, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec stance(Stance v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, v, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, v, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec health(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, v, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, v, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec damage(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, v, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, v, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec speed(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, v, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, v, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec fleesBelow(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, v, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, v, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec missile(EntityType v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, v, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, v, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec rideable(boolean v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, v, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, v, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec attackTicks(int v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, v, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, v, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec name(Component v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, v, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, v, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec tactic(Tactic v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, v, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, v, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec regenPerSecond(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, v, grumpiness, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, v, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec grumpiness(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, v, ability, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, v, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec ability(CompanionAbility v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, v, abilityPower, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, v, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec abilityPower(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, v, abilityHaste);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, v, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
     }
 
     public CompanionSpec abilityHaste(double v) {
-        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, v);
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, v, lifesteal, toughness, thorns, auras, collectRadius, spotRadius);
+    }
+
+    public CompanionSpec lifesteal(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, v, toughness, thorns, auras, collectRadius, spotRadius);
+    }
+
+    public CompanionSpec toughness(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, v, thorns, auras, collectRadius, spotRadius);
+    }
+
+    public CompanionSpec thorns(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, v, auras, collectRadius, spotRadius);
+    }
+
+    public CompanionSpec collectRadius(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, v, spotRadius);
+    }
+
+    public CompanionSpec spotRadius(double v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, auras, collectRadius, v);
+    }
+
+    public CompanionSpec auras(java.util.Map<String, Integer> v) {
+        return new CompanionSpec(type, height, flies, baby, fighting, stance, health, damage, speed, fleesBelow, missile, rideable, attackTicks, name, particle, particleShape, wanderRadius, wanderEagerness, silent, tactic, regenPerSecond, grumpiness, ability, abilityPower, abilityHaste, lifesteal, toughness, thorns, v, collectRadius, spotRadius);
     }
 }

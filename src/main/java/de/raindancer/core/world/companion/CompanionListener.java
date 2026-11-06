@@ -111,6 +111,10 @@ public final class CompanionListener implements Listener {
             return;
         }
         companion.get().lastHurt = companion.get().ticks;
+        double toughness = companion.get().spec().toughness();
+        if (toughness > 0) {
+            event.setDamage(Knacks.taken(event.getDamage(), toughness));
+        }
         if (event.getFinalDamage() >= living.getHealth()) {
             event.setCancelled(true);
             companions.beaten(companion.get());
@@ -133,6 +137,33 @@ public final class CompanionListener implements Listener {
                 && of(event.getEntity()).map(victim -> !victim.owner().equals(owner.getUniqueId())).orElse(true)) {
             companions.grudges().struck(owner.getUniqueId(), event.getEntity().getUniqueId(), now);
         }
+    }
+
+    /** Lifesteal for the companion that struck, thorns from the one that was struck. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onKnacks(EntityDamageByEntityEvent event) {
+        Entity hitter = event.getDamager() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Entity shooter ? shooter : event.getDamager();
+        double dealt = event.getFinalDamage();
+        of(hitter).ifPresent(striker -> {
+            double back = Knacks.share(dealt, striker.spec().lifesteal());
+            if (back > 0 && hitter instanceof LivingEntity mob) {
+                Scheduling.entity(companions.core(), mob, () -> mob.setHealth(Math.min(
+                        CompanionService.maxHealth(mob), mob.getHealth() + back)));
+            }
+        });
+        if (event.getCause() == EntityDamageEvent.DamageCause.THORNS) {
+            return;
+        }
+        of(event.getEntity()).ifPresent(struck -> {
+            double back = Knacks.share(dealt, struck.spec().thorns());
+            if (back > 0 && hitter instanceof LivingEntity attacker && event.getEntity() instanceof LivingEntity mob
+                    && !hitter.getUniqueId().equals(struck.owner())) {
+                Scheduling.entity(companions.core(), attacker, () -> attacker.damage(back,
+                        org.bukkit.damage.DamageSource.builder(org.bukkit.damage.DamageType.THORNS)
+                                .withCausingEntity(mob).withDirectEntity(mob).build()));
+            }
+        });
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

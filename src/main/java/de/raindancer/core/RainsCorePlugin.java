@@ -967,6 +967,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         getServer().getPluginManager().registerEvents(combatListener, this);
         companions = new de.raindancer.core.world.companion.CompanionService(this, getServer(), combat,
                 vanish::isVanished);
+        if (land != null) {
+            Land claims = land;
+            companions.pickupRule((player, where) -> claims.allow(player, where,
+                    de.raindancer.core.world.protection.LandAction.ITEM_PICKUP));
+        }
         getServer().getPluginManager().registerEvents(
                 new de.raindancer.core.world.companion.CompanionListener(companions), this);
         vanish.onChange((who, hidden) -> {

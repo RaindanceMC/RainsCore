@@ -72,6 +72,7 @@ public final class CompanionService {
     private final java.util.Set<UUID> hidingOthers = ConcurrentHashMap.newKeySet();
     private final CompanionBrain brain;
     private final AbilityCaster caster;
+    private volatile java.util.function.BiPredicate<Player, org.bukkit.Location> mayPickUp = (player, where) -> true;
 
     public CompanionService(Plugin core, Server server, Combat combat, Predicate<UUID> vanished) {
         this.core = core;
@@ -412,6 +413,15 @@ public final class CompanionService {
     public void clear() {
         all().forEach(companion -> remove(companion, CompanionHooks.Gone.LOST));
         hidden.clear();
+    }
+
+    /** Whether the land lets a player pick up at a spot — a fetching companion asks before it brings anything. */
+    public void pickupRule(java.util.function.BiPredicate<Player, org.bukkit.Location> rule) {
+        mayPickUp = rule == null ? (player, where) -> true : rule;
+    }
+
+    boolean mayPickUp(Player player, org.bukkit.Location where) {
+        return mayPickUp.test(player, where);
     }
 
     /** Its rider swung: its ability goes off if it is ready, on the rider's thread. */

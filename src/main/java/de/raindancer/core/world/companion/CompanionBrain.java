@@ -106,6 +106,7 @@ final class CompanionBrain {
             de.raindancer.core.ui.effect.ParticleShows.at(mob.getLocation(), mob.getYaw(), spec.particle(), null, null,
                     4, spec.particleShape(), tick, 48, viewer -> true, null);
         }
+        knacks(mob, owner, spec, tick);
         if (mob.getPassengers().contains(owner)) {
             carry(companion, mob, owner, spec);
             return;
@@ -530,6 +531,78 @@ final class CompanionBrain {
         }
         missile.remove();
         return true;
+    }
+
+    // ------------------------------------------------------------------ knacks
+
+    /** Auras on its owner, drops fetched to them, monsters marked for them — each on its own beat. */
+    private void knacks(Mob mob, Player owner, CompanionSpec spec, long tick) {
+        org.bukkit.plugin.Plugin core = service.core();
+        Location here = mob.getLocation();
+        if (!spec.auras().isEmpty() && Knacks.due(tick, Knacks.AURA_EVERY)
+                && here.distanceSquared(owner.getLocation()) <= Knacks.AURA_REACH * Knacks.AURA_REACH) {
+            Scheduling.entity(core, owner, () -> spec.auras().forEach((key, amplifier) -> {
+                org.bukkit.potion.PotionEffectType type = org.bukkit.Registry.EFFECT.get(
+                        org.bukkit.NamespacedKey.minecraft(key));
+                if (type != null) {
+                    owner.addPotionEffect(new org.bukkit.potion.PotionEffect(type, Knacks.AURA_LASTS,
+                            Math.max(0, amplifier), true, false, true));
+                }
+            }));
+        }
+        if (spec.collectRadius() > 0 && Knacks.due(tick, Knacks.FETCH_EVERY)) {
+            fetch(mob, owner, spec.collectRadius());
+        }
+        if (spec.spotRadius() > 0 && Knacks.due(tick + 10, Knacks.SPOT_EVERY)) {
+            double r = spec.spotRadius();
+            java.util.List<Location> marks = new java.util.ArrayList<>();
+            for (Entity near : mob.getNearbyEntities(r, r / 2, r)) {
+                if (near instanceof Enemy && near instanceof LivingEntity living && !living.isDead()
+                        && service.byMob(near.getUniqueId()).isEmpty()) {
+                    marks.add(near.getLocation().add(0, near.getHeight() + 0.6, 0));
+                }
+            }
+            if (!marks.isEmpty()) {
+                Particle.DustOptions red = new Particle.DustOptions(org.bukkit.Color.fromRGB(0xff3b3b), 1.4f);
+                Scheduling.entity(core, owner, () -> marks.forEach(at ->
+                        owner.spawnParticle(Particle.DUST, at, 4, 0.12, 0.12, 0.12, 0, red)));
+            }
+        }
+    }
+
+    private void fetch(Mob mob, Player owner, double radius) {
+        org.bukkit.plugin.Plugin core = service.core();
+        int fetched = 0;
+        for (Entity near : mob.getNearbyEntities(radius, radius / 2, radius)) {
+            if (fetched >= 16) {
+                break;
+            }
+            Location where = near.getLocation();
+            boolean somebody = false;
+            for (Player other : near.getWorld().getNearbyPlayers(where, Knacks.SOMEBODY_ELSES)) {
+                somebody |= !other.equals(owner);
+            }
+            Knacks.Loot loot;
+            if (near instanceof org.bukkit.entity.Item item) {
+                loot = new Knacks.Loot(item.getTicksLived(),
+                        item.getOwner() == null || item.getOwner().equals(owner.getUniqueId()),
+                        item.getThrower() == null || item.getThrower().equals(owner.getUniqueId()),
+                        somebody, service.mayPickUp(owner, where));
+            } else if (near instanceof org.bukkit.entity.ExperienceOrb orb) {
+                loot = new Knacks.Loot(orb.getTicksLived(), true, true, somebody, true);
+            } else {
+                continue;
+            }
+            if (Knacks.fetches(loot)) {
+                fetched++;
+                Location to = owner.getLocation().add(0, 0.5, 0);
+                Scheduling.entity(core, near, () -> near.teleportAsync(to));
+            }
+        }
+        if (fetched > 0) {
+            mob.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, mob.getLocation().add(0, mob.getHeight(), 0), 3,
+                    0.2, 0.2, 0.2);
+        }
     }
 
     private void mend(Companion companion, Mob mob, Player owner, CompanionSpec spec) {
