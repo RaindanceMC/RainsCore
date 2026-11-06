@@ -28,6 +28,8 @@ public final class Companion {
     volatile org.bukkit.Location exploring;
     volatile org.bukkit.Location stayAt;
     volatile long lastHurt;
+    /** The server tick its ability is ready again. */
+    volatile long abilityReadyAt;
     volatile int cooldown;
     int side = 1;
     final Legs.State legs = new Legs.State();

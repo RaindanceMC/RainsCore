@@ -1,5 +1,6 @@
 package de.raindancer.core.world.companion;
 
+import de.raindancer.core.platform.util.Scheduling;
 import de.raindancer.core.world.combat.Combat;
 import io.papermc.paper.entity.TeleportFlag;
 import org.bukkit.Input;
@@ -53,7 +54,16 @@ final class CompanionBrain {
     private final Grudges grudges;
     private final Server server;
     private final Targeting targeting = new Targeting();
-    private final Map<UUID, Companion> missiles = new ConcurrentHashMap<>();
+    private final Map<UUID, Shot> missiles = new ConcurrentHashMap<>();
+    private AbilityCaster caster;
+
+    /**
+     * Something a companion threw: how hard it lands, what it leaves behind, and how wide it bursts (0: only what it
+     * strikes). An ability's shot only ever lands on what its rider may fight.
+     */
+    record Shot(Companion companion, double damage, org.bukkit.potion.PotionEffect effect, double burst,
+                boolean ability) {
+    }
     private final java.util.Random random = new java.util.Random();
     private final Legs legs = new Legs(random);
 
@@ -64,8 +74,18 @@ final class CompanionBrain {
         this.server = server;
     }
 
-    Optional<Companion> missile(UUID projectile) {
-        return Optional.ofNullable(missiles.remove(projectile));
+    Optional<Shot> missile(UUID projectile) {
+        return Optional.ofNullable(missiles.get(projectile));
+    }
+
+    void caster(AbilityCaster caster) {
+        this.caster = caster;
+    }
+
+    /** An ability's missile, ready to fly. */
+    void shot(Projectile projectile, Companion companion, double damage, org.bukkit.potion.PotionEffect effect,
+              double burst) {
+        missiles.put(projectile.getUniqueId(), new Shot(companion, damage, effect, burst, true));
     }
 
     boolean isMissile(UUID projectile) {
@@ -456,22 +476,60 @@ final class CompanionBrain {
         if (missile instanceof ShulkerBullet bullet) {
             bullet.setTarget(target);
         }
-        missiles.put(missile.getUniqueId(), companion);
+        missiles.put(missile.getUniqueId(), new Shot(companion, spec.damage(), null, 0, false));
     }
 
-    /** A missile hit: its damage, as the companion's. */
-    void hit(Companion companion, Projectile missile, Entity struck) {
-        if (struck instanceof LivingEntity living && !struck.getUniqueId().equals(companion.owner())
-                && service.byMob(struck.getUniqueId()).map(other -> !other.owner().equals(companion.owner()))
-                .orElse(true)) {
-            Entity mob = companion.mob() == null ? null : server.getEntity(companion.mob());
+    /**
+     * A missile hit: its damage, as the companion's.
+     *
+     * @return whether it is done — false when it only passed its own side, and flies on
+     */
+    boolean hit(Shot shot, Projectile missile, Entity struck) {
+        Companion companion = shot.companion();
+        Player owner = server.getPlayer(companion.owner());
+        boolean ownSide = struck != null && (struck.getUniqueId().equals(companion.owner())
+                || service.byMob(struck.getUniqueId()).map(other -> other.owner().equals(companion.owner()))
+                .orElse(false));
+        if (ownSide) {
+            return false;
+        }
+        missiles.remove(missile.getUniqueId());
+        Entity mob = companion.mob() == null ? null : server.getEntity(companion.mob());
+        if (shot.burst() > 0) {
+            Location at = missile.getLocation();
+            at.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, at, 1);
+            if (!companion.spec().silent()) {
+                at.getWorld().playSound(at, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 1f);
+            }
+            if (mob instanceof Mob thrower && owner != null && caster != null) {
+                for (Entity near : at.getWorld().getNearbyEntities(at, shot.burst(), shot.burst(), shot.burst())) {
+                    if (near.getLocation().distance(at) <= shot.burst() + near.getWidth() && caster.fair(owner, near)) {
+                        Vector away = near.getLocation().toVector().subtract(at.toVector()).setY(0);
+                        away = away.lengthSquared() < 1e-6 ? new Vector(0, 0.5, 0) : away.normalize().multiply(0.8);
+                        caster.hurt(thrower, (LivingEntity) near, shot.damage(), DamageType.FIREBALL,
+                                away.setY(0.4), shot.effect());
+                    }
+                }
+            }
+        } else if (shot.ability()) {
+            if (struck != null && mob instanceof Mob thrower && owner != null && caster != null
+                    && caster.fair(owner, struck)) {
+                boolean flame = missile instanceof org.bukkit.entity.SmallFireball;
+                caster.hurt(thrower, (LivingEntity) struck, shot.damage(),
+                        flame ? DamageType.UNATTRIBUTED_FIREBALL : DamageType.WITHER_SKULL, null, shot.effect());
+                if (flame) {
+                    Scheduling.entity(service.core(), struck, () -> struck.setFireTicks(Math.max(struck.getFireTicks(), 80)));
+                }
+            }
+        } else if (struck instanceof LivingEntity living) {
             DamageSource.Builder source = DamageSource.builder(DamageType.MOB_PROJECTILE).withDirectEntity(missile);
             if (mob != null) {
                 source.withCausingEntity(mob);
             }
-            living.damage(companion.spec().damage(), source.build());
+            living.damage(shot.damage(), source.build());
         }
         missile.remove();
+        return true;
     }
 
     private void mend(Companion companion, Mob mob, Player owner, CompanionSpec spec) {

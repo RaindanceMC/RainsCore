@@ -64,6 +64,10 @@ public interface CompanionHooks {
     default void inspected(Companion companion, Player viewer) {
     }
 
+    /** Its rider set off its ability. */
+    default void abilityUsed(Companion companion, CompanionAbility ability) {
+    }
+
     /** Whether it may come along into a world — asked when its owner changes worlds. */
     default boolean allowedIn(Companion companion, String world) {
         return true;

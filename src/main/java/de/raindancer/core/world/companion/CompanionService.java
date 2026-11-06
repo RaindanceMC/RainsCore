@@ -71,6 +71,7 @@ public final class CompanionService {
     private final Grudges grudges = new Grudges();
     private final java.util.Set<UUID> hidingOthers = ConcurrentHashMap.newKeySet();
     private final CompanionBrain brain;
+    private final AbilityCaster caster;
 
     public CompanionService(Plugin core, Server server, Combat combat, Predicate<UUID> vanished) {
         this.core = core;
@@ -78,6 +79,8 @@ public final class CompanionService {
         this.combat = combat;
         this.vanished = vanished;
         this.brain = new CompanionBrain(this, combat, grudges, server);
+        this.caster = new AbilityCaster(this, brain, combat, core, server);
+        brain.caster(caster);
     }
 
     // ------------------------------------------------------------------ asking
@@ -409,6 +412,11 @@ public final class CompanionService {
     public void clear() {
         all().forEach(companion -> remove(companion, CompanionHooks.Gone.LOST));
         hidden.clear();
+    }
+
+    /** Its rider swung: its ability goes off if it is ready, on the rider's thread. */
+    void ability(Companion companion, Mob mount, Player rider) {
+        caster.cast(companion, mount, rider);
     }
 
     Plugin core() {

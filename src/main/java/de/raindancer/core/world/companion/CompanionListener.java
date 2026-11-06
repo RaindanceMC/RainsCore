@@ -158,10 +158,50 @@ public final class CompanionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onMissile(ProjectileHitEvent event) {
-        companions.brain().missile(event.getEntity().getUniqueId()).ifPresent(companion -> {
+        companions.brain().missile(event.getEntity().getUniqueId()).ifPresent(shot -> {
             event.setCancelled(true);
-            companions.brain().hit(companion, event.getEntity(), event.getHitEntity());
+            companions.brain().hit(shot, event.getEntity(), event.getHitEntity());
         });
+    }
+
+    /**
+     * Swinging at the air on a companion that has an ability sets it off. Not ignoreCancelled: Paper hands a swing at
+     * the air in already cancelled.
+     */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onSwing(org.bukkit.event.player.PlayerInteractEvent event) {
+        org.bukkit.event.block.Action action = event.getAction();
+        if (action != org.bukkit.event.block.Action.LEFT_CLICK_AIR
+                && action != org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
+            return;
+        }
+        Player rider = event.getPlayer();
+        if (!(rider.getVehicle() instanceof Mob mount)) {
+            return;
+        }
+        of(mount).filter(companion -> companion.owner().equals(rider.getUniqueId())
+                && companion.spec().ability() != null).ifPresent(companion -> {
+            event.setCancelled(true);
+            companions.ability(companion, mount, rider);
+        });
+    }
+
+    /** The game counts a pet monster as a monster near the bed; when only companions are, the bed lets the player in. */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBed(org.bukkit.event.player.PlayerBedEnterEvent event) {
+        if (event.getBedEnterResult() != org.bukkit.event.player.PlayerBedEnterEvent.BedEnterResult.NOT_SAFE) {
+            return;
+        }
+        org.bukkit.Location bed = event.getBed().getLocation().add(0.5, 0, 0.5);
+        java.util.List<Boolean> companions = new java.util.ArrayList<>();
+        for (Entity near : bed.getWorld().getNearbyEntities(bed, Sleeping.ACROSS, Sleeping.UP, Sleeping.ACROSS)) {
+            if (near instanceof org.bukkit.entity.Enemy) {
+                companions.add(of(near).isPresent());
+            }
+        }
+        if (Sleeping.letIn(companions)) {
+            event.setUseBed(org.bukkit.event.Event.Result.ALLOW);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
