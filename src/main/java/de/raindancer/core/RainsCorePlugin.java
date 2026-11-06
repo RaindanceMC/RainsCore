@@ -978,6 +978,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         menusSwitch = de.raindancer.core.ui.menu.MenuPack.profileSwitch(() -> settings.current().menusPainted());
         de.raindancer.core.ui.profile.ProfileExtensions.register(menusSwitch);
         startResourcePacks(settings.current());
+        // Custom models: Core puts its bundled engine (BetterModel) into plugins/ and takes its pack into this one.
+        de.raindancer.core.world.model.ModelEngine.start(this, resourcePacks, true, getLogger());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         if (network.isNetwork()) {
             // On a network every server reaches every other through the network's database: the two-server link

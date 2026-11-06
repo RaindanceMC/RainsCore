@@ -36,6 +36,12 @@ dependencies:
       join-classpath: true
     # Same treatment. With it, Economies offers a Rain economy to every Vault plugin and falls back to a
     # foreign Vault economy when none is installed — see VaultBridge.
+    # The model engine Core installs itself (world.model.BundledEngine). Loaded first so its pack and API are there
+    # when Core starts; a server without it yet (first start) loads as before.
+    BetterModel:
+      load: BEFORE
+      required: false
+      join-classpath: true
     Vault:
       load: BEFORE
       required: false
