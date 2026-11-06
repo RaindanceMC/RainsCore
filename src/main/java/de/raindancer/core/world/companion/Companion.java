@@ -31,6 +31,21 @@ public final class Companion {
     volatile int cooldown;
     int side = 1;
     final Legs.State legs = new Legs.State();
+    /** Where its mob stood this tick — for the others to keep clear of, without reaching into its entity. */
+    volatile org.bukkit.Location at;
+    /** Its place among its owner's companions, and how many there are: which spot behind them is its own. */
+    volatile int slot;
+    volatile int slots = 1;
+    volatile float slotYaw;
+    /** It has come to a stop — resting, sitting, at a spot it explores. */
+    volatile boolean resting;
+    /** The companion it is cuddling up to, and the one cuddling up to it (ids), and till when. */
+    volatile UUID cuddling;
+    volatile UUID cuddledBy;
+    volatile long cuddleUntil;
+    /** Somebody else's companion it is squaring up to, and till when. */
+    volatile UUID squabbling;
+    volatile long squabbleUntil;
     final Progress chase = new Progress();
     final java.util.Map<UUID, Long> gaveUp = new java.util.concurrent.ConcurrentHashMap<>();
 

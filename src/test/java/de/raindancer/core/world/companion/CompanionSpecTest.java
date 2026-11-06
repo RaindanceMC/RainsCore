@@ -86,4 +86,15 @@ class CompanionSpecTest {
         assertThat(CompanionSpec.of(EntityType.WITHER).silent()).isFalse();
         assertThat(CompanionSpec.of(EntityType.WITHER).silent(true).silent()).isTrue();
     }
+
+    @Test
+    @DisplayName("good-natured unless told otherwise; grumpiness is a share")
+    void grumpiness() {
+        CompanionSpec wolf = CompanionSpec.of(EntityType.WOLF);
+        assertThat(wolf.grumpiness()).isZero();
+        assertThat(wolf.grumpiness(0.7).grumpiness()).isEqualTo(0.7);
+        assertThat(wolf.grumpiness(3).grumpiness()).isEqualTo(1);
+        assertThat(wolf.grumpiness(-1).grumpiness()).isZero();
+        assertThat(wolf.grumpiness(0.5).tactic(Tactic.CAUTIOUS).silent(true).grumpiness()).isEqualTo(0.5);
+    }
 }

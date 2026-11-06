@@ -90,6 +90,10 @@ public final class CompanionService {
         return List.copyOf(byId.values());
     }
 
+    Optional<Companion> byId(UUID id) {
+        return id == null ? Optional.empty() : Optional.ofNullable(byId.get(id));
+    }
+
     public Optional<Companion> byMob(UUID mob) {
         return mob == null ? Optional.empty() : Optional.ofNullable(byMob.get(mob));
     }

@@ -43,6 +43,8 @@ final class Legs {
         long glanceUntil;
         float glanceYaw;
         final double phase = Math.random();
+        /** This tick's push off other companions, from {@link Spacing#away}. */
+        Steering.Vec nudge = new Steering.Vec(0, 0, 0);
     }
 
     private final Random random;
@@ -71,8 +73,8 @@ final class Legs {
         if (distance <= reach) {
             state.progress.reset();
             state.course = null;
-            push(mob, spec.flies() ? hover(mob, spec, tick, state) : new Steering.Vec(0, fall(mob, spec), 0),
-                    lookAt, spec, false);
+            push(mob, nudged(spec.flies() ? hover(mob, spec, tick, state) : new Steering.Vec(0, fall(mob, spec), 0),
+                    state), lookAt, spec, false);
             return 0;
         }
         Steering.Vec waypoint = spec.flies() ? flyTowards(mob, aim, reach, tick, state)
@@ -90,7 +92,7 @@ final class Legs {
                 push = new Steering.Vec(push.x(), Steering.JUMP, push.z());
             }
         }
-        push(mob, push, lookAt, spec, true);
+        push(mob, nudged(push, state), lookAt, spec, true);
         state.progress.stuck(distance, tick, Integer.MAX_VALUE);
         return state.progress.stuckFor(tick);
     }
@@ -104,8 +106,12 @@ final class Legs {
         if (state.stillSince < 0) {
             state.stillSince = tick;
         }
-        if (!settle) {
+        boolean crowded = state.nudge.length() > 0.03;
+        if (!settle || crowded) {
             standUp(mob, state);
+            if (crowded) {
+                state.stillSince = tick;
+            }
         } else if (tick % 20 == 0 && (spec.flies() || mob instanceof Sittable)) {
             Resting.Pose next = Resting.next(state.pose, tick - state.stillSince, vigour, canLie(mob), random);
             if (next != state.pose) {
@@ -123,7 +129,13 @@ final class Legs {
         if (state.pose == Resting.Pose.STAND) {
             lookAt = glance(mob, lookAt, tick, state);
         }
-        push(mob, push, lookAt, spec, false);
+        push(mob, nudged(push, state), lookAt, spec, false);
+    }
+
+    private static Steering.Vec nudged(Steering.Vec push, State state) {
+        Steering.Vec nudge = state.nudge;
+        return nudge.x() == 0 && nudge.z() == 0 ? push
+                : new Steering.Vec(push.x() + nudge.x(), push.y(), push.z() + nudge.z());
     }
 
     // ------------------------------------------------------------------ walking

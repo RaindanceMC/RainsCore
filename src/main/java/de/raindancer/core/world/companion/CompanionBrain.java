@@ -45,6 +45,8 @@ final class CompanionBrain {
     private static final long GIVE_UP_FOR = 400;
     /** A companion sitting by its owner gets up only once they are this much further than it follows. */
     private static final double SETTLED_SLACK = 1.5;
+    /** Near enough its own spot behind its owner. */
+    private static final double SPOT_REACH = 0.7;
 
     private final CompanionService service;
     private final Combat combat;
@@ -119,13 +121,22 @@ final class CompanionBrain {
             companion.target = chosen == null ? null : chosen.getUniqueId();
         }
         boolean idle = companion.wandering.ownerIdle(vec(there), tick);
+        space(companion, mob, owner, here, tick, idle);
         LivingEntity target = alive(companion.target, mob, owner, spec);
         if (target == null) {
             companion.target = null;
         }
         double vigour = Recovery.vigour(share);
+        if (target != null || fleeing || !(idle || companion.staying())) {
+            stopCuddling(companion);
+            companion.squabbling = null;
+        }
         if (target != null) {
             fight(companion, mob, owner, target, spec, tick, vigour);
+        } else if (!fleeing && (idle || companion.staying()) && cuddle(companion, mob, owner, spec, tick, vigour)) {
+            companion.exploring = null;
+        } else if (!fleeing && (idle || companion.staying()) && squabble(companion, mob, spec, tick, vigour)) {
+            companion.exploring = null;
         } else if (!fleeing && (companion.staying() || idle) && spec.wanderRadius() > 0) {
             explore(companion, mob, owner, companion.staying() ? stayPoint(companion, mob) : there, spec, tick,
                     share, vigour);
@@ -143,11 +154,12 @@ final class CompanionBrain {
     private void follow(Companion companion, Mob mob, Player owner, CompanionSpec spec, long tick, boolean fleeing,
                         double vigour, boolean idle) {
         Location there = owner.getLocation();
-        Location aim = there.clone();
+        Location aim = fleeing ? there.clone() : ownSpot(companion, mob, there);
+        boolean onSpot = !aim.equals(there);
         if (spec.flies()) {
             aim.add(0, 1.5, 0);
         }
-        double reach = fleeing ? 1.5 : FOLLOW_REACH;
+        double reach = fleeing ? 1.5 : onSpot ? SPOT_REACH : FOLLOW_REACH;
         double flat = Math.hypot(aim.getX() - mob.getX(), aim.getZ() - mob.getZ());
         if (flat <= reach + (companion.legs.pose == Resting.Pose.STAND ? 0 : SETTLED_SLACK)
                 && (!spec.flies() || Math.abs(aim.getY() - mob.getY()) < 2)) {
@@ -156,8 +168,174 @@ final class CompanionBrain {
         }
         double speed = fleeing ? spec.speed() * 1.2 : spec.speed() * vigour * (flat > 8 ? 1.3 : 1);
         long stuck = legs.go(companion, mob, aim, reach, speed, spec, tick, owner.getEyeLocation());
-        if (stuck > STUCK_FOLLOWING) {
+        if (stuck > STUCK_FOLLOWING && mob.getLocation().distanceSquared(there) > 16) {
             bringBack(companion, mob, there);
+        }
+    }
+
+    /** Its own spot behind its owner — or its owner, where that spot is in a wall or over a drop. */
+    private static Location ownSpot(Companion companion, Mob mob, Location there) {
+        Steering.Vec spot = Spacing.spot(vec(there), companion.slotYaw, companion.slot, companion.slots,
+                Spacing.FOLLOW);
+        Location at = new Location(there.getWorld(), spot.x(), spot.y(), spot.z());
+        org.bukkit.block.Block feet = at.getBlock();
+        if (!feet.isPassable() || !feet.getRelative(0, 1, 0).isPassable()
+                || feet.getRelative(0, -1, 0).isPassable() && feet.getRelative(0, -2, 0).isPassable()) {
+            return there.clone();
+        }
+        return at;
+    }
+
+    // ------------------------------------------------------------------ keeping apart
+
+    /**
+     * Where it stands, which spot behind its owner is its own (they face the way they last walked), and this tick's
+     * push off any companion — anybody's — it is too close to.
+     */
+    private void space(Companion companion, Mob mob, Player owner, Location here, long tick, boolean idle) {
+        companion.at = here;
+        companion.resting = companion.legs.stillSince >= 0;
+        if (!idle) {
+            companion.slotYaw = owner.getYaw();
+        }
+        if (tick % 20 == 1) {
+            java.util.List<Companion> mine = new java.util.ArrayList<>(service.of(companion.owner()));
+            mine.sort(java.util.Comparator.comparing(Companion::id));
+            companion.slot = Math.max(0, mine.indexOf(companion));
+            companion.slots = Math.max(1, mine.size());
+        }
+        java.util.List<Steering.Vec> near = new java.util.ArrayList<>();
+        java.util.List<Steering.Vec> snuggled = new java.util.ArrayList<>();
+        for (Companion other : service.all()) {
+            Location at = other.at;
+            if (other == companion || at == null || at.getWorld() != here.getWorld()
+                    || at.distanceSquared(here) > 2.5 * 2.5) {
+                continue;
+            }
+            boolean cuddle = other.id().equals(companion.cuddling) || other.id().equals(companion.cuddledBy);
+            (cuddle ? snuggled : near).add(vec(at));
+        }
+        Steering.Vec apart = Spacing.away(vec(here), near, Math.max(0.9, mob.getWidth() + 0.5), companion.slot);
+        Steering.Vec touching = Spacing.away(vec(here), snuggled, touching(mob) * 0.9, companion.slot);
+        companion.legs.nudge = new Steering.Vec(apart.x() + touching.x(), 0, apart.z() + touching.z());
+    }
+
+    private static double touching(Mob mob) {
+        return Math.max(0.35, mob.getWidth() + 0.05);
+    }
+
+    // ------------------------------------------------------------------ cuddling
+
+    /**
+     * Cuddled up to one of its owner's resting companions — or now and then setting off to. @return whether that is
+     * what it does this tick
+     */
+    private boolean cuddle(Companion companion, Mob mob, Player owner, CompanionSpec spec, long tick, double vigour) {
+        UUID by = companion.cuddledBy;
+        if (by != null && service.byId(by).map(other -> !companion.id().equals(other.cuddling)).orElse(true)) {
+            companion.cuddledBy = null;
+        }
+        if (companion.cuddling == null) {
+            if (tick % 20 == 0 && companion.resting && companion.cuddledBy == null
+                    && tick - companion.legs.stillSince > Resting.SITS_AFTER && Cuddling.feelsLikeIt(random)) {
+                startCuddling(companion, tick);
+            }
+            return false;
+        }
+        Companion partner = service.byId(companion.cuddling).orElse(null);
+        Location at = partner == null ? null : partner.at;
+        if (at == null || at.getWorld() != mob.getWorld() || tick > companion.cuddleUntil
+                || at.distanceSquared(mob.getLocation()) > Math.pow(Cuddling.RANGE + 2, 2)) {
+            stopCuddling(companion);
+            return false;
+        }
+        Steering.Vec spot = Cuddling.beside(vec(at), vec(mob.getLocation()), touching(mob));
+        Location there = new Location(mob.getWorld(), spot.x(), at.getY(), spot.z());
+        if (Math.hypot(spot.x() - mob.getX(), spot.z() - mob.getZ()) > 0.35) {
+            legs.go(companion, mob, there, 0.25, spec.speed() * 0.5 * vigour, spec, tick, at);
+            return true;
+        }
+        legs.rest(companion, mob, spec, tick, at.clone().add(0, mob.getHeight() / 2, 0), vigour, true);
+        if (tick % 80 == 0) {
+            mob.getWorld().spawnParticle(Particle.HEART, mob.getLocation().add(0, mob.getHeight() + 0.2, 0), 1,
+                    0.1, 0.05, 0.1);
+        }
+        return true;
+    }
+
+    // ------------------------------------------------------------------ squabbling
+
+    /**
+     * Squaring up to somebody else's companion — or, grumpy, now and then picking one to. For show: it stops short,
+     * faces it, hops and huffs; nobody is hurt. @return whether that is what it does this tick
+     */
+    private boolean squabble(Companion companion, Mob mob, CompanionSpec spec, long tick, double vigour) {
+        if (companion.squabbling == null) {
+            if (tick % 20 == 0 && companion.at != null && companion.cuddling == null && companion.cuddledBy == null
+                    && Squabbling.picksOn(spec.grumpiness(), random)) {
+                java.util.List<Squabbling.Rival> near = new java.util.ArrayList<>();
+                for (Companion other : service.all()) {
+                    Location at = other.at;
+                    if (at != null && at.getWorld() == mob.getWorld()) {
+                        near.add(new Squabbling.Rival(other.id(), other.owner(), vec(at)));
+                    }
+                }
+                Squabbling.rival(vec(companion.at), companion.owner(), near).ifPresent(rival -> {
+                    companion.squabbling = rival.id();
+                    companion.squabbleUntil = tick + Squabbling.lasts(random);
+                });
+            }
+            return false;
+        }
+        Companion rival = service.byId(companion.squabbling).orElse(null);
+        Location at = rival == null ? null : rival.at;
+        if (at == null || at.getWorld() != mob.getWorld() || tick > companion.squabbleUntil
+                || at.distanceSquared(mob.getLocation()) > Math.pow(Squabbling.RANGE + 3, 2)) {
+            companion.squabbling = null;
+            return false;
+        }
+        Steering.Vec spot = Squabbling.faceOff(vec(at), vec(mob.getLocation()), touching(mob));
+        Location face = at.clone().add(0, mob.getHeight() / 2, 0);
+        if (Math.hypot(spot.x() - mob.getX(), spot.z() - mob.getZ()) > 0.4) {
+            legs.go(companion, mob, new Location(mob.getWorld(), spot.x(), at.getY(), spot.z()), 0.3,
+                    spec.speed() * 0.7 * vigour, spec, tick, face);
+            return true;
+        }
+        legs.rest(companion, mob, spec, tick, face, vigour, false);
+        if (!spec.flies() && mob.isOnGround() && tick % 14 == 0) {
+            mob.setVelocity(mob.getVelocity().setY(0.3));
+        }
+        if (tick % 20 == 0) {
+            mob.getWorld().spawnParticle(Particle.ANGRY_VILLAGER, mob.getLocation().add(0, mob.getHeight() + 0.25, 0),
+                    1, 0.1, 0.05, 0.1);
+        }
+        if (tick % 30 == 0) {
+            mob.swingMainHand();
+        }
+        return true;
+    }
+
+    private void startCuddling(Companion companion, long tick) {
+        java.util.List<Cuddling.Mate> mates = new java.util.ArrayList<>();
+        for (Companion other : service.of(companion.owner())) {
+            Location at = other.at;
+            if (other != companion && at != null && companion.at != null && at.getWorld() == companion.at.getWorld()) {
+                mates.add(new Cuddling.Mate(other.id(), vec(at), other.resting,
+                        other.cuddling == null && other.cuddledBy == null));
+            }
+        }
+        Cuddling.partner(vec(companion.at), mates).flatMap(mate -> service.byId(mate.id())).ifPresent(partner -> {
+            partner.cuddledBy = companion.id();
+            companion.cuddling = partner.id();
+            companion.cuddleUntil = tick + Cuddling.lasts(random);
+        });
+    }
+
+    private void stopCuddling(Companion companion) {
+        UUID partner = companion.cuddling;
+        if (partner != null) {
+            companion.cuddling = null;
+            service.byId(partner).ifPresent(other -> other.cuddledBy = null);
         }
     }
 
@@ -427,10 +605,19 @@ final class CompanionBrain {
         }
         boolean there = spot != null && Math.hypot(spot.getX() - mob.getX(), spot.getZ() - mob.getZ()) < 1.2
                 && (!spec.flies() || Math.abs(spot.getY() - mob.getY()) < 1.5);
-        if (spot == null || (there && tick % 20 == 0
+        if (spot == null || (there && tick % 20 == 0 && companion.cuddledBy == null
                 && Wandering.setsOff(spec.wanderEagerness() * vigour
                         * (companion.legs.pose == Resting.Pose.STAND ? 1 : 0.3), radius, random))) {
-            Steering.Vec next = Wandering.spot(vec(anchor), radius, spec.flies(), random);
+            java.util.List<Steering.Vec> taken = new java.util.ArrayList<>();
+            for (Companion other : service.all()) {
+                for (Location at : new Location[]{other.at, other.exploring}) {
+                    if (other != companion && at != null && at.getWorld() == anchor.getWorld()
+                            && at.distanceSquared(anchor) <= Math.pow(radius + 3, 2)) {
+                        taken.add(vec(at));
+                    }
+                }
+            }
+            Steering.Vec next = Spacing.freeSpot(vec(anchor), radius, spec.flies(), taken, random);
             spot = new Location(mob.getWorld(), next.x(), next.y(), next.z());
             companion.exploring = spot;
             there = false;
