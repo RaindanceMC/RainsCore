@@ -71,6 +71,74 @@ public class ConfirmMenu extends Menu {
         this.onYes = onYes;
     }
 
+    /** Whether the question is asked in the game's own dialog rather than in a three-row chest: {@code -Drains.anvil=true} keeps the chest. */
+    private static final boolean DIALOGS = !Boolean.getBoolean("rains.anvil");
+
+    /**
+     * Asked in the game's own confirmation dialog since 2.52.0 — the question as the title, what saying yes does
+     * underneath, Yes and No — because that is what the client has a window for, and a chest with three blocks
+     * in it was the next best thing. Every plugin's "are you sure?" goes through here, so every one of them asks
+     * the same way. No, and Escape, go back to the page this was opened from; yes runs the action and then goes
+     * back too, unless the action opened a page of its own.
+     */
+    @Override
+    public void open() {
+        if (!DIALOGS || viewer == null) {
+            super.open();
+            return;
+        }
+        // One paragraph for what it does and one for the closing line: a dialog spaces its messages generously,
+        // so a message per lore line read as a list of headings.
+        List<io.papermc.paper.registry.data.dialog.body.DialogBody> body = new ArrayList<>();
+        if (!consequences.isEmpty()) {
+            Component what = Component.empty();
+            for (int at = 0; at < consequences.size(); at++) {
+                what = what.append(Icons.loreLine(consequences.get(at)));
+                if (at + 1 < consequences.size()) {
+                    what = what.append(Component.newline());
+                }
+            }
+            body.add(io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(what, 300));
+        }
+        if (closingLine != null && !closingLine.isBlank()) {
+            body.add(io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(Icons.loreLine(closingLine), 300));
+        }
+        org.bukkit.plugin.Plugin plugin = org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(ConfirmMenu.class);
+        net.kyori.adventure.text.event.ClickCallback.Options once = net.kyori.adventure.text.event.ClickCallback.Options
+                .builder().uses(1).lifetime(java.time.Duration.ofMinutes(10)).build();
+        var yes = io.papermc.paper.registry.data.dialog.ActionButton.builder(MINI.deserialize("<green>Yes, do it"))
+                .tooltip(MINI.deserialize("<gray>Go ahead.")).width(150)
+                .action(io.papermc.paper.registry.data.dialog.action.DialogAction.customClick((response, audience) ->
+                        de.raindancer.core.platform.util.Scheduling.entity(plugin, viewer, () -> {
+                            if (!viewer.isOnline()) {
+                                return;
+                            }
+                            if (onYes != null) {
+                                onYes.run();
+                            }
+                            // Back where this came from — unless the action already put a page on screen.
+                            if (!(viewer.getOpenInventory().getTopInventory().getHolder(false) instanceof Menu)) {
+                                leave();
+                            }
+                        }), once)).build();
+        var no = io.papermc.paper.registry.data.dialog.ActionButton.builder(MINI.deserialize("<red>No, leave it alone"))
+                .tooltip(MINI.deserialize("<gray>Nothing happens.")).width(150)
+                .action(io.papermc.paper.registry.data.dialog.action.DialogAction.customClick((response, audience) ->
+                        de.raindancer.core.platform.util.Scheduling.entity(plugin, viewer, () -> {
+                            if (viewer.isOnline()) {
+                                leave();
+                            }
+                        }), once)).build();
+        io.papermc.paper.dialog.Dialog dialog = io.papermc.paper.dialog.Dialog.create(factory -> factory.empty()
+                .base(io.papermc.paper.registry.data.dialog.DialogBase.builder(Icons.name(question))
+                        .canCloseWithEscape(true).pause(false)
+                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
+                        .body(body).build())
+                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yes, no)));
+        viewer.closeInventory();
+        viewer.showDialog(dialog);
+    }
+
     @Override
     protected Component title() {
         return MINI.deserialize(question);
