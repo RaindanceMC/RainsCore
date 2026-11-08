@@ -54,4 +54,16 @@ class SidebarSectionsTest {
         assertThat(SidebarSections.linesFor(ADA, 10)).isEmpty();
         assertThat(SidebarSections.forgetFrom(SidebarSectionsTest.class.getClassLoader())).isEqualTo(1);
     }
+
+    @Test
+    void aPlayersLayoutHidesAndReorders() {
+        SidebarSections.register("economy-balance", "Balance", 0, player -> List.of(Component.text("Balance")));
+        SidebarSections.register("guild", player -> List.of(Component.text("Guild")));
+        SidebarSections.register("economy-richest", "Richest", 90, player -> List.of(Component.text("Richest")));
+        assertThat(plain(SidebarSections.compose(ADA, 10))).containsExactly("Balance", "", "Guild", "", "Richest");
+        SidebarLayout mine = new SidebarLayout(List.of("economy-richest"), java.util.Set.of("guild"));
+        assertThat(plain(SidebarSections.compose(ADA, mine, 10))).containsExactly("Richest", "", "Balance");
+        assertThat(SidebarSections.sections()).extracting(SidebarSections.Section::title)
+                .containsExactly("Balance", "Guild", "Richest");
+    }
 }
