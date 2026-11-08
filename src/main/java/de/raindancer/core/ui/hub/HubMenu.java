@@ -2,6 +2,7 @@ package de.raindancer.core.ui.hub;
 
 import de.raindancer.core.RainsCore;
 import de.raindancer.core.platform.command.CommandDirectory;
+import de.raindancer.core.platform.command.CommandNote;
 import de.raindancer.core.ui.chat.Brand;
 import de.raindancer.core.ui.chat.Style;
 import de.raindancer.core.ui.menu.Icons;
@@ -18,6 +19,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** {@code /hub}: the server's front door — a banner, a door per installed module, and the shortcuts. */
 public final class HubMenu extends HubPage {
@@ -88,14 +90,46 @@ public final class HubMenu extends HubPage {
         CommandDirectory directory = RainsCore.get().commands();
         List<Tile> tiles = new ArrayList<>();
         for (HubEntry entry : RainsCore.get().hub().visibleTo(viewer()::hasPermission, directory)) {
-            int commands = Hub.notesFor(entry, directory, viewer()::hasPermission).size();
-            tiles.add(new Tile(door(entry, commands, true),
-                    event -> new HubModuleMenu(viewer(), brand(), this, entry).open()));
+            List<CommandNote> notes = Hub.notesFor(entry, directory, viewer()::hasPermission);
+            Optional<CommandNote> front = frontDoor(entry, notes);
+            tiles.add(new Tile(door(entry, notes.size(), true, front.map(CommandNote::slashed).orElse(null)), event -> {
+                if (front.isPresent() && !event.isRightClick()) {
+                    // Straight to the feature's own page — its Back comes here, see Menu.cameFrom.
+                    de.raindancer.core.ui.menu.Menu.cameFrom(viewer(), this);
+                    viewer().closeInventory();
+                    de.raindancer.core.platform.util.TypedCommands.run(viewer(), front.get().command());
+                    return;
+                }
+                new HubModuleMenu(viewer(), brand(), this, entry).open();
+            }));
         }
         return tiles;
     }
 
     static ItemStack door(HubEntry entry, int commands, boolean clickable) {
+        return door(entry, commands, clickable, null);
+    }
+
+    /**
+     * The command a click on a feature's door runs outright: one of the feature's own that takes nothing after it
+     * and is named like the feature — {@code /guild} for guilds, {@code /pets} for pets, {@code /claim} for claims.
+     * A feature with no such command (the economy's doors are /bank, /shop, /sell…) opens its page of doors.
+     */
+    static Optional<CommandNote> frontDoor(HubEntry entry, List<CommandNote> notes) {
+        String id = entry.id().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        java.util.Set<String> names = new java.util.LinkedHashSet<>(List.of(id, id + "s", id.endsWith("s") ? id.substring(0, id.length() - 1) : id));
+        for (String name : names) {
+            for (CommandNote note : notes) {
+                if (HubModuleMenu.runsDirectly(note) && note.command().equalsIgnoreCase(name)) {
+                    return Optional.of(note);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** @param front the command a click runs outright, or null when a click opens the feature's page of doors */
+    static ItemStack door(HubEntry entry, int commands, boolean clickable, String front) {
         List<String> lore = new ArrayList<>();
         for (String line : HubLook.clip(HubLook.wrap(entry.description(), WRAP), 3)) {
             lore.add("<gray>" + Text.literal(line));
@@ -111,7 +145,12 @@ public final class HubMenu extends HubPage {
         }
         if (clickable) {
             lore.add("");
-            lore.add("<dark_gray>» <white>Click to open");
+            if (front != null) {
+                lore.add("<dark_gray>» <white>Click to open " + Text.literal(front));
+                lore.add("<dark_gray>» <white>Right click for all its commands");
+            } else {
+                lore.add("<dark_gray>» <white>Click to open");
+            }
         }
         return tidy(Icons.of(entry.icon(), "<bold><gradient:" + entry.accent() + ":" + HubLook.lighter(entry.accent(), 0.55)
                 + ">" + Text.literal(entry.name()) + "</gradient></bold>", lore), !clickable);
