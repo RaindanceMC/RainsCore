@@ -69,7 +69,11 @@ public final class HubModuleMenu extends HubPage {
     @Override
     List<Tile> tiles() {
         List<Tile> tiles = new ArrayList<>();
-        for (CommandNote note : Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission)) {
+        // What a click runs outright comes first — the pages and the one-word actions — and what still has to be
+        // typed out after it, so the first row is the row somebody is most likely to want.
+        List<CommandNote> notes = new ArrayList<>(Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission));
+        notes.sort(java.util.Comparator.comparing((CommandNote note) -> !runsDirectly(note)));
+        for (CommandNote note : notes) {
             tiles.add(new Tile(commandIcon(note), event -> use(note)));
         }
         return tiles;

@@ -44,6 +44,18 @@ public record HubLook(Material icon, String accent) {
 
     /** Substrings of a command name and what they look like; the first that fits wins, so order matters. */
     private static final Map<String, Material> COMMAND_HINTS = java.util.stream.Stream.of(new Object[][]{
+            // The longer name first where a shorter one is inside it: "baltop" before "bal", "tpa" before "tp".
+            {"baltop", Material.GOLDEN_HELMET}, {"treasury", Material.BEACON}, {"giveaway", Material.CHEST_MINECART},
+            {"contract", Material.WRITABLE_BOOK}, {"hire", Material.IRON_PICKAXE}, {"repair", Material.ANVIL},
+            {"season", Material.CLOCK}, {"cash", Material.GOLD_NUGGET}, {"fund", Material.ENDER_CHEST},
+            {"raffle", Material.PAPER}, {"gamble", Material.DIAMOND}, {"eco", Material.COMMAND_BLOCK},
+            {"market", Material.ITEM_FRAME}, {"guild", Material.WHITE_BANNER}, {"pet", Material.BONE},
+            {"cosmetic", Material.BLAZE_POWDER}, {"fish", Material.FISHING_ROD}, {"skill", Material.ENCHANTED_BOOK},
+            {"island", Material.GRASS_BLOCK}, {"kit", Material.CHEST}, {"vote", Material.PAPER},
+            {"friend", Material.PLAYER_HEAD}, {"party", Material.CAKE}, {"link", Material.IRON_CHAIN},
+            {"xp", Material.EXPERIENCE_BOTTLE}, {"enchant", Material.ENCHANTED_BOOK}, {"screen", Material.PAINTING},
+            {"hub", Material.NETHER_STAR}, {"nearby", Material.SPYGLASS}, {"ping", Material.REDSTONE_TORCH},
+            {"playtime", Material.CLOCK}, {"send", Material.MINECART}, {"trade", Material.EMERALD},
             {"home", Material.RED_BED}, {"warp", Material.END_PORTAL_FRAME}, {"tpa", Material.ENDER_EYE},
             {"tp", Material.ENDER_PEARL}, {"spawn", Material.GRASS_BLOCK}, {"back", Material.RECOVERY_COMPASS},
             {"pay", Material.GOLD_NUGGET}, {"bal", Material.GOLD_INGOT}, {"bank", Material.GOLD_BLOCK},

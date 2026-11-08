@@ -94,6 +94,11 @@ public final class AnvilInput {
     record Shown(boolean usable, String text, String line) {
     }
 
+    /** Whether a typed value is asked for in the game's dialog rather than in an anvil: {@code -Drains.anvil=true} keeps the anvil. */
+    private static final boolean DIALOGS = !Boolean.getBoolean("rains.anvil");
+    /** The dialog's field is longer than an anvil's name: room for a message of the day, not just a name. */
+    private static final int DIALOG_FIELD_LENGTH = 200;
+
     private static final Map<UUID, Session<?>> open = new ConcurrentHashMap<>();
 
     private static final int INPUT = 0;
@@ -113,6 +118,12 @@ public final class AnvilInput {
                                 Consumer<T> onAnswer, Runnable onCancel) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(parser, "parser");
+        if (DIALOGS) {
+            // The game's own window for a typed value, since 2.52.0: every plugin that asked in an anvil asks in a
+            // dialog now, with nothing to change on its side. The anvil stays for a server that switches it back.
+            TextDialog.ask(player, title, start, DIALOG_FIELD_LENGTH, parser, onAnswer, onCancel);
+            return;
+        }
         AnvilView view = MenuType.ANVIL.builder()
                 .title(Component.text(title == null ? "" : title))
                 .checkReachable(false)
