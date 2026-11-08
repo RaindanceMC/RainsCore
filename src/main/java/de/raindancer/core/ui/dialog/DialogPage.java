@@ -260,7 +260,7 @@ public final class DialogPage {
             java.util.Optional<Component> face = part.face() == null || Faces.isBedrock(player.getUniqueId())
                     ? java.util.Optional.empty() : Faces.cached(part.face());
             if (face.isPresent()) {
-                parts.add(DialogBody.plainMessage(face.get(), TEXT_WIDTH));
+                parts.add(DialogBody.plainMessage(face.get(), Faces.WIDTH));
                 parts.add(DialogBody.plainMessage(part.text(), TEXT_WIDTH));
             } else if (part.item() == null) {
                 parts.add(DialogBody.plainMessage(part.text(), TEXT_WIDTH));

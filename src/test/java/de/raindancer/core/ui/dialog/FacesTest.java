@@ -40,7 +40,7 @@ class FacesTest {
     }
 
     @Test
-    @DisplayName("a face is eight rows of eight pixels in the skin's own colours, in the face font")
+    @DisplayName("a face is sixty-four pixels in the skin's own colours, row by row, in the face font")
     void eightByEight() {
         Component face = Faces.face(skin());
         List<TextComponent> pixels = glyphs(face);
@@ -48,8 +48,8 @@ class FacesTest {
         assertThat(pixels.getFirst().color()).isEqualTo(TextColor.color(8 * 16, 8 * 16, 0x20));
         assertThat(pixels.get(63).color()).isEqualTo(TextColor.color(15 * 16, 15 * 16, 0x20));
         assertThat(face.style().font()).isEqualTo(Faces.FONT);
-        assertThat(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(face)
-                .split("\n")).hasSize(8);
+        assertThat(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(face))
+                .as("no line breaks: the dialog wraps it at Faces.WIDTH").doesNotContain("\n");
     }
 
     @Test
@@ -61,6 +61,18 @@ class FacesTest {
         List<TextComponent> pixels = glyphs(Faces.face(skin));
         assertThat(pixels.get(0).color()).isEqualTo(TextColor.color(0xFF0000));
         assertThat(pixels.get(1).color()).isEqualTo(TextColor.color(9 * 16, 8 * 16, 0x20));
+    }
+
+    @Test
+    @DisplayName("a hat layer with nothing see-through in it is ignored, as the game does for old skins")
+    void solidHatIgnored() {
+        BufferedImage skin = skin();
+        for (int y = 0; y < 16; y++) {
+            for (int x = 32; x < 64; x++) {
+                skin.setRGB(x, y, 0xFF000000);
+            }
+        }
+        assertThat(glyphs(Faces.face(skin)).getFirst().color()).isEqualTo(TextColor.color(8 * 16, 8 * 16, 0x20));
     }
 
     @Test

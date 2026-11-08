@@ -36,7 +36,13 @@ public final class Faces {
 
     public static final Key FONT = Key.key("rainscore", "face");
     /** One pixel: a square, then a step back over the gap a glyph leaves after itself. */
-    static final String PIXEL = "";
+    static final String PIXEL = "\uE000\uE001";
+    /**
+     * How wide a face is drawn, in pixels. When the client wraps the line it counts a square as ten — the step back is
+     * not counted — so eight need 80 and nine 90; 85 sits in the middle and wraps after every eighth. (Measured with
+     * the real client: 73 and 77 wrapped after seven.)
+     */
+    public static final int WIDTH = 85;
 
     private static final Duration KEPT = Duration.ofMinutes(30);
     private static final Duration RETRY = Duration.ofMinutes(5);
@@ -48,6 +54,7 @@ public final class Faces {
     private record Known(Component face, long at) {
     }
 
+    private static final de.raindancer.core.platform.log.LogChannel log = de.raindancer.core.platform.log.Log.of("gui");
     private static final Map<UUID, Known> KNOWN = new ConcurrentHashMap<>();
 
     private Faces() {
@@ -75,27 +82,58 @@ public final class Faces {
         CompletableFuture<PlayerProfile> profile;
         try {
             PlayerProfile own = Bukkit.getOfflinePlayer(who).getPlayerProfile();
-            if (own.hasTextures()) {
+            if (own.hasTextures() && own.getTextures().getSkin() != null) {
                 profile = CompletableFuture.completedFuture(own);
             } else if (!Bukkit.getOnlineMode() && own.getName() != null) {
-                // An offline-mode id is nobody's at Mojang; the name is what such a server's clients show skins by.
-                profile = Bukkit.createProfile(own.getName()).update();
+                // An offline-mode id is nobody's at Mojang, and Paper's own lookup by name answers it from the user
+                // cache with that same id: Mojang is asked whose the name is, as such a server's clients do.
+                String name = own.getName();
+                HttpRequest whose = HttpRequest.newBuilder(URI.create("https://api.mojang.com/users/profiles/minecraft/"
+                        + java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8)))
+                        .timeout(Duration.ofSeconds(4)).build();
+                profile = HTTP.sendAsync(whose, HttpResponse.BodyHandlers.ofString()).thenApply(response -> {
+                    if (response.statusCode() != 200) {
+                        return null;
+                    }
+                    String id = com.google.gson.JsonParser.parseString(response.body()).getAsJsonObject()
+                            .get("id").getAsString();
+                    PlayerProfile real = Bukkit.createProfile(UUID.fromString(id.replaceFirst(
+                            "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5")), name);
+                    real.complete(true, true);
+                    return real;
+                });
             } else {
-                profile = own.update();
+                profile = CompletableFuture.supplyAsync(() -> {
+                    own.complete(true, true);
+                    return own;
+                });
             }
         } catch (RuntimeException noServer) {
+            log.debug("No face for {}: {}", who, noServer);
             return CompletableFuture.completedFuture(null);
         }
         return profile.thenCompose(found -> {
             URL skin = found == null ? null : found.getTextures().getSkin();
             if (skin == null) {
+                log.debug("No face for {}: the profile {} has no skin", who, found == null ? null : found.getName());
                 return CompletableFuture.<byte[]>completedFuture(null);
             }
             HttpRequest request = HttpRequest.newBuilder(URI.create(skin.toString())).timeout(Duration.ofSeconds(4)).build();
             return HTTP.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
-                    .thenApply(response -> response.statusCode() == 200 ? response.body() : null);
+                    .thenApply(response -> {
+                        if (response.statusCode() != 200) {
+                            log.debug("No face for {}: {} answered {}", who, skin, response.statusCode());
+                            return null;
+                        }
+                        return response.body();
+                    });
         }).handle((png, failed) -> {
             Component face = null;
+            if (failed != null) {
+                log.debug("No face for {}: {}", who, failed);
+            } else if (png == null) {
+                log.debug("No face for {}: no skin to be had", who);
+            }
             if (png != null) {
                 try {
                     face = face(ImageIO.read(new ByteArrayInputStream(png)));
@@ -116,20 +154,35 @@ public final class Faces {
         if (skin == null || skin.getWidth() != 64 || skin.getHeight() != 64 && skin.getHeight() != 32) {
             return null;
         }
+        boolean wearsHat = hatSeeThrough(skin);
         TextComponent.Builder face = Component.text().font(FONT).shadowColor(ShadowColor.none());
+        // No line breaks: a dialog measured each as lines of their own and left a face's height of nothing below it.
+        // The face is drawn WIDTH wide instead, which wraps it after every eighth pixel.
         for (int y = 0; y < 8; y++) {
-            if (y > 0) {
-                face.append(Component.newline());
-            }
             for (int x = 0; x < 8; x++) {
                 int under = skin.getRGB(8 + x, 8 + y);
-                int hat = skin.getRGB(40 + x, 8 + y);
-                int alpha = hat >>> 24;
-                int rgb = alpha == 0 ? under : alpha == 255 ? hat : blend(under, hat, alpha);
+                int over = skin.getRGB(40 + x, 8 + y);
+                int alpha = wearsHat ? over >>> 24 : 0;
+                int rgb = alpha == 0 ? under : alpha == 255 ? over : blend(under, over, alpha);
                 face.append(Component.text(PIXEL, TextColor.color(rgb & 0xFFFFFF)));
             }
         }
         return face.build();
+    }
+
+    /**
+     * The game's rule for old skins: a hat layer without a single see-through pixel was painted over by an editor
+     * that knew no layers, and is not worn.
+     */
+    private static boolean hatSeeThrough(BufferedImage skin) {
+        for (int y = 0; y < 16; y++) {
+            for (int x = 32; x < 64; x++) {
+                if (skin.getRGB(x, y) >>> 24 < 128) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static int blend(int under, int over, int alpha) {
