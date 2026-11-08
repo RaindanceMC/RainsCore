@@ -35,6 +35,8 @@ public final class Companion {
     final Legs.State legs = new Legs.State();
     /** Where its mob stood this tick — for the others to keep clear of, without reaching into its entity. */
     volatile org.bukkit.Location at;
+    /** The {@link CompanionIndex} cell it is filed under. */
+    volatile CompanionIndex.Cell cell;
     /** Its place among its owner's companions, and how many there are: which spot behind them is its own. */
     volatile int slot;
     volatile int slots = 1;

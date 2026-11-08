@@ -214,7 +214,7 @@ final class CompanionBrain {
      * push off any companion — anybody's — it is too close to.
      */
     private void space(Companion companion, Mob mob, Player owner, Location here, long tick, boolean idle) {
-        companion.at = here;
+        service.index().moved(companion, here);
         companion.resting = companion.legs.stillSince >= 0;
         if (!idle) {
             companion.slotYaw = owner.getYaw();
@@ -227,15 +227,15 @@ final class CompanionBrain {
         }
         java.util.List<Steering.Vec> near = new java.util.ArrayList<>();
         java.util.List<Steering.Vec> snuggled = new java.util.ArrayList<>();
-        for (Companion other : service.all()) {
+        service.index().near(here, 2.5, other -> {
             Location at = other.at;
             if (other == companion || at == null || at.getWorld() != here.getWorld()
                     || at.distanceSquared(here) > 2.5 * 2.5) {
-                continue;
+                return;
             }
             boolean cuddle = other.id().equals(companion.cuddling) || other.id().equals(companion.cuddledBy);
             (cuddle ? snuggled : near).add(vec(at));
-        }
+        });
         Steering.Vec apart = Spacing.away(vec(here), near, Math.max(0.9, mob.getWidth() + 0.5), companion.slot);
         Steering.Vec touching = Spacing.away(vec(here), snuggled, touching(mob) * 0.9, companion.slot);
         companion.legs.nudge = new Steering.Vec(apart.x() + touching.x(), 0, apart.z() + touching.z());
@@ -295,12 +295,12 @@ final class CompanionBrain {
             if (tick % 20 == 0 && companion.at != null && companion.cuddling == null && companion.cuddledBy == null
                     && Squabbling.picksOn(spec.grumpiness(), random)) {
                 java.util.List<Squabbling.Rival> near = new java.util.ArrayList<>();
-                for (Companion other : service.all()) {
+                service.index().near(companion.at, Squabbling.RANGE + 1, other -> {
                     Location at = other.at;
                     if (at != null && at.getWorld() == mob.getWorld()) {
                         near.add(new Squabbling.Rival(other.id(), other.owner(), vec(at)));
                     }
-                }
+                });
                 Squabbling.rival(vec(companion.at), companion.owner(), near).ifPresent(rival -> {
                     companion.squabbling = rival.id();
                     companion.squabbleUntil = tick + Squabbling.lasts(random);
@@ -740,14 +740,15 @@ final class CompanionBrain {
                 && Wandering.setsOff(spec.wanderEagerness() * vigour
                         * (companion.legs.pose == Resting.Pose.STAND ? 1 : 0.3), radius, random))) {
             java.util.List<Steering.Vec> taken = new java.util.ArrayList<>();
-            for (Companion other : service.all()) {
+            // Filed by where it stands, so reach as far as its own exploring spot can lie from there.
+            service.index().near(anchor, radius + 3 + 24, other -> {
                 for (Location at : new Location[]{other.at, other.exploring}) {
                     if (other != companion && at != null && at.getWorld() == anchor.getWorld()
                             && at.distanceSquared(anchor) <= Math.pow(radius + 3, 2)) {
                         taken.add(vec(at));
                     }
                 }
-            }
+            });
             Steering.Vec next = Spacing.freeSpot(vec(anchor), radius, spec.flies(), taken, random);
             spot = new Location(mob.getWorld(), next.x(), next.y(), next.z());
             companion.exploring = spot;

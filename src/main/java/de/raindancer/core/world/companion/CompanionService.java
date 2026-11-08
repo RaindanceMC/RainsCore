@@ -63,6 +63,7 @@ public final class CompanionService {
     private final Combat combat;
     private final Predicate<UUID> vanished;
     private final Map<UUID, Companion> byId = new ConcurrentHashMap<>();
+    private final CompanionIndex index = new CompanionIndex();
     private final Map<UUID, Companion> byMob = new ConcurrentHashMap<>();
     /** Mobs let go of but not yet taken out of the world — until then nothing may hurt or kill them. */
     private final java.util.Set<UUID> leaving = ConcurrentHashMap.newKeySet();
@@ -87,7 +88,21 @@ public final class CompanionService {
     // ------------------------------------------------------------------ asking
 
     public List<Companion> of(UUID owner) {
-        return byId.values().stream().filter(companion -> companion.owner().equals(owner)).toList();
+        return index.of(owner);
+    }
+
+    CompanionIndex index() {
+        return index;
+    }
+
+    private void track(Companion companion) {
+        byId.put(companion.id(), companion);
+        index.add(companion);
+    }
+
+    private Companion untrack(Companion companion) {
+        index.remove(companion);
+        return byId.remove(companion.id());
     }
 
     public List<Companion> all() {
@@ -135,7 +150,7 @@ public final class CompanionService {
         if (!place(companion, owner)) {
             return new Summoned(null, Refusal.FAILED);
         }
-        byId.put(companion.id(), companion);
+        track(companion);
         return new Summoned(companion, null);
     }
 
@@ -294,7 +309,7 @@ public final class CompanionService {
     }
 
     void remove(Companion companion, CompanionHooks.Gone why) {
-        if (byId.remove(companion.id()) == null) {
+        if (untrack(companion) == null) {
             return;
         }
         takeMob(companion);
@@ -342,7 +357,7 @@ public final class CompanionService {
             byMob.remove(mob);
             combat.companions().release(mob);
             brains.remove(companion.id());
-            byId.remove(companion.id());
+            untrack(companion);
             companion.gone = true;
             tell(companion, CompanionHooks.Gone.LOST);
         }
@@ -369,7 +384,7 @@ public final class CompanionService {
             return;
         }
         for (Companion companion : taken) {
-            byId.remove(companion.id());
+            untrack(companion);
             takeMob(companion);
             companion.gone = true;
             tell(companion, CompanionHooks.Gone.OWNER_VANISHED);
@@ -385,7 +400,7 @@ public final class CompanionService {
         }
         for (Companion companion : back) {
             if (place(companion, owner)) {
-                byId.put(companion.id(), companion);
+                track(companion);
             }
         }
     }
