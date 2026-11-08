@@ -8,9 +8,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import de.raindancer.core.platform.util.Scheduling;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
+import java.util.function.ToDoubleFunction;
 
 /**
  * A particle worn by a player: drawn in a {@link ParticleShape} around them, every time it is asked,
@@ -24,7 +27,39 @@ public final class ParticleShows {
     /** Core's own particle, not one of Minecraft's: cocoa beans tumbling down, every fourth point a curl of steam. */
     public static final String COFFEE = "COFFEE";
 
+    /** The most people one draw is sent to; the nearest win. A crowd at the spawn must not multiply every point. */
+    public static final int MAX_VIEWERS = 40;
+
+    /** Beyond this many blocks a viewer is sent only every second point — a shape is still a shape from afar. */
+    public static final double FULL_DETAIL_RANGE = 20;
+
     private ParticleShows() {
+    }
+
+    /** Who one draw goes to: {@code near} get every point, {@code far} every second one. */
+    record Audience<T>(List<T> near, List<T> far) {
+
+        boolean isEmpty() {
+            return near.isEmpty() && far.isEmpty();
+        }
+    }
+
+    /** Keeps the {@code cap} nearest of {@code candidates} and splits them at {@code fullDetailRange}. */
+    static <T> Audience<T> audience(List<T> candidates, ToDoubleFunction<T> distanceSquared, int cap,
+                                    double fullDetailRange) {
+        List<T> kept = candidates;
+        if (candidates.size() > cap) {
+            kept = new ArrayList<>(candidates);
+            kept.sort(Comparator.comparingDouble(distanceSquared));
+            kept = kept.subList(0, cap);
+        }
+        double limit = fullDetailRange * fullDetailRange;
+        List<T> near = new ArrayList<>();
+        List<T> far = new ArrayList<>();
+        for (T each : kept) {
+            (distanceSquared.applyAsDouble(each) <= limit ? near : far).add(each);
+        }
+        return new Audience<>(near, far);
     }
 
     /** Whether this is one of Core's own particles rather than Minecraft's. */
@@ -118,8 +153,10 @@ public final class ParticleShows {
         if (found == null || !canShow(particle) || feet.getWorld() == null) {
             return;
         }
-        List<Player> viewers = feet.getNearbyPlayers(range).stream().filter(sees).toList();
-        if (viewers.isEmpty()) {
+        Audience<Player> audience = audience(
+                feet.getNearbyPlayers(range).stream().filter(sees).toList(),
+                viewer -> viewer.getLocation().distanceSquared(feet), MAX_VIEWERS, FULL_DETAIL_RANGE);
+        if (audience.isEmpty()) {
             return;
         }
         World world = feet.getWorld();
@@ -141,11 +178,23 @@ public final class ParticleShows {
             int rgb = blended ? colourAlong(from, colourTo, offset[3]) : from;
             Object data = trail ? trailData(new Location(world, x, y, z), rgb, lifetimeTicks)
                     : blended ? BukkitEffectSink.dataFor(found.getDataType(), rgb, dustSize(count)) : single;
+            boolean everyone = index % 2 == 0;
             if (own && isSteam(index)) {
-                world.spawnParticle(Particle.WHITE_SMOKE, viewers, source, x, y + 0.2, z, 1, 0, 0.02, 0, 0.01, null);
+                send(world, Particle.WHITE_SMOKE, audience, everyone, source, x, y + 0.2, z, 0.02, 0.01, null);
                 continue;
             }
-            world.spawnParticle(drawn, viewers, source, x, y, z, 1, 0, 0, 0, 0, data);
+            send(world, drawn, audience, everyone, source, x, y, z, 0, 0, data);
+        }
+    }
+
+    private static void send(World world, Particle particle, Audience<Player> audience, boolean everyone,
+                             Player source, double x, double y, double z, double offsetY, double speed,
+                             Object data) {
+        if (!audience.near().isEmpty()) {
+            world.spawnParticle(particle, audience.near(), source, x, y, z, 1, 0, offsetY, 0, speed, data);
+        }
+        if (everyone && !audience.far().isEmpty()) {
+            world.spawnParticle(particle, audience.far(), source, x, y, z, 1, 0, offsetY, 0, speed, data);
         }
     }
 

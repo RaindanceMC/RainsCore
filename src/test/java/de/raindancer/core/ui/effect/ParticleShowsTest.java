@@ -112,4 +112,29 @@ class ParticleShowsTest {
         org.assertj.core.api.Assertions.assertThat(ParticleShows.isOwn("COFFEE")).isTrue();
         org.assertj.core.api.Assertions.assertThat(ParticleShows.isOwn("FLAME")).isFalse();
     }
+
+    @Test
+    @DisplayName("a crowd is cut to the nearest few, and those far off are split from those close by")
+    void audienceIsCappedAndSplit() {
+        java.util.List<Double> distances = new java.util.ArrayList<>();
+        for (int each = 100; each >= 1; each--) {
+            distances.add((double) each);
+        }
+        ParticleShows.Audience<Double> audience =
+                ParticleShows.audience(distances, d -> d * d, 10, 5);
+
+        assertThat(audience.near()).hasSize(5).allMatch(d -> d <= 5);
+        assertThat(audience.far()).hasSize(5).allMatch(d -> d > 5 && d <= 10);
+    }
+
+    @Test
+    @DisplayName("a small audience is kept whole and nobody is dropped for being far")
+    void smallAudienceKept() {
+        ParticleShows.Audience<Double> audience =
+                ParticleShows.audience(java.util.List.of(3.0, 30.0), d -> d * d, 40, 20);
+
+        assertThat(audience.near()).containsExactly(3.0);
+        assertThat(audience.far()).containsExactly(30.0);
+        assertThat(ParticleShows.audience(java.util.List.<Double>of(), d -> d, 40, 20).isEmpty()).isTrue();
+    }
 }
