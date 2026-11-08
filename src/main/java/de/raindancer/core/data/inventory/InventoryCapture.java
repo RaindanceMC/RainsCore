@@ -63,9 +63,20 @@ public final class InventoryCapture implements Listener {
 
     /** Everybody online, each read on their own thread and written off it. For the timer. */
     public void saveEveryone() {
+        int index = 0;
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            Scheduling.entity(plugin, online, () -> save(online, true));
+            // A few players a tick rather than everybody in one: a hundred inventories serialised in the same tick
+            // was a visible stutter every five minutes.
+            Scheduling.entityLater(plugin, online, spreadDelay(index++, SAVES_PER_TICK), () -> save(online, true));
         }
+    }
+
+    /** How many players' inventories are read in one tick of the periodic save. */
+    static final int SAVES_PER_TICK = 4;
+
+    /** The tick, counted from the save's start, on which the {@code index}th player is read. */
+    static long spreadDelay(int index, int perTick) {
+        return Math.max(0, index) / Math.max(1, perTick);
     }
 
     /** Everybody online, read and written now — at shutdown, when nothing can be scheduled any more. */

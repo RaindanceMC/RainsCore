@@ -2192,6 +2192,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      * had before they arrived, stamped newer, over what they brought — so they are not saved until it is.
      */
     private final java.util.Set<java.util.UUID> sharedArriving = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** What each player's namespaces looked like when last kept, so an unchanged one is not written again. */
+    private final java.util.Map<java.util.UUID, java.util.Map<String, Integer>> sharedKept =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private volatile de.raindancer.core.platform.network.SharedPlayerData sharedData;
 
     /** A player's shared namespaces into the database, read on their thread, written off it, then announced. */
@@ -2210,8 +2213,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 log.warn("{}'s {} data could not be read to be kept: {}", player.getName(), namespace, unreadable.getMessage());
                 continue;
             }
+            int mark = de.raindancer.core.platform.network.SharedPlayerData.fingerprint(bytes);
+            java.util.Map<String, Integer> kept = sharedKept.computeIfAbsent(id, key -> new java.util.concurrent.ConcurrentHashMap<>());
+            if (Integer.valueOf(mark).equals(kept.get(namespace))) {
+                continue;   // Unchanged since it was last kept: nothing to write, nobody to tell.
+            }
             Scheduling.async(this, () -> {
                 if (sharedData.save(id, namespace, bytes, now)) {
+                    kept.put(namespace, mark);
                     bus.publish(de.raindancer.core.platform.network.SharedPlayerData.TOPIC, id.toString(), namespace);
                 }
             });
@@ -2858,9 +2867,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (following != null && linkFollows) {
             following.fetch(event.getPlayer().getUniqueId());
         }
-        if (mentionCompletions != null) {
-            mentionCompletions.refresh();
-        }
+        // No refresh of everybody's mention completions here: the timer compares and sends every two seconds, and
+        // a full pass per join was quadratic in the players online.
         if (!settings.current().auditEnabled()) {
             return;
         }
@@ -2967,6 +2975,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             // put on them; then the database keeps what it had.
             keepSharedData(event.getPlayer());
             sharedArriving.remove(event.getPlayer().getUniqueId());
+            sharedKept.remove(event.getPlayer().getUniqueId());
             java.util.UUID leaving = event.getPlayer().getUniqueId();
             Scheduling.async(this, () -> presence.left(leaving));
             de.raindancer.core.social.friends.Socials leftFrom = socials;

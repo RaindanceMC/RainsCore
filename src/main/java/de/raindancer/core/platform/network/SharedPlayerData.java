@@ -24,6 +24,14 @@ public final class SharedPlayerData {
     }
 
     /** Keeps a player's namespace — unless a newer one is already kept. Off the server's threads. */
+    /**
+     * A cheap mark of what some bytes were, so a namespace that has not changed since it was last kept is not
+     * written and announced again every thirty seconds.
+     */
+    public static int fingerprint(byte[] data) {
+        return data == null ? 0 : java.util.Arrays.hashCode(data) * 31 + data.length;
+    }
+
     public boolean save(UUID player, String namespace, byte[] data, long at) {
         return database.write(connection -> {
             try (PreparedStatement upsert = connection.prepareStatement("""

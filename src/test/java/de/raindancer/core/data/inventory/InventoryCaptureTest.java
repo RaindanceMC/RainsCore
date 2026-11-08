@@ -52,4 +52,13 @@ class InventoryCaptureTest {
         assertThat(saved.food()).isEqualTo(19);
         assertThat(saved.effects()).contains("effects: []");
     }
+
+    @Test
+    void thePeriodicSaveIsSpreadOverTicks() {
+        assertThat(InventoryCapture.spreadDelay(0, 4)).isZero();
+        assertThat(InventoryCapture.spreadDelay(3, 4)).isZero();
+        assertThat(InventoryCapture.spreadDelay(4, 4)).isEqualTo(1);
+        assertThat(InventoryCapture.spreadDelay(99, 4)).isEqualTo(24);
+        assertThat(InventoryCapture.spreadDelay(5, 0)).isEqualTo(5);
+    }
 }

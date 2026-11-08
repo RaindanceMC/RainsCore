@@ -51,4 +51,14 @@ class SharedPlayerDataTest {
         assertThat(shared.read(ALEX, "other")).get().extracting(SharedPlayerData.Kept::at).isEqualTo(50L);
         assertThat(shared.read(UUID.randomUUID(), "rainscosmetics")).isEmpty();
     }
+
+    @org.junit.jupiter.api.Test
+    void aFingerprintTellsChangedBytesApart() {
+        byte[] some = {1, 2, 3};
+        org.assertj.core.api.Assertions.assertThat(SharedPlayerData.fingerprint(some))
+                .isEqualTo(SharedPlayerData.fingerprint(new byte[] {1, 2, 3}))
+                .isNotEqualTo(SharedPlayerData.fingerprint(new byte[] {1, 2, 4}))
+                .isNotEqualTo(SharedPlayerData.fingerprint(new byte[] {1, 2, 3, 0}));
+        org.assertj.core.api.Assertions.assertThat(SharedPlayerData.fingerprint(null)).isZero();
+    }
 }
