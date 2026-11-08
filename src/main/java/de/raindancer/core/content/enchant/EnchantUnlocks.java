@@ -7,6 +7,7 @@ import org.bukkit.plugin.Plugin;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BooleanSupplier;
 
 /**
  * Whether a player has unlocked one of Rain's enchantments — asked by whoever sells them (the economy's
@@ -29,6 +30,36 @@ public final class EnchantUnlocks {
     private static final List<Provided> sources = new CopyOnWriteArrayList<>();
 
     private EnchantUnlocks() {
+    }
+
+    private static volatile BooleanSupplier shards;
+
+    /** The enchants plugin says whether shards can be earned here (its shard world on or off), asked live. */
+    public static synchronized void shardsFrom(Plugin owner, BooleanSupplier active) {
+        shards = active;
+    }
+
+    public static synchronized void retractShards(BooleanSupplier active) {
+        if (shards == active) {
+            shards = null;
+        }
+    }
+
+    /**
+     * Whether shards can be earned on this server, so guilds can hide unlocking with them. Nobody saying so counts
+     * as yes: a server whose enchants plugin predates this keeps its menus.
+     */
+    public static boolean shardsOffered() {
+        BooleanSupplier source = shards;
+        if (source == null) {
+            return true;
+        }
+        try {
+            return source.getAsBoolean();
+        } catch (RuntimeException broken) {
+            log.error(broken, "The enchants plugin could not say whether shards are offered; they are treated as offered.");
+            return true;
+        }
     }
 
     public static synchronized void provide(Plugin owner, Source source) {
