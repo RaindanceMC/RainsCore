@@ -125,10 +125,13 @@ public final class Brand {
     }
 
     /**
-     * A window title: the tag, then this page.
+     * A window title: this page, by itself.
      *
-     * <p>Unlike the chat prefix it is always shown: a window with no name at all is worse than a
-     * window whose name somebody wanted shorter.
+     * <p>The tag used to stand in front of every title ({@code Pets » Rex}). It said the same thing on every
+     * window of a plugin, which is nothing — the player opened the pets menu and knows it — and it cost a third
+     * of a title's 146 pixels, so the page name it was in front of was the half that got clipped. The chat
+     * prefix is where the plugin signs itself; a window is named after what it shows. A front page with no
+     * name of its own still gets the tag, because a window with no name at all is worse.
      *
      * @param page MiniMessage for the page's own name; blank for the front page
      */
@@ -137,8 +140,7 @@ public final class Brand {
         if (trimmed.isEmpty()) {
             return MiniMessage.miniMessage().deserialize(gradientTag());
         }
-        return MiniMessage.miniMessage()
-                .deserialize(gradientTag() + dash() + clip(trimmed, pageBudget()));
+        return MiniMessage.miniMessage().deserialize(clip(trimmed, pageBudget()));
     }
 
     /**
@@ -151,7 +153,9 @@ public final class Brand {
         if (page == null) {
             return title("");
         }
-        return title("").append(MiniMessage.miniMessage().deserialize(dash())).append(clip(page));
+        // No colour of its own: a page name that carries none takes the window's — vanilla's title grey, or the ink
+        // of a painted backdrop — which is what the tag in front used to do by being colourless at the root.
+        return clip(page);
     }
 
     // ------------------------------------------------------------------ internals
@@ -172,15 +176,6 @@ public final class Brand {
         }
     }
 
-    /**
-     * What separates the tag from the page.
-     *
-     * <p>The colour comes from {@link Style}: a page name that carries none of its own inherits this,
-     * which is how every menu gets its title colour without saying so.
-     */
-    private static String dash() {
-        return "<" + Style.titleLabel() + "> » ";
-    }
 
     /** The tag in the server's gradient — the branded half of a window title or a chat prefix. */
     private String gradientTag() {
@@ -240,8 +235,9 @@ public final class Brand {
                 .append(here));
     }
 
+    /** The whole title is the page's, now that no tag stands in front of it. */
     private int pageBudget() {
-        return Math.max(24, TITLE_PIXELS - FontWidth.of(tag(), true) - FontWidth.of(" » ", false));
+        return TITLE_PIXELS;
     }
 
     /**

@@ -86,7 +86,8 @@ class MenuTrailTest {
     @Test
     @DisplayName("two names that do not fit lose the parent, not the page")
     void thePageIsNeverTheOneClipped() {
-        Page parent = new Page("claimtrials", null);
+        // Long enough that both names cannot share the 146 pixels, now that no tag spends any of them.
+        Page parent = new Page("The Grand Duchy of Claimtrials", null);
         String title = plain(new Page("Trusted people", parent).windowTitle());
 
         assertThat(title)
@@ -95,7 +96,7 @@ class MenuTrailTest {
                 .doesNotContain("\u2026");
         assertThat(title)
                 .as("dropped whole rather than abbreviated to something nobody can read")
-                .doesNotContain("claimtrials");
+                .doesNotContain("Claimtrials");
     }
 
     @Test
@@ -112,12 +113,12 @@ class MenuTrailTest {
     }
 
     @Test
-    @DisplayName("the brand is still in front of it")
-    void theBrandComesFirst() {
+    @DisplayName("the brand no longer stands in front of it — the title is the pages' alone")
+    void theBrandStaysOutOfTheTitle() {
         Page parent = new Page("Server", null);
         String title = plain(new Page("Fence", parent).windowTitle());
 
-        assertThat(title).startsWith("Claims");
+        assertThat(title).startsWith("Server").doesNotContain("Claims").doesNotContain("»");
         assertThat(title.indexOf("Server")).isLessThan(title.indexOf("Fence"));
     }
 
