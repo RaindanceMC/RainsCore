@@ -9,6 +9,7 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
@@ -83,6 +84,18 @@ public final class ClickActions {
      */
     private final Map<String, Pending> pending = new LinkedHashMap<>();
 
+    private record Expiry(long expiresAt, String token) { }
+
+    /**
+     * Tokens by expiry, soonest first, so a full registry drops what has lapsed without scanning
+     * everything. Entries are removed lazily: one whose token is gone from {@link #pending} is
+     * skipped when it surfaces, and the heap is rebuilt when it fills with such ghosts.
+     */
+    private final PriorityQueue<Expiry> byExpiry =
+            new PriorityQueue<>((a, b) -> Long.compare(a.expiresAt(), b.expiresAt()));
+
+    private boolean warnedAboutEviction;
+
     public ClickActions(LongSupplier clock) {
         this.clock = clock;
     }
@@ -90,7 +103,9 @@ public final class ClickActions {
     /**
      * Registers one action and returns the token that runs it.
      *
-     * @param onlyFor   the only player allowed to click, or null for a button anybody may use
+     * @param onlyFor   the only player allowed to click, or null for a button anybody may use —
+     *                  one shared token for a whole broadcast (a welcome button) costs one entry,
+     *                  not one per recipient
      * @param validFor  how long it lasts; null means {@link #DEFAULT_LIFETIME}
      * @param oneShot   whether the first click uses it up — true for anything that answers a
      *                  question, so double-clicking [Accept] cannot accept twice
@@ -108,8 +123,10 @@ public final class ClickActions {
         String token = newToken();
         synchronized (this) {
             evictIfFull();
-            pending.put(token, new Pending(onlyFor, oneShot,
-                    clock.getAsLong() + lifetime.toMillis(), action, false));
+            long expiresAt = clock.getAsLong() + lifetime.toMillis();
+            pending.put(token, new Pending(onlyFor, oneShot, expiresAt, action, false));
+            byExpiry.add(new Expiry(expiresAt, token));
+            compactIfGhostly();
         }
         return token;
     }
@@ -180,8 +197,7 @@ public final class ClickActions {
 
     /** Removes what has expired. Called on a slow timer. */
     public synchronized void sweep() {
-        long now = clock.getAsLong();
-        pending.values().removeIf(each -> now >= each.expiresAt());
+        dropExpired();
     }
 
     /** How many buttons are waiting. For a diagnostic command, and for the tests. */
@@ -196,12 +212,40 @@ public final class ClickActions {
         if (pending.size() < MAX_PENDING) {
             return;
         }
-        long now = clock.getAsLong();
-        pending.values().removeIf(each -> now >= each.expiresAt());
+        dropExpired();
+        if (pending.size() < MAX_PENDING) {
+            return;
+        }
         Iterator<String> oldestFirst = pending.keySet().iterator();
         while (pending.size() >= MAX_PENDING && oldestFirst.hasNext()) {
             oldestFirst.next();
             oldestFirst.remove();
+        }
+        if (!warnedAboutEviction) {
+            warnedAboutEviction = true;
+            log.warn("Chat button registry is full ({} live buttons): the oldest live buttons are being "
+                    + "evicted, so offers may stop working. A plugin is probably registering a button per "
+                    + "recipient; share one token instead.", MAX_PENDING);
+        }
+    }
+
+    /** Pops everything that has lapsed off the expiry heap and out of the map. */
+    private void dropExpired() {
+        long now = clock.getAsLong();
+        Expiry head;
+        while ((head = byExpiry.peek()) != null && now >= head.expiresAt()) {
+            byExpiry.poll();
+            Pending found = pending.get(head.token());
+            if (found != null && now >= found.expiresAt()) {
+                pending.remove(head.token());
+            }
+        }
+    }
+
+    private void compactIfGhostly() {
+        if (byExpiry.size() > 2 * pending.size() + 1024) {
+            byExpiry.clear();
+            pending.forEach((token, each) -> byExpiry.add(new Expiry(each.expiresAt(), token)));
         }
     }
 

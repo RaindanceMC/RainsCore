@@ -266,6 +266,47 @@ class ClickActionsTest {
             assertThat(actions.run(ALICE, oldest)).isEqualTo(ClickResult.UNKNOWN);
             assertThat(actions.run(ALICE, newest)).isEqualTo(ClickResult.RAN);
         }
+
+        @Test
+        @DisplayName("a full registry drops lapsed buttons before any live one, whatever their age")
+        void lapsedGoBeforeLive() {
+            String oldestLive = register(ALICE, Duration.ofHours(1), true);
+            for (int each = 0; each < ClickActions.MAX_PENDING - 2; each++) {
+                register(ALICE, Duration.ofMinutes(30), true);
+            }
+            register(ALICE, Duration.ofSeconds(1), true);
+            clock.addAndGet(2_000);
+
+            String fresh = register(ALICE, Duration.ofHours(1), true);
+
+            assertThat(actions.run(ALICE, oldestLive)).isEqualTo(ClickResult.RAN);
+            assertThat(actions.run(ALICE, fresh)).isEqualTo(ClickResult.RAN);
+            assertThat(actions.size()).isLessThanOrEqualTo(ClickActions.MAX_PENDING);
+        }
+
+        @Test
+        @DisplayName("registering at the cap stays cheap: no scan of every entry per button")
+        void evictionIsCheap() {
+            for (int each = 0; each < ClickActions.MAX_PENDING; each++) {
+                register(ALICE, Duration.ofHours(1), true);
+            }
+            long start = System.nanoTime();
+            for (int each = 0; each < 200_000; each++) {
+                register(ALICE, Duration.ofHours(1), true);
+            }
+            assertThat(java.time.Duration.ofNanos(System.nanoTime() - start))
+                    .isLessThan(Duration.ofSeconds(3));
+            assertThat(actions.size()).isEqualTo(ClickActions.MAX_PENDING);
+        }
+
+        @Test
+        @DisplayName("revoked and spent tokens do not pile up in the bookkeeping")
+        void revokedDoNotLeak() {
+            for (int each = 0; each < 50_000; each++) {
+                actions.revoke(register(ALICE, Duration.ofHours(1), true));
+            }
+            assertThat(actions.size()).isZero();
+        }
     }
 
     // ------------------------------------------------------------------ misbehaviour
