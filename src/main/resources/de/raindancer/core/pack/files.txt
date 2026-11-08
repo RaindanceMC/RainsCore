@@ -1,4 +1,5 @@
 assets/rainscore/font/buttons.json
+assets/rainscore/font/face.json
 assets/rainscore/font/hints.json
 assets/rainscore/font/menu.json
 assets/rainscore/font/title.json
@@ -24,6 +25,7 @@ assets/rainscore/textures/font/buttons/mid4.png
 assets/rainscore/textures/font/buttons/mid64.png
 assets/rainscore/textures/font/buttons/mid8.png
 assets/rainscore/textures/font/buttons/right.png
+assets/rainscore/textures/font/face/pixel.png
 assets/rainscore/textures/font/hints/left.png
 assets/rainscore/textures/font/hints/middle.png
 assets/rainscore/textures/font/hints/right.png
