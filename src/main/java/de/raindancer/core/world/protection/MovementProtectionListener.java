@@ -147,7 +147,8 @@ public final class MovementProtectionListener implements Listener {
         if (leaving.isPresent() && leaving.get().id().equals(entering.get().id())) {
             return false;   // moving about inside, including on the way out
         }
-        if (land.flags().isAllowedFor(entering.get(), LandFlag.WALK_IN, player)) {
+        if (land.flags().isAllowedFor(entering.get(), LandFlag.WALK_IN, player)
+                || land.allowedByOthers(player, entering.get(), LandAction.ENTER)) {
             return false;
         }
         refuse(player, entering.get());

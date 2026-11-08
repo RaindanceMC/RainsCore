@@ -44,4 +44,20 @@ class EnvironmentProtectionListenerTest {
         assertThat(EnvironmentProtectionListener.griefFlagFor(mock(Player.class))).isNull();
         assertThat(EnvironmentProtectionListener.griefFlagFor(mock(FallingBlock.class))).isNull();
     }
+
+    @Test
+    @DisplayName("TNT lit by a player who is online counts as theirs (a raid's charge); anything else as nobody's")
+    void tntIsWhoeverLitIt() {
+        Player raider = mock(Player.class);
+        org.mockito.Mockito.when(raider.isOnline()).thenReturn(true);
+        org.bukkit.entity.TNTPrimed tnt = mock(org.bukkit.entity.TNTPrimed.class);
+        org.mockito.Mockito.when(tnt.getSource()).thenReturn(raider);
+        assertThat(EnvironmentProtectionListener.litBy(tnt)).isSameAs(raider);
+
+        Player gone = mock(Player.class);
+        org.bukkit.entity.TNTPrimed left = mock(org.bukkit.entity.TNTPrimed.class);
+        org.mockito.Mockito.when(left.getSource()).thenReturn(gone);
+        assertThat(EnvironmentProtectionListener.litBy(left)).isNull();
+        assertThat(EnvironmentProtectionListener.litBy(mock(org.bukkit.entity.Creeper.class))).isNull();
+    }
 }

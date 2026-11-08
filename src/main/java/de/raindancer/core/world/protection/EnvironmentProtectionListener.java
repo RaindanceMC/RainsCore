@@ -112,7 +112,26 @@ public final class EnvironmentProtectionListener implements Listener {
         }
         // Remove only the blocks inside protected claims instead of cancelling the whole blast, so an
         // explosion outside a claim still works normally right up to the border.
-        event.blockList().removeIf(block -> denied(block.getLocation(), LandFlag.EXPLOSIONS));
+        Player lit = litBy(event.getEntity());
+        event.blockList().removeIf(block -> denied(block.getLocation(), LandFlag.EXPLOSIONS)
+                && !openedTo(lit, block.getLocation()));
+    }
+
+    /** Whoever lit this TNT, if they are still here — a raid's charge is theirs. */
+    static Player litBy(org.bukkit.entity.Entity exploded) {
+        if (exploded instanceof org.bukkit.entity.TNTPrimed tnt && tnt.getSource() instanceof Player player
+                && player.isOnline()) {
+            return player;
+        }
+        return null;
+    }
+
+    /** Whether a rule besides the claim (a raid) lets this player break blocks there, explosion flag or not. */
+    private boolean openedTo(Player player, org.bukkit.Location where) {
+        if (player == null) {
+            return false;
+        }
+        return land.areaAt(where).map(area -> land.allowedByOthers(player, area, LandAction.BREAK)).orElse(false);
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)

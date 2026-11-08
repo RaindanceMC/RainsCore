@@ -94,6 +94,8 @@ public final class Land {
     private final Map<UUID, Long> bypassSince = new ConcurrentHashMap<>();
     /** Who has said "stop asking" for their current bypass — cleared the moment it is toggled off. */
     private final Set<UUID> bypassReminderSilenced = ConcurrentHashMap.newKeySet();
+    /** Extra yeses on top of an area's no ({@link #alsoAllow}). */
+    private final java.util.List<LandRule> alsoAllowed = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /** @param clock milliseconds; injected so the refusal throttle can be tested without waiting for it */
     public Land(LandPolicy policy, Messages messages, LongSupplier clock) {
@@ -349,7 +351,42 @@ public final class Land {
         if (isBypassing(player)) {
             return true;
         }
-        return area.may(player.getUniqueId(), action);
+        return area.may(player.getUniqueId(), action) || allowedByOthers(player, area, action);
+    }
+
+    /**
+     * Adds a rule that may let a player do what an area refused (a raid). Only consulted on a refusal; a yes wins.
+     * A plugin that stops takes its rule back with {@link #stopAllowing}.
+     */
+    public void alsoAllow(LandRule rule) {
+        if (rule != null) {
+            alsoAllowed.add(rule);
+        }
+    }
+
+    /** @return whether it was there to remove */
+    public boolean stopAllowing(LandRule rule) {
+        return rule != null && alsoAllowed.remove(rule);
+    }
+
+    /**
+     * Whether one of the extra rules lets this player do it here — without the area's own answer. For things that
+     * are refused regardless of membership (a claim's explosion flag) and that only such a rule may open.
+     */
+    public boolean allowedByOthers(Player player, ProtectedArea area, LandAction action) {
+        if (player == null || area == null || alsoAllowed.isEmpty()) {
+            return false;
+        }
+        for (LandRule rule : alsoAllowed) {
+            try {
+                if (rule.allows(player, area, action)) {
+                    return true;
+                }
+            } catch (RuntimeException broken) {
+                // a broken rule is a no; the event goes on
+            }
+        }
+        return false;
     }
 
     /** The three-way answer, for a caller that needs to tell "no" from "nobody knows". */
