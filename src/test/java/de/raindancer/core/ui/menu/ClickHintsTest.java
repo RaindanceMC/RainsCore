@@ -280,6 +280,30 @@ class ClickHintsTest {
     }
 
     @Test
+    @DisplayName("a button that can be clicked but says nothing about it gets the mouse under its lore")
+    void clickableWithoutHint() {
+        UUID java = UUID.randomUUID();
+        ClickHints.install(id -> JAVA);
+        ItemStack start = TestItems.of(Material.EMERALD, meta -> meta.lore(List.of(mini("<gray>Draw the first card"))));
+
+        ItemStack shown = Icons.forViewer(start, java, true);
+        assertThat(shown.getItemMeta().lore()).extracting(ClickHintsTest::plain)
+                .containsExactly("Draw the first card", "", String.valueOf(L));
+        assertThat(Icons.forViewer(start, java, false)).as("not clickable").isSameAs(start);
+
+        ItemStack bare = TestItems.of(Material.EMERALD);
+        assertThat(Icons.forViewer(bare, java, true).getItemMeta().lore()).extracting(ClickHintsTest::plain)
+                .containsExactly(String.valueOf(L));
+
+        ItemStack hinted = TestItems.of(Material.EMERALD, meta -> meta.lore(List.of(mini("<yellow>Click<gray> to start"))));
+        assertThat(Icons.forViewer(hinted, java, true).getItemMeta().lore()).extracting(ClickHintsTest::plain)
+                .as("says it already").containsExactly(L + " | start");
+
+        ClickHints.install(id -> NONE);
+        assertThat(Icons.forViewer(start, java, true)).as("nobody to draw for").isSameAs(start);
+    }
+
+    @Test
     @DisplayName("a button without a hint is not copied")
     void nothingToDo() {
         UUID java = UUID.randomUUID();

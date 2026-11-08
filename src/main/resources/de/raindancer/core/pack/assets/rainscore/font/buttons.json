@@ -1,0 +1,106 @@
+{
+ "providers": [
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/left.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue000"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/right.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue001"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid1.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue002"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid2.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue003"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid4.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue004"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid8.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue005"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid16.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue006"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid32.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue007"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/buttons/mid64.png",
+   "ascent": 8,
+   "height": 9,
+   "chars": [
+    "\ue008"
+   ]
+  },
+  {
+   "type": "space",
+   "advances": {
+    "\ue010": -1,
+    "\ue018": 1,
+    "\ue011": -2,
+    "\ue019": 2,
+    "\ue012": -4,
+    "\ue01a": 4,
+    "\ue013": -8,
+    "\ue01b": 8,
+    "\ue014": -16,
+    "\ue01c": 16,
+    "\ue015": -32,
+    "\ue01d": 32,
+    "\ue016": -64,
+    "\ue01e": 64,
+    "\ue017": -128,
+    "\ue01f": 128
+   }
+  }
+ ]
+}

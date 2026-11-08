@@ -1,3 +1,4 @@
+assets/rainscore/font/buttons.json
 assets/rainscore/font/hints.json
 assets/rainscore/font/menu.json
 assets/rainscore/font/title.json
@@ -14,6 +15,15 @@ assets/rainscore/models/item/ui/arrow_left.json
 assets/rainscore/models/item/ui/arrow_right.json
 assets/rainscore/models/item/ui/arrow_up.json
 assets/rainscore/models/item/ui/blank.json
+assets/rainscore/textures/font/buttons/left.png
+assets/rainscore/textures/font/buttons/mid1.png
+assets/rainscore/textures/font/buttons/mid16.png
+assets/rainscore/textures/font/buttons/mid2.png
+assets/rainscore/textures/font/buttons/mid32.png
+assets/rainscore/textures/font/buttons/mid4.png
+assets/rainscore/textures/font/buttons/mid64.png
+assets/rainscore/textures/font/buttons/mid8.png
+assets/rainscore/textures/font/buttons/right.png
 assets/rainscore/textures/font/hints/left.png
 assets/rainscore/textures/font/hints/middle.png
 assets/rainscore/textures/font/hints/right.png

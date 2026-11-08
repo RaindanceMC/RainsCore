@@ -31,10 +31,34 @@ public final class SidebarSections {
     private static final LogChannel log = Log.of("scoreboard");
 
     /** A section as registered: whose, what it is called on the menu, where it sits by default. */
-    public record Section(String owner, String title, int rank) {
+    public record Section(String owner, String title, int rank, Size size) {
+
+        public Section(String owner, String title, int rank) {
+            this(owner, title, rank, null);
+        }
     }
 
-    private record Entry(Section section, Function<UUID, List<Component>> lines) {
+    /**
+     * A section the player can make bigger or smaller: how many of something it lists, from {@code min} to
+     * {@code max}, {@code fallback} until they choose. {@code unit} names them on the menu: "players".
+     */
+    public record Size(int min, int max, int fallback, String unit) {
+
+        public Size {
+            min = Math.max(1, min);
+            max = Math.max(min, max);
+            fallback = Math.clamp(fallback, min, max);
+        }
+
+        int clamp(int chosen) {
+            return Math.clamp(chosen, min, max);
+        }
+    }
+
+    /** How a section came out on a player's sidebar. */
+    public enum Fit { SHOWN, SHORTENED, NO_ROOM, HIDDEN, EMPTY }
+
+    private record Entry(Section section, java.util.function.BiFunction<UUID, Integer, List<Component>> lines) {
     }
 
     /** The rank of a section registered without one: after the balance, before the boards. */
@@ -59,7 +83,25 @@ public final class SidebarSections {
         if (owner == null || lines == null) {
             return;
         }
-        Entry entry = new Entry(new Section(owner, title == null || title.isBlank() ? titleOf(owner) : title, rank), lines);
+        put(new Entry(new Section(owner, title == null || title.isBlank() ? titleOf(owner) : title, rank),
+                (player, size) -> lines.apply(player)));
+    }
+
+    /**
+     * A section the player sizes ({@link Size}): {@code lines} gets how many to list. Short of room it is asked again
+     * with fewer, down to the smallest, rather than left out.
+     */
+    public static synchronized void registerSized(String owner, String title, int rank, Size size,
+                                                  java.util.function.BiFunction<UUID, Integer, List<Component>> lines) {
+        if (owner == null || lines == null || size == null) {
+            return;
+        }
+        put(new Entry(new Section(owner, title == null || title.isBlank() ? titleOf(owner) : title, rank, size),
+                lines));
+    }
+
+    private static void put(Entry entry) {
+        String owner = entry.section().owner();
         for (int index = 0; index < entries.size(); index++) {
             if (entries.get(index).section().owner().equals(owner)) {
                 entries.set(index, entry);
@@ -116,7 +158,19 @@ public final class SidebarSections {
         return build(player, layout, room, false);
     }
 
+    /** How each section comes out on this player's sidebar — for the menu to say what did not fit. */
+    public static Map<String, Fit> fits(UUID player, SidebarLayout layout, int room) {
+        Map<String, Fit> fits = new java.util.LinkedHashMap<>();
+        build(player, layout, room, false, fits);
+        return fits;
+    }
+
     private static List<Component> build(UUID player, SidebarLayout layout, int room, boolean gapFirst) {
+        return build(player, layout, room, gapFirst, null);
+    }
+
+    private static List<Component> build(UUID player, SidebarLayout layout, int room, boolean gapFirst,
+                                         Map<String, Fit> fits) {
         List<Component> built = new ArrayList<>();
         if (player == null || room <= 0) {
             return built;
@@ -128,31 +182,64 @@ public final class SidebarSections {
         SidebarLayout mine = layout == null ? SidebarLayout.DEFAULT : layout;
         for (String owner : mine.arrange(known())) {
             Entry entry = byOwner.get(owner);
-            if (entry == null || !mine.shows(owner)) {
+            if (entry == null) {
                 continue;
             }
-            List<Component> section;
-            try {
-                section = entry.lines().apply(player);
-            } catch (RuntimeException failed) {
-                if (complainedAbout.putIfAbsent(owner, Boolean.TRUE) == null) {
-                    log.error(failed, "The sidebar section of {} failed and is left out until it works.", owner);
-                }
+            if (!mine.shows(owner)) {
+                note(fits, owner, Fit.HIDDEN);
                 continue;
+            }
+            Size size = entry.section().size();
+            int wanted = size == null ? 0 : size.clamp(mine.sizeOf(owner, size.fallback()));
+            boolean gap = gapFirst || !built.isEmpty();
+            int left = room - built.size() - (gap ? 1 : 0);
+            List<Component> section = null;
+            boolean empty = true;
+            boolean shortened = false;
+            for (int count = wanted; ; count--) {
+                List<Component> drawn = lines(entry, owner, player, count);
+                if (drawn == null) {
+                    break;
+                }
+                empty = drawn.isEmpty();
+                if (empty || drawn.size() <= left) {
+                    section = drawn;
+                    break;
+                }
+                if (size == null || count <= size.min()) {
+                    break;
+                }
+                shortened = true;
             }
             if (section == null || section.isEmpty()) {
-                continue;
-            }
-            boolean gap = gapFirst || !built.isEmpty();
-            if (built.size() + (gap ? 1 : 0) + section.size() > room) {
+                note(fits, owner, empty ? Fit.EMPTY : Fit.NO_ROOM);
                 continue;
             }
             if (gap) {
                 built.add(Component.empty());
             }
             built.addAll(section);
+            note(fits, owner, shortened ? Fit.SHORTENED : Fit.SHOWN);
         }
         return built;
+    }
+
+    private static List<Component> lines(Entry entry, String owner, UUID player, int count) {
+        try {
+            List<Component> lines = entry.lines().apply(player, count);
+            return lines == null ? List.of() : lines;
+        } catch (RuntimeException failed) {
+            if (complainedAbout.putIfAbsent(owner, Boolean.TRUE) == null) {
+                log.error(failed, "The sidebar section of {} failed and is left out until it works.", owner);
+            }
+            return null;
+        }
+    }
+
+    private static void note(Map<String, Fit> fits, String owner, Fit fit) {
+        if (fits != null) {
+            fits.put(owner, fit);
+        }
     }
 
     /** Drops the sections whose code came from {@code loader}. @return how many */

@@ -55,6 +55,7 @@ public final class SidebarMenu extends Menu {
                 "<dark_gray>The server's name at the top stays."));
 
         List<String> arranged = mine.arrange(known);
+        java.util.Map<String, SidebarSections.Fit> fits = SidebarSections.fits(viewer.getUniqueId(), mine, Sidebar.MAX_LINES);
         for (String owner : arranged) {
             SidebarSections.Section section = sections.stream().filter(each -> each.owner().equals(owner)).findFirst().orElse(null);
             if (section == null) {
@@ -63,7 +64,18 @@ public final class SidebarMenu extends Menu {
             boolean on = mine.shows(owner);
             int place = arranged.indexOf(owner);
             List<String> lore = new ArrayList<>();
-            lore.add(on ? "<green>Shown" : "<gray>Hidden");
+            lore.add(switch (fits.getOrDefault(owner, on ? SidebarSections.Fit.SHOWN : SidebarSections.Fit.HIDDEN)) {
+                case SHOWN -> "<green>Shown";
+                case SHORTENED -> "<yellow>Shown, made smaller to fit";
+                case NO_ROOM -> "<red>Does not fit <gray>— move it up, or hide another";
+                case EMPTY -> "<green>Shown <dark_gray>(nothing to say right now)";
+                case HIDDEN -> "<gray>Hidden";
+            });
+            SidebarSections.Size size = section.size();
+            if (size != null) {
+                lore.add("<gray>Showing <white>" + size.clamp(mine.sizeOf(owner, size.fallback())) + "</white> "
+                        + MINI.escapeTags(size.unit()) + " <dark_gray>(" + size.min() + "–" + Math.min(9, size.max()) + ")");
+            }
             lore.add("");
             lore.add("<yellow>Click<gray> to " + (on ? "hide" : "show") + " it");
             if (place > 0) {
@@ -71,6 +83,10 @@ public final class SidebarMenu extends Menu {
             }
             if (place < arranged.size() - 1) {
                 lore.add("<yellow>Right click<gray> to move it down");
+            }
+            if (size != null) {
+                lore.add("<yellow>1</yellow><gray>–</gray><yellow>" + Math.min(9, size.max())
+                        + "</yellow><gray> while pointing at it: how many");
             }
             // Left to right, then the next row, in the sidebar's order: seven to a row, twenty-one at most.
             if (place >= 21) {
@@ -80,7 +96,9 @@ public final class SidebarMenu extends Menu {
                     (on ? "<white>" : "<gray>") + (place + 1) + ". " + MINI.escapeTags(section.title()), lore), click -> {
                 SidebarLayout now = SidebarPreferences.of(viewer);
                 SidebarLayout next;
-                if (click.isShiftClick()) {
+                if (click.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY && size != null) {
+                    next = now.sized(owner, size.clamp(click.getHotbarButton() + 1));
+                } else if (click.isShiftClick()) {
                     next = now.movedUp(owner, SidebarSections.known());
                 } else if (click.isRightClick()) {
                     next = now.movedDown(owner, SidebarSections.known());
@@ -121,7 +139,8 @@ public final class SidebarMenu extends Menu {
         return List.of("Each row is one section of your sidebar,",
                 "top to bottom as it is shown.",
                 "Click to hide or show it; shift click moves",
-                "it up, right click moves it down.",
+                "it up, right click moves it down. A number",
+                "key while pointing at one says how many it lists.",
                 "",
                 "The server's name at the top stays.");
     }

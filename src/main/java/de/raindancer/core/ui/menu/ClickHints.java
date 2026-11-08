@@ -5,6 +5,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.Style;
+import de.raindancer.core.ui.text.Runs;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
@@ -95,9 +96,6 @@ public final class ClickHints {
                     // "Click to open", "Right click: open" read as "[mouse] | open"
                     + "(?<join>\\s+to\\s+|\\s*:\\s+)?");
 
-    /** Stands in for a piece that is not plain text, so no hint is ever matched into or across it. */
-    private static final char OPAQUE = '\uFFFC';
-
     private static volatile Function<UUID, Audience> who = id -> Audience.NONE;
 
     private ClickHints() {
@@ -150,20 +148,16 @@ public final class ClickHints {
         if (line == null || audience == null || audience == Audience.NONE) {
             return line;
         }
-        List<Run> runs = new ArrayList<>();
-        flatten(line, Style.empty(), runs);
-        StringBuilder all = new StringBuilder();
-        for (Run run : runs) {
-            all.append(run.text() == null ? String.valueOf(OPAQUE) : run.text());
-        }
+        List<Runs.Run> runs = Runs.of(line);
+        String all = Runs.joined(runs);
         Matcher matcher = HINT.matcher(all);
         List<Component> out = new ArrayList<>();
         boolean changed = false;
         int at = 0;
         while (matcher.find()) {
             changed = true;
-            copy(runs, at, matcher.start(), out, audience);
-            Style there = styleAt(runs, matcher.start());
+            Runs.copy(runs, at, matcher.start(), out, style -> withHover(style, audience));
+            Style there = Runs.styleAt(runs, matcher.start());
             out.addAll(glyphs(matcher.group("hint"), there, audience));
             if (matcher.group("join") != null) {
                 Style gap = there.decoration(TextDecoration.BOLD, false).decoration(TextDecoration.ITALIC, false);
@@ -176,58 +170,8 @@ public final class ClickHints {
         if (!changed && runs.stream().noneMatch(run -> hoverChanges(run.style(), audience))) {
             return line;
         }
-        copy(runs, at, all.length(), out, audience);
-        return Component.textOfChildren(out.toArray(new Component[0]));
-    }
-
-    /** A stretch of the line in one style: plain text, or a piece that is not ({@code text == null}). */
-    private record Run(String text, Style style, Component opaque) {
-    }
-
-    private static void flatten(Component component, Style inherited, List<Run> out) {
-        Style style = component.style().merge(inherited, Style.Merge.Strategy.IF_ABSENT_ON_TARGET);
-        if (component instanceof TextComponent text) {
-            if (!text.content().isEmpty()) {
-                out.add(new Run(text.content(), style, null));
-            }
-        } else {
-            out.add(new Run(null, style, component.children(List.of()).style(style)));
-        }
-        for (Component child : component.children()) {
-            flatten(child, style, out);
-        }
-    }
-
-    /** The runs' text between two positions of the joined line, each piece in its own run's style. */
-    private static void copy(List<Run> runs, int from, int to, List<Component> out, Audience audience) {
-        int start = 0;
-        for (Run run : runs) {
-            int length = run.text() == null ? 1 : run.text().length();
-            int end = start + length;
-            int a = Math.max(from, start);
-            int b = Math.min(to, end);
-            if (a < b) {
-                Style style = withHover(run.style(), audience);
-                out.add(run.text() == null ? run.opaque().style(style)
-                        : Component.text(run.text().substring(a - start, b - start), style));
-            }
-            start = end;
-            if (start >= to) {
-                break;
-            }
-        }
-    }
-
-    private static Style styleAt(List<Run> runs, int position) {
-        int start = 0;
-        for (Run run : runs) {
-            int end = start + (run.text() == null ? 1 : run.text().length());
-            if (position < end) {
-                return run.style();
-            }
-            start = end;
-        }
-        return Style.empty();
+        Runs.copy(runs, at, all.length(), out, style -> withHover(style, audience));
+        return Runs.line(out);
     }
 
     /** A hover's text has its hints drawn too: "Click to accept" over a chat button. */
@@ -258,6 +202,31 @@ public final class ClickHints {
             shown.add(drawn);
         }
         return changed ? shown : lore;
+    }
+
+    /**
+     * The lore of a button that can be clicked, with the mouse under it when nothing in it says what a click does —
+     * the very same list when something does, or when there is nobody to draw it for.
+     */
+    public static List<Component> withClickLine(List<Component> lore, Audience audience) {
+        if (audience == null || audience == Audience.NONE) {
+            return lore;
+        }
+        List<Component> lines = lore == null ? List.of() : lore;
+        for (Component line : lines) {
+            String text = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(line);
+            if (HINT.matcher(text).find() || text.indexOf(Glyph.LEFT.character()) >= 0
+                    || text.indexOf(Glyph.RIGHT.character()) >= 0 || text.indexOf(Glyph.MIDDLE.character()) >= 0) {
+                return lore;
+            }
+        }
+        List<Component> shown = new ArrayList<>(lines);
+        if (!shown.isEmpty()) {
+            shown.add(Component.empty());
+        }
+        shown.add(glyph(Glyph.LEFT, Style.empty(), audience));
+        return shown;
     }
 
     /** A copy of the item with its lore's hints drawn; the very same item when there were none. */

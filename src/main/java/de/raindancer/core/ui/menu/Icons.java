@@ -291,15 +291,30 @@ public final class Icons {
      * other way.
      */
     public static ItemStack forViewer(ItemStack item, UUID viewer) {
-        if (item == null || !item.hasItemMeta()) {
+        return forViewer(item, viewer, false);
+    }
+
+    /**
+     * The same for a button: one that can be clicked and does not say so gets the mouse under its lore, for a viewer
+     * who is shown the click icons.
+     */
+    public static ItemStack forViewer(ItemStack item, UUID viewer, boolean clickable) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta() && !clickable) {
             return item;
         }
         ItemMeta original = item.getItemMeta();
+        if (original == null) {
+            return item;
+        }
         String tag = original.getPersistentDataContainer()
                 .get(ARROW, org.bukkit.persistence.PersistentDataType.STRING);
         java.util.Optional<Arrow> shown = Arrow.shown(tag, tag != null && MenuStyle.wearing(viewer));
+        ClickHints.Audience audience = ClickHints.audience(viewer);
         List<net.kyori.adventure.text.Component> lore = original.lore();
-        List<net.kyori.adventure.text.Component> hinted = ClickHints.rewrite(lore, ClickHints.audience(viewer));
+        List<net.kyori.adventure.text.Component> hinted = ClickHints.rewrite(lore, audience);
+        if (clickable) {
+            hinted = ClickHints.withClickLine(hinted, audience);
+        }
         if (shown.isEmpty() && hinted == lore) {
             return item;
         }
