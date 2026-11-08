@@ -31,6 +31,17 @@ public final class DialogReturn extends Menu {
         reopen.run();
     }
 
+    /** A module's page that changed something asks its parent to redraw: that is the dialog, shown afresh. */
+    @Override
+    public void refresh() {
+        reopen.run();
+    }
+
+    @Override
+    public void reopen() {
+        reopen.run();
+    }
+
     @Override
     protected Component title() {
         return MiniMessage.miniMessage().deserialize("<white>" + Text.literal(name));

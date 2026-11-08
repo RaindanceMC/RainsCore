@@ -61,6 +61,20 @@ public final class ProfileMenu extends Menu {
         new ProfileMenu(viewer, brand, null, subject, name).open();
     }
 
+    /**
+     * Shown as the game's own window ({@link ProfileDialog}) — every way in, a clicked name, {@code /player} or a
+     * module's list, lands there. {@code -Drains.anvil=true} keeps the chest, as for {@code ConfirmMenu}.
+     */
+    @Override
+    public void open() {
+        if (Boolean.getBoolean("rains.anvil")) {
+            super.open();
+            return;
+        }
+        Menu from = parent();
+        ProfileDialog.open(viewer, brand(), subject, subjectName, from == null ? null : from::open);
+    }
+
     @Override
     protected Component title() {
         return MINI.deserialize("<" + Style.titleLabel() + ">" + Text.literal(subjectName));
