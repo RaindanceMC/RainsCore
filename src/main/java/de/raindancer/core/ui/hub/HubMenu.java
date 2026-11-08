@@ -64,6 +64,14 @@ public final class HubMenu extends HubPage {
         toolbar(5, Icons.head(viewer(), "<gradient:#F9A8D4:#FBCFE8>Your profile</gradient>",
                 "<gray>How the server sees you.", "", "<dark_gray>» <white>Click to open"),
                 event -> ProfileMenu.open(viewer(), brand(), viewer().getUniqueId()));
+        if (!de.raindancer.core.ui.scoreboard.SidebarSections.sections().isEmpty()) {
+            // The page for the player's own sidebar, from here too: whoever draws the sidebar redraws it on its own
+            // timer, so no switch and no redraw are needed from this door.
+            toolbar(7, Icons.of(Material.OAK_SIGN, "<gradient:#A7F3D0:#6EE7B7>Your sidebar</gradient>",
+                    "<gray>What is on the right of your screen,", "<gray>in the order you like.", "",
+                    "<dark_gray>» <white>Click to arrange"),
+                    event -> new de.raindancer.core.ui.scoreboard.SidebarMenu(viewer(), brand(), this, null, null, null).open());
+        }
     }
 
     private ItemStack banner() {
