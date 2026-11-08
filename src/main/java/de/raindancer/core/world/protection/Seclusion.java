@@ -4,7 +4,10 @@ import de.raindancer.core.platform.util.Scheduling;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -53,13 +56,27 @@ public final class Seclusion {
             revealEverybody();
             return;
         }
-        for (Player watcher : plugin.getServer().getOnlinePlayers()) {
-            Set<UUID> shouldHide = new HashSet<>();
-            for (Player subject : plugin.getServer().getOnlinePlayers()) {
-                if (subject.equals(watcher)) {
-                    continue;
+        List<Player> everybody = new ArrayList<>(plugin.getServer().getOnlinePlayers());
+        // Each player's ground is looked up once; the pairing below reads it rather than asking again.
+        Map<UUID, ProtectedArea> standingOn = new HashMap<>();
+        List<Player> secluded = new ArrayList<>();
+        for (Player player : everybody) {
+            land.areaAt(player.getLocation()).ifPresent(area -> {
+                standingOn.put(player.getUniqueId(), area);
+                if (keepsSomebodyOut(area)) {
+                    secluded.add(player);
                 }
-                if (!mayBeSeen(subject, watcher)) {
+            });
+        }
+        if (secluded.isEmpty() && hiddenFrom.isEmpty()) {
+            return;
+        }
+        for (Player watcher : everybody) {
+            Set<UUID> shouldHide = new HashSet<>();
+            ProtectedArea watcherStands = standingOn.get(watcher.getUniqueId());
+            for (Player subject : secluded) {
+                if (!subject.equals(watcher)
+                        && !mayBeSeen(standingOn.get(subject.getUniqueId()), watcherStands, watcher)) {
                     shouldHide.add(subject.getUniqueId());
                 }
             }
@@ -67,21 +84,25 @@ public final class Seclusion {
         }
     }
 
+    /** Whether any tier is refused sight of this ground — if none is, nobody on it can be hidden. */
+    private boolean keepsSomebodyOut(ProtectedArea area) {
+        for (LandAudience tier : LandAudience.values()) {
+            if (!land.flags().isAllowed(area, LandFlag.VISIBLE_FROM_OUTSIDE, tier, null)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * Whether this watcher may see this person.
+     * Whether this watcher may see somebody standing on {@code area}.
      *
      * <p>The tier is the <em>watcher's</em> standing on the ground the subject is on, which is what makes
      * "people I trust may see in, strangers may not" one setting rather than a list. A watcher standing on the
      * same ground always sees them: the flag is about being seen from outside.
      */
-    private boolean mayBeSeen(Player subject, Player watcher) {
-        var where = land.areaAt(subject.getLocation());
-        if (where.isEmpty()) {
-            return true;   // not on protected ground at all
-        }
-        ProtectedArea area = where.get();
-        var watcherStands = land.areaAt(watcher.getLocation());
-        if (watcherStands.isPresent() && watcherStands.get().id().equals(area.id())) {
+    private boolean mayBeSeen(ProtectedArea area, ProtectedArea watcherStands, Player watcher) {
+        if (watcherStands != null && watcherStands.id().equals(area.id())) {
             return true;   // both inside; this flag is about being seen from outside
         }
         if (land.isBypassing(watcher)) {
