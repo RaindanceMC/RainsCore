@@ -279,6 +279,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private InteractionProtectionListener interactionProtection;
     private Seclusion seclusion;
     private de.raindancer.core.ui.tablist.TabKeeper tabKeeper;
+    private de.raindancer.core.ui.menu.ClickHintPackets clickHintPackets;
     private ResourcePacks resourcePacks;
     private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
     private de.raindancer.core.ui.profile.ProfileExtension ownNametagSwitch;
@@ -684,6 +685,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         tabKeeper = new de.raindancer.core.ui.tablist.TabKeeper(new de.raindancer.core.ui.tablist.TabKeep());
         tabKeeper.keep().keepListedWhile(seclusion::hides);
         getServer().getOnlinePlayers().forEach(tabKeeper::inject);
+        clickHintPackets = new de.raindancer.core.ui.menu.ClickHintPackets();
+        getServer().getOnlinePlayers().forEach(clickHintPackets::inject);
         Scheduling.globalTimer(this, SECLUSION_PERIOD_TICKS, SECLUSION_PERIOD_TICKS,
                 task -> {
                     seclusion.refresh();
@@ -1400,6 +1403,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
         de.raindancer.core.ui.menu.ClickHints.uninstall();
+        if (clickHintPackets != null) {
+            getServer().getOnlinePlayers().forEach(clickHintPackets::eject);
+        }
         if (menusSwitch != null) {
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
         }
@@ -2843,6 +2849,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         tabKeeper.inject(event.getPlayer());
+        clickHintPackets.inject(event.getPlayer());
         offerOwnerHint(event.getPlayer());
         if (presence != null) {
             java.util.UUID id = event.getPlayer().getUniqueId();

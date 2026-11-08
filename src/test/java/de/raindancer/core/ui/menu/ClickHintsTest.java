@@ -7,7 +7,10 @@ import de.raindancer.core.CoreConfig;
 import de.raindancer.core.testkit.TestItems;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -73,43 +76,109 @@ class ClickHintsTest {
         component.children().forEach(child -> collect(child, found));
     }
 
-    @ParameterizedTest(name = "{0}")
-    @CsvSource(delimiter = '|', value = {
-            "Click to rename|L to rename",
-            "Left click to buy one|L to buy one",
-            "Left-Click to buy one|L to buy one",
-            "Right click to sell all|R to sell all",
-            "Right-click: remove|R: remove",
-            "or right click to take one|or R to take one",
-            "Shift click to move it up|SL to move it up",
-            "Shift-click to move it up|SL to move it up",
-            "Shift right click to move it down|SR to move it down",
-            "Shift-Right-Click to move it down|SR to move it down",
-            "Middle click to copy|M to copy",
-            "Click to add one. Right click to take one.|L to add one. R to take one.",
-    })
-    @DisplayName("a click hint becomes the mouse it means, and the rest of the line stays")
-    void hintsBecomeMice(String line, String expected) {
-        Component shown = ClickHints.rewrite(Component.text(line), JAVA);
-        assertThat(plain(shown)).isEqualTo(expectedText(expected));
+    /** {L}, {R}, {M}, {S} stand for the glyphs, ¦ for the bar. */
+    private static String glyphs(String expected) {
+        return expected.replace("{L}", String.valueOf(L)).replace("{R}", String.valueOf(R))
+                .replace("{M}", String.valueOf(M)).replace("{S}", String.valueOf(S)).replace('¦', '|');
     }
 
-    /** The expected line with the placeholder letters swapped for glyphs, only where a letter is a word of its own. */
-    private static String expectedText(String expected) {
-        StringBuilder out = new StringBuilder();
-        String[] words = expected.split("(?<= )|(?= )|(?=[:.])|(?<=[:.])");
-        for (String word : words) {
-            out.append(switch (word) {
-                case "L" -> String.valueOf(L);
-                case "R" -> String.valueOf(R);
-                case "M" -> String.valueOf(M);
-                case "SL" -> "" + S + L;
-                case "SR" -> "" + S + R;
-                default -> word;
-            });
-        }
-        return out.toString();
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "Click to rename|{L} ¦ rename",
+            "Left click to buy one|{L} ¦ buy one",
+            "Left-Click to buy one|{L} ¦ buy one",
+            "Right click to sell all|{R} ¦ sell all",
+            "Right-click: remove|{R} ¦ remove",
+            "or right click to take one|or {R} ¦ take one",
+            "Shift click to move it up|{S}{L} ¦ move it up",
+            "Shift-click to move it up|{S}{L} ¦ move it up",
+            "Shift right click to move it down|{S}{R} ¦ move it down",
+            "Shift-Right-Click to move it down|{S}{R} ¦ move it down",
+            "Middle click to copy|{M} ¦ copy",
+            "Click to add one. Right click to take one.|{L} ¦ add one. {R} ¦ take one.",
+            "Click a slot first|{L} a slot first",
+            "Click|{L}",
+    })
+    @DisplayName("a click hint becomes the mouse it means: [mouse] | what it does")
+    void hintsBecomeMice(String line, String expected) {
+        Component shown = ClickHints.rewrite(Component.text(line), JAVA);
+        assertThat(plain(shown)).isEqualTo(glyphs(expected));
     }
+
+    @Test
+    @DisplayName("the hint and its 'to' in different colours still become one icon and a bar; the rest keeps its colour")
+    void acrossColours() {
+        Component shown = ClickHints.rewrite(mini("<yellow>Right click<gray> to open <white>the chest"), JAVA);
+        assertThat(plain(shown)).isEqualTo(R + " | open the chest");
+        assertThat(colourOf(shown, "open")).isEqualTo(NamedTextColor.GRAY);
+        assertThat(colourOf(shown, "the chest")).isEqualTo(NamedTextColor.WHITE);
+        assertThat(colourOf(shown, "|")).isEqualTo(NamedTextColor.DARK_GRAY);
+    }
+
+    /** The effective colour of the first text component whose content starts with {@code text}. */
+    private static TextColor colourOf(Component line, String text) {
+        return find(line, text, null);
+    }
+
+    private static TextColor find(Component c, String text, TextColor inherited) {
+        TextColor colour = c.color() != null ? c.color() : inherited;
+        if (c instanceof TextComponent t && t.content().startsWith(text)) {
+            return colour;
+        }
+        for (Component child : c.children()) {
+            TextColor found = find(child, text, colour);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    @Test
+    @DisplayName("only the icon is in the hint font: everything after it keeps the game's font (it showed as boxes)")
+    void fontStaysOnTheIcon() {
+        Component shown = ClickHints.rewrite(mini("<!italic><yellow>Click<gray> to show it to yourself"), JAVA);
+        List<TextComponent> pieces = new ArrayList<>();
+        texts(shown, null, pieces);
+        for (TextComponent piece : pieces) {
+            boolean glyph = ClickHints.Glyph.of(piece.content().charAt(0)) != null;
+            assertThat(piece.font()).as("'" + piece.content() + "'").isEqualTo(glyph ? ClickHints.FONT : null);
+        }
+        assertThat(pieces).extracting(TextComponent::content).contains("show it to yourself");
+    }
+
+    /** Every non-empty text, with the font it is drawn in once its parents' styles are applied. */
+    private static void texts(Component c, net.kyori.adventure.key.Key inherited, List<TextComponent> out) {
+        net.kyori.adventure.key.Key font = c.font() != null ? c.font() : inherited;
+        if (c instanceof TextComponent t && !t.content().isEmpty()) {
+            out.add(t.font(font));
+        }
+        c.children().forEach(child -> texts(child, font, out));
+    }
+
+    @Test
+    @DisplayName("a chat button keeps its click and its hover on the icon, and the hover's own hint is drawn too")
+    void chatButton() {
+        ClickEvent accept = ClickEvent.runCommand("/tpaccept");
+        Component button = Component.text("[Click to accept]", NamedTextColor.GREEN).clickEvent(accept)
+                .hoverEvent(HoverEvent.showText(Component.text("Click to accept Rain")));
+        Component shown = ClickHints.rewrite(Component.text("Rain wants to visit. ").append(button), JAVA);
+
+        assertThat(plain(shown)).isEqualTo("Rain wants to visit. [" + L + " | accept]");
+        TextComponent glyph = glyphsIn(shown).getFirst();
+        assertThat(glyph.clickEvent()).isEqualTo(accept);
+        Component hover = (Component) glyph.hoverEvent().value();
+        assertThat(plain(hover)).isEqualTo(L + " | accept Rain");
+    }
+
+    @Test
+    @DisplayName("something that is not plain text, like a translated name, is kept and never matched into")
+    void opaque() {
+        Component line = Component.text("Click to give ").append(Component.translatable("item.minecraft.diamond"));
+        Component shown = ClickHints.rewrite(line, JAVA);
+        assertThat(plain(shown)).isEqualTo(L + " | give item.minecraft.diamond");
+    }
+
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {
@@ -138,7 +207,7 @@ class ClickHintsTest {
         assertThat(glyph.color()).isEqualTo(NamedTextColor.WHITE);
         assertThat(glyph.decoration(TextDecoration.ITALIC)).isEqualTo(TextDecoration.State.FALSE);
         assertThat(glyph.decoration(TextDecoration.BOLD)).isEqualTo(TextDecoration.State.FALSE);
-        assertThat(plain(shown)).isEqualTo(L + " to buy");
+        assertThat(plain(shown)).isEqualTo(L + " | buy");
     }
 
     @Test
@@ -189,10 +258,25 @@ class ClickHintsTest {
         ItemStack shown = Icons.forViewer(button, java);
         assertThat(shown).isNotSameAs(button);
         assertThat(shown.getItemMeta().lore()).extracting(ClickHintsTest::plain)
-                .containsExactly("Your home", L + " to rename");
+                .containsExactly("Your home", L + " | rename");
         assertThat(button.getItemMeta().lore()).extracting(ClickHintsTest::plain)
                 .containsExactly("Your home", "Click to rename");
         assertThat(Icons.forViewer(button, other)).isSameAs(button);
+    }
+
+    @Test
+    @DisplayName("an item in somebody's inventory: a copy with its lore drawn, the original untouched; none needed, none made")
+    void items() {
+        ItemStack wand = TestItems.of(Material.BLAZE_ROD, meta -> meta.lore(List.of(mini("<gray>Right click a chest to sell it"))));
+        ItemStack shown = ClickHints.rewrite(wand, JAVA);
+        assertThat(shown).isNotSameAs(wand);
+        assertThat(shown.getItemMeta().lore()).extracting(ClickHintsTest::plain).containsExactly(R + " a chest to sell it");
+        assertThat(wand.getItemMeta().lore()).extracting(ClickHintsTest::plain).containsExactly("Right click a chest to sell it");
+
+        ItemStack stone = TestItems.of(Material.STONE);
+        assertThat(ClickHints.rewrite(stone, JAVA)).isSameAs(stone);
+        assertThat(ClickHints.rewrite(wand, NONE)).isSameAs(wand);
+        assertThat(ClickHints.rewrite((ItemStack) null, JAVA)).isNull();
     }
 
     @Test
