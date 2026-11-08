@@ -71,4 +71,21 @@ class ReservedNamesTest {
         assertThat(ReservedNames.reservedAgainst(SOMEBODY, NameStyle.NONE)).isFalse();
         assertThat(ReservedNames.reservedAgainst(SOMEBODY, null)).isFalse();
     }
+
+    @Test
+    @DisplayName("his own presets: Amethyst Flow first, every one bold and flowing, named, none twice; nobody else has any")
+    void presets() {
+        List<ReservedNames.Preset> his = ReservedNames.presetsOf(ReservedNames.RAINDANCER118);
+        assertThat(his).hasSizeGreaterThan(5);
+        assertThat(his.getFirst().style()).isEqualTo(ReservedNames.AMETHYST_FLOW);
+        assertThat(his).allSatisfy(preset -> {
+            assertThat(preset.title()).isNotBlank();
+            assertThat(preset.style().isAnimated()).isTrue();
+            assertThat(preset.style().has(TextDecoration.BOLD)).isTrue();
+            assertThat(preset.style().colours()).hasSizeBetween(2, NameStyle.MAX_STOPS);
+        });
+        assertThat(his.stream().map(ReservedNames.Preset::style).distinct()).hasSize(his.size());
+        assertThat(ReservedNames.presetsOf(SOMEBODY)).isEmpty();
+    }
+
 }

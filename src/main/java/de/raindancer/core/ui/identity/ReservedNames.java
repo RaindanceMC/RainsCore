@@ -30,6 +30,34 @@ public final class ReservedNames {
 
     private static final Map<UUID, NameStyle> OWN = Map.of(RAINDANCER118, AMETHYST_FLOW);
 
+    /** A named style in somebody's own collection. */
+    public record Preset(String title, NameStyle style) {
+    }
+
+    private static final Map<UUID, List<Preset>> PRESETS = Map.of(RAINDANCER118, List.of(
+            new Preset("Amethyst Flow", AMETHYST_FLOW),
+            flowing("Amethyst Night", "#3C1361", "#8932B8", "#C77DFF", "#8932B8"),
+            flowing("Royal Amethyst", "#5B1E96", "#8932B8", "#C77DFF", "#FFD86F", "#C77DFF", "#8932B8"),
+            flowing("Lightning", "#4C1D95", "#8932B8", "#7DD3FC", "#FFFFFF", "#7DD3FC", "#8932B8"),
+            flowing("Nebula", "#8932B8", "#FF5EDB", "#FFC2F0", "#7B61FF"),
+            flowing("Rain Glass", "#4361EE", "#4CC9F0", "#E0FBFC", "#4CC9F0", "#4361EE", "#8932B8"),
+            flowing("Ember Amethyst", "#8932B8", "#FF2E63", "#FF8C00", "#FF2E63"),
+            flowing("Midnight Aurora", "#00F5A0", "#00D9F5", "#8932B8", "#C77DFF"),
+            flowing("Violet Storm", "#4361EE", "#8932B8", "#D16BFF", "#8932B8"),
+            flowing("Thunderstorm", "#7B5CFF", "#4361EE", "#4CC9F0", "#E0FBFC"),
+            flowing("Aurora", "#00F5A0", "#00D9F5", "#7B61FF", "#FF5EDB"),
+            flowing("Neon Rain", "#00C6FF", "#5B5BFF", "#B000FF", "#FF00C8"),
+            flowing("Golden Storm", "#FFD200", "#FF8C00", "#FF2E63", "#8E2DE2")));
+
+    /** Somebody's own collection of name styles, to put on with a click; empty for nearly everybody. */
+    public static List<Preset> presetsOf(UUID player) {
+        return player == null ? List.of() : PRESETS.getOrDefault(player, List.of());
+    }
+
+    private static Preset flowing(String title, String... colours) {
+        return new Preset(title, new NameStyle(hex(colours), Set.of(TextDecoration.BOLD), true));
+    }
+
     static final double MEDIAN = 15;
     static final double WORST_TENTH = 24;
     private static final int SAMPLES = 48;
