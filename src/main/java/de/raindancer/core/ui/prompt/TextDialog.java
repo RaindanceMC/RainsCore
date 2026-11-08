@@ -49,11 +49,17 @@ public final class TextDialog {
      */
     public static <T> void ask(Player player, String title, String start, int longest, Parsers.Parser<T> parser,
                                Consumer<T> onAnswer, Runnable onCancel) {
-        ask(player, title, start, longest, parser, onAnswer, onCancel, null);
+        ask(player, title, start, longest, 0, parser, onAnswer, onCancel, null);
     }
 
-    private static <T> void ask(Player player, String title, String start, int longest, Parsers.Parser<T> parser,
-                                Consumer<T> onAnswer, Runnable onCancel, String problem) {
+    /** The same with a field of several lines, for something longer: a description, a message. */
+    public static <T> void askLong(Player player, String title, String start, int longest, int lines,
+                                   Parsers.Parser<T> parser, Consumer<T> onAnswer, Runnable onCancel) {
+        ask(player, title, start, longest, Math.max(2, lines), parser, onAnswer, onCancel, null);
+    }
+
+    private static <T> void ask(Player player, String title, String start, int longest, int lines,
+                                Parsers.Parser<T> parser, Consumer<T> onAnswer, Runnable onCancel, String problem) {
         Plugin plugin = JavaPlugin.getProvidingPlugin(TextDialog.class);
         Runnable cancel = onCancel == null ? () -> { } : onCancel;
         List<DialogBody> body = new ArrayList<>();
@@ -63,7 +69,10 @@ public final class TextDialog {
         DialogInput field = DialogInput.text(ANSWER, Component.text(title == null ? "" : title))
                 .initial(start == null ? "" : start)
                 .maxLength(Math.max(1, Math.max(longest, start == null ? 0 : start.length())))
-                .width(WIDTH).labelVisible(true).build();
+                .width(WIDTH).labelVisible(true)
+                .multiline(lines > 0 ? io.papermc.paper.registry.data.dialog.input.TextDialogInput.MultilineOptions
+                        .create(lines, Math.min(512, 9 * lines + 8)) : null)
+                .build();
         ActionButton use = ActionButton.builder(MINI.deserialize("<green>Use"))
                 .tooltip(MINI.deserialize("<gray>Take what is typed")).width(120)
                 .action(DialogAction.customClick((response, audience) -> {
@@ -82,7 +91,7 @@ public final class TextDialog {
                         if (verdict.isOk()) {
                             onAnswer.accept(verdict.value());
                         } else {
-                            ask(player, title, typed, longest, parser, onAnswer, onCancel, verdict.problem());
+                            ask(player, title, typed, longest, lines, parser, onAnswer, onCancel, verdict.problem());
                         }
                     });
                 }, ONCE)).build();
