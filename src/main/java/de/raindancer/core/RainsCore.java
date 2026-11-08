@@ -253,6 +253,14 @@ public interface RainsCore {
     Punishments punishments();
 
     /**
+     * What moderation did on this server — punishments given and lifted, anti-cheat alerts, reports filed — for a
+     * plugin that passes it on (a Discord feed). A feed nobody is told into when the Core has none.
+     */
+    default de.raindancer.core.moderation.feed.ModerationFeed moderationFeed() {
+        return new de.raindancer.core.moderation.feed.ModerationFeed();
+    }
+
+    /**
      * What actually stops a punished player, and what they are told.
      *
      * <p>Here rather than in whichever plugin owns the moderation commands, because any plugin can

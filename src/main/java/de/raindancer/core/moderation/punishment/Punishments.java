@@ -66,6 +66,9 @@ public final class Punishments {
 
     private volatile NetworkBus bus;
 
+    /** Told of every punishment given or lifted on this server; null tells nobody. */
+    private volatile de.raindancer.core.moderation.feed.ModerationFeed feed;
+
     /**
      * Which punishments have changed and need writing.
      *
@@ -94,6 +97,11 @@ public final class Punishments {
         this.writeSoon = writeSoon;
     }
 
+    /** Where punishments given and lifted on this server are told, for whoever passes them on. */
+    public void feed(de.raindancer.core.moderation.feed.ModerationFeed feed) {
+        this.feed = feed;
+    }
+
     private Instant now() {
         return Instant.ofEpochMilli(clock.getAsLong());
     }
@@ -108,6 +116,11 @@ public final class Punishments {
      */
     public Punishment punish(UUID target, PunishmentKind kind, UUID moderator, String reason,
                              Duration length) {
+        return punish(target, kind, moderator, reason, length, true);
+    }
+
+    private Punishment punish(UUID target, PunishmentKind kind, UUID moderator, String reason,
+                              Duration length, boolean tell) {
         Instant now = now();
         Punishment given = Punishment.given(target, kind, moderator, reason, now, length);
         byPlayer.compute(target, (player, old) -> {
@@ -129,6 +142,10 @@ public final class Punishments {
         writeSoon();
         log.info("{} was {} by {} for '{}' ({})", target, kind.past(), moderator, given.reason(),
                 given.length());
+        de.raindancer.core.moderation.feed.ModerationFeed told = feed;
+        if (tell && told != null) {
+            told.punished(given);
+        }
         return given;
     }
 
@@ -189,7 +206,7 @@ public final class Punishments {
         }
         String moderator = exported.getOrDefault("mute.moderator", "");
         punish(player, PunishmentKind.MUTE, moderator.isBlank() ? null : UUID.fromString(moderator), reason,
-                endsAt == null ? null : Duration.between(now(), endsAt));
+                endsAt == null ? null : Duration.between(now(), endsAt), false);
     }
 
     /** Whether an {@link #export} says the player is banned there. */
@@ -208,6 +225,7 @@ public final class Punishments {
         }
         Instant now = now();
         boolean[] lifted = new boolean[1];
+        Punishment[] ended = new Punishment[1];
         byPlayer.computeIfPresent(target, (player, old) -> {
             List<Punishment> next = new ArrayList<>(old);
             for (int at = 0; at < next.size(); at++) {
@@ -219,6 +237,7 @@ public final class Punishments {
                     // that applies until the next restart and then quietly comes back.
                     changed.add(updated.id());
                     lifted[0] = true;
+                    ended[0] = updated;
                     break;
                 }
             }
@@ -230,6 +249,10 @@ public final class Punishments {
         writeSoon();
         log.info("{}'s {} was lifted by {} ('{}')", target, kind.name().toLowerCase(Locale.ROOT),
                 moderator, reason);
+        de.raindancer.core.moderation.feed.ModerationFeed told = feed;
+        if (told != null) {
+            told.lifted(ended[0]);
+        }
         return true;
     }
 

@@ -254,6 +254,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
 
     private GrantListener grantListener;
     private Punishments punishments;
+    private final de.raindancer.core.moderation.feed.ModerationFeed moderationFeed = new de.raindancer.core.moderation.feed.ModerationFeed();
     private PunishmentGuard punishmentGuard;
     private de.raindancer.core.moderation.punishment.BlockedAttempts blockedAttempts;
     private VanillaBanBridge banBridge;
@@ -586,6 +587,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 System::currentTimeMillis);
         punishments.load();
         punishments.connect(bus);
+        punishments.feed(moderationFeed);
         punishments.writeSoon(write -> Scheduling.async(this, write));
         punishmentGuard = new PunishmentGuard(punishments, System::currentTimeMillis);
         punishmentGuard.messages(messages);
@@ -1877,6 +1879,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public Punishments punishments() {
         return punishments;
+    }
+
+    @Override
+    public de.raindancer.core.moderation.feed.ModerationFeed moderationFeed() {
+        return moderationFeed;
     }
 
     @Override

@@ -76,6 +76,40 @@ class PunishmentsTest {
         clock.addAndGet(by.toMillis());
     }
 
+    // ------------------------------------------------------------------ the feed
+
+    @Nested
+    @DisplayName("telling the moderation feed")
+    class Feed {
+
+        private final java.util.List<String> heard = new java.util.ArrayList<>();
+
+        @BeforeEach
+        void listen() {
+            var feed = new de.raindancer.core.moderation.feed.ModerationFeed();
+            feed.onPunishment(notice -> heard.add((notice.lifted() ? "lift " : "give ") + notice.punishment().kind()));
+            punishments.feed(feed);
+        }
+
+        @Test
+        @DisplayName("a punishment and its lifting are told once each; replacing one is not a lifting")
+        void tellsGivingAndLifting() {
+            punishments.punish(ALICE, PunishmentKind.MUTE, MOD, "spam", Duration.ofHours(1));
+            punishments.punish(ALICE, PunishmentKind.MUTE, MOD, "more spam", Duration.ofHours(2));
+            punishments.lift(ALICE, PunishmentKind.MUTE, MOD, "sorry");
+            assertThat(punishments.lift(ALICE, PunishmentKind.MUTE, MOD, "again")).isFalse();
+            assertThat(heard).containsExactly("give MUTE", "give MUTE", "lift MUTE");
+        }
+
+        @Test
+        @DisplayName("a mute adopted from the linked server is not told: its own server told it")
+        void adoptedIsSilent() {
+            punishments.adopt(ALICE, java.util.Map.of("mute", "true", "mute.reason", "spam", "mute.ends", ""));
+            assertThat(punishments.isActive(ALICE, PunishmentKind.MUTE)).isTrue();
+            assertThat(heard).isEmpty();
+        }
+    }
+
     // ------------------------------------------------------------------ handing them out
 
     @Nested
