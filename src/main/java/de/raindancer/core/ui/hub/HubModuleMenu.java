@@ -23,27 +23,48 @@ public final class HubModuleMenu extends HubPage {
     private static final MiniMessage MINI = MiniMessage.miniMessage();
 
     private final HubEntry entry;
+    /** Whether this is the second page: the commands that still have to be typed out after a click. */
+    private final boolean typed;
 
     public HubModuleMenu(Player viewer, Brand brand, Menu parent, HubEntry entry) {
+        this(viewer, brand, parent, entry, false);
+    }
+
+    private HubModuleMenu(Player viewer, Brand brand, Menu parent, HubEntry entry, boolean typed) {
         super(viewer, brand, parent);
         this.entry = entry;
+        this.typed = typed;
     }
 
     @Override
     protected Component title() {
         return MINI.deserialize("<gradient:" + entry.accent() + ":" + HubLook.lighter(entry.accent(), 0.55) + ">"
-                + Text.literal(entry.name()) + "</gradient>");
+                + Text.literal(entry.name()) + "</gradient>" + (typed ? " <dark_gray>› <white>Commands to type" : ""));
     }
 
     @Override
     public String breadcrumb() {
-        return entry.name();
+        return typed ? entry.name() + " commands" : entry.name();
     }
 
     @Override
     void header() {
         set(MenuLayout.HEADER_SUBJECT, HubMenu.door(entry, Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission).size(), false));
         guideButton();
+        if (!typed) {
+            long toType = notes().stream().filter(note -> !runsDirectly(note)).count();
+            if (toType > 0) {
+                toolbar(4, tidy(Icons.of(org.bukkit.Material.WRITABLE_BOOK,
+                        "<gradient:#FDE68A:#FDBA74>Commands to type</gradient>",
+                        "<gray>" + toType + " more that need something", "<gray>typed after them: a name, an amount.", "",
+                        "<dark_gray>» <white>Click to see them"), false),
+                        event -> new HubModuleMenu(viewer(), brand(), this, entry, true).open());
+            }
+        }
+    }
+
+    private List<CommandNote> notes() {
+        return Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission);
     }
 
     /** "Ask the guide": the feature's own topic in /help, when the guide has one this viewer may read. */
@@ -69,12 +90,13 @@ public final class HubModuleMenu extends HubPage {
     @Override
     List<Tile> tiles() {
         List<Tile> tiles = new ArrayList<>();
-        // What a click runs outright comes first — the pages and the one-word actions — and what still has to be
-        // typed out after it, so the first row is the row somebody is most likely to want.
-        List<CommandNote> notes = new ArrayList<>(Hub.notesFor(entry, RainsCore.get().commands(), viewer()::hasPermission));
-        notes.sort(java.util.Comparator.comparing((CommandNote note) -> !runsDirectly(note)));
-        for (CommandNote note : notes) {
-            tiles.add(new Tile(commandIcon(note), event -> use(note)));
+        // The front page is the doors — what a click runs outright: the pages and the one-word actions. What still
+        // has to be typed out after a click is a page of its own behind one button, so twenty commands do not
+        // read as a wall of twenty when a player wants the shop.
+        for (CommandNote note : notes()) {
+            if (runsDirectly(note) != typed) {
+                tiles.add(new Tile(commandIcon(note), event -> use(note)));
+            }
         }
         return tiles;
     }
