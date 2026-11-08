@@ -139,6 +139,9 @@ public final class Identities {
                 ? identity.prefix()
                 : identity.nametagPrefix();
         Component built = NameBadges.before(player, NameBadges.Place.NAMETAG);
+        if (badgesAbove.getAsBoolean() && !built.equals(Component.empty())) {
+            built = built.append(Component.newline());
+        }
         if (!prefix.isEmpty()) {
             built = built.append(parse(prefix));
         }
@@ -447,6 +450,12 @@ public final class Identities {
     public static final String TOPIC = "identity";
 
     private volatile de.raindancer.core.platform.network.NetworkBus bus;
+    private volatile java.util.function.BooleanSupplier badgesAbove = () -> false;
+
+    /** The nametag's badges on a line of their own over the name, instead of in front of it. */
+    public void badgesAbove(java.util.function.BooleanSupplier above) {
+        badgesAbove = above == null ? () -> false : above;
+    }
 
     /**
      * Joins the network: identities this server writes are announced, and those another server

@@ -280,6 +280,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Seclusion seclusion;
     private de.raindancer.core.ui.tablist.TabKeeper tabKeeper;
     private de.raindancer.core.ui.menu.ClickHintPackets clickHintPackets;
+    private final de.raindancer.core.ui.badge.Badges badges = new de.raindancer.core.ui.badge.Badges();
+    private final java.util.concurrent.atomic.AtomicBoolean badgesPending = new java.util.concurrent.atomic.AtomicBoolean();
     private ResourcePacks resourcePacks;
     private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
     private de.raindancer.core.ui.profile.ProfileExtension ownNametagSwitch;
@@ -513,6 +515,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 task -> Scheduling.global(this, task));
 
         identities = new Identities(databases.core());
+        identities.badgesAbove(() -> settings != null && settings.current().nametagBadgeAbove());
         identities.load();
         identities.connect(bus);
         de.raindancer.core.ui.chat.PrefixFile prefixFile =
@@ -686,6 +689,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         tabKeeper.keep().keepListedWhile(seclusion::hides);
         getServer().getOnlinePlayers().forEach(tabKeeper::inject);
         clickHintPackets = new de.raindancer.core.ui.menu.ClickHintPackets();
+        clickHintPackets.badges(badges, id -> !de.raindancer.core.ui.menu.ClickHints.isBedrock(id)
+                && (resourcePacks == null || !resourcePacks.isWearing(id)));
         getServer().getOnlinePlayers().forEach(clickHintPackets::inject);
         Scheduling.globalTimer(this, SECLUSION_PERIOD_TICKS, SECLUSION_PERIOD_TICKS,
                 task -> {
@@ -1003,12 +1008,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.ui.menu.ClickHints.install(id -> de.raindancer.core.ui.menu.ClickHints.audience(
                 de.raindancer.core.ui.menu.ClickHints.isBedrock(id), resourcePacks.isWearing(id),
                 settings.current().clickIcons(), settings.current().clickIconsBedrock()));
-        try {
-            de.raindancer.core.ui.menu.ClickHints.writeBedrockPack(getDataFolder().toPath().resolve("bedrock"));
-        } catch (java.io.IOException failure) {
-            de.raindancer.core.platform.log.Log.of("gui").warn(
-                    "The Bedrock pack with the click icons could not be written ({}).", failure.getMessage());
-        }
+        badges.onChange(this::publishBadges);
+        publishBadges();
         de.raindancer.core.ui.profile.ProfileExtensions.register(menusSwitch);
         startResourcePacks(settings.current());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
@@ -2442,6 +2443,52 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public WorldEntryRules worldEntryRules() {
         return worldEntryRules;
+    }
+
+    @Override
+    public de.raindancer.core.ui.badge.Badges badges() {
+        return badges;
+    }
+
+    @Override
+    public boolean badgesShown() {
+        return resourcePacks != null && settings != null && settings.current().packsEnabled()
+                && settings.current().packsRequired();
+    }
+
+    /**
+     * Writes the badges into the pack and the Bedrock pack, a moment after the last one came in — a plugin
+     * registers all its ranks at once — and sends the rebuilt pack to whoever is on when it changed. The Bedrock pack
+     * still has to be copied into Geyser's packs folder by hand.
+     */
+    private void publishBadges() {
+        if (!badgesPending.compareAndSet(false, true)) {
+            return;
+        }
+        Scheduling.asyncLater(this, 2, TimeUnit.SECONDS, () -> {
+            badgesPending.set(false);
+            try {
+                java.nio.file.Path folder = getDataFolder().toPath().resolve("pack").resolve("badges");
+                boolean changed = badges.writeJava(folder);
+                de.raindancer.core.ui.menu.ClickHints.writeBedrockPack(getDataFolder().toPath().resolve("bedrock"),
+                        badges.bedrockPages());
+                if (!changed || resourcePacks == null || badges.all().isEmpty()) {
+                    return;
+                }
+                resourcePacks.contribute(de.raindancer.core.content.pack.PackContribution
+                        .of("RainsCore", "badges", folder).describedAs("Rank badges"));
+                String before = resourcePacks.current().map(de.raindancer.core.content.pack.PackBuild::digest)
+                        .orElse(null);
+                if (before != null) {
+                    resourcePacks.rebuild().filter(built -> !built.digest().equals(before)).ifPresent(built ->
+                            resourcePacks.sendToAll(getServer().getOnlinePlayers().stream()
+                                    .map(org.bukkit.entity.Player::getUniqueId).toList()));
+                }
+            } catch (java.io.IOException failure) {
+                de.raindancer.core.platform.log.Log.of("gui").warn(
+                        "The rank badges could not be written into the packs ({}).", failure.getMessage());
+            }
+        });
     }
 
     @Override

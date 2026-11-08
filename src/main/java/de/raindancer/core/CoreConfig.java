@@ -427,7 +427,12 @@ public record CoreConfig(
         @Describe("The same icons for Bedrock players. Needs Core's Bedrock pack in Geyser's packs folder: Core writes "
                 + "it to plugins/RainsCore/bedrock/rainscore.mcpack. Without it Bedrock shows empty boxes — switch "
                 + "this off then.")
-        boolean clickIconsBedrock
+        boolean clickIconsBedrock,
+
+        @In("appearance") @Title("Rank badge above the name")
+        @Describe("Over a player's head, the rank badge on a line of its own above the name instead of in front "
+                + "of it. Chat and the tablist keep it in front.")
+        boolean nametagBadgeAbove
 
 ) {
 
@@ -479,5 +484,6 @@ public record CoreConfig(
             true,
             // Players put up a few screens in their bases; three keeps a busy server's refresh cheap.
             true, 3, "",
-            true, true);
+            true, true,
+            false);
 }

@@ -279,6 +279,12 @@ public final class ClickHints {
 
     /** Writes {@code rainscore.mcpack} into {@code folder}, over an older one; copy it into Geyser's {@code packs}. */
     public static Path writeBedrockPack(Path folder) throws IOException {
+        return writeBedrockPack(folder, java.util.Map.of());
+    }
+
+    /** The same with more glyph pages in it — the badges' — by their path in the pack. */
+    public static Path writeBedrockPack(Path folder, java.util.Map<String, java.awt.image.BufferedImage> pages)
+            throws IOException {
         Files.createDirectories(folder);
         Path target = folder.resolve("rainscore.mcpack");
         Path partial = Files.createTempFile(folder, "rainscore", ".mcpack.part");
@@ -293,6 +299,11 @@ public final class ClickHints {
                         in.transferTo(zip);
                         zip.closeEntry();
                     }
+                }
+                for (java.util.Map.Entry<String, java.awt.image.BufferedImage> page : pages.entrySet()) {
+                    zip.putNextEntry(new ZipEntry(page.getKey()));
+                    javax.imageio.ImageIO.write(page.getValue(), "png", zip);
+                    zip.closeEntry();
                 }
             }
             Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);

@@ -145,6 +145,22 @@ class IdentitiesTest {
         }
 
         @Test
+        @DisplayName("a badge sits in front of the name, or on a line of its own above it when the server says so")
+        void badgeBesideOrAbove() {
+            NameBadges.registerPlaced("badge-above-test", (id, place) -> id.equals(ALICE)
+                    ? java.util.Optional.of(net.kyori.adventure.text.Component.text("[OWNER]"))
+                    : java.util.Optional.empty());
+            try {
+                assertThat(plain(identities.nametag(ALICE, "Raindancer118"))).isEqualTo("[OWNER] Raindancer118");
+                identities.badgesAbove(() -> true);
+                assertThat(plain(identities.nametag(ALICE, "Raindancer118"))).isEqualTo("[OWNER] \nRaindancer118");
+                assertThat(plain(identities.nametag(BOB, "Bob"))).as("no badge, no empty line").isEqualTo("Bob");
+            } finally {
+                NameBadges.unregister("badge-above-test");
+            }
+        }
+
+        @Test
         @DisplayName("is kept short, because the client draws it over the world")
         void isClipped() {
             identities.setNametagPrefix(ALICE, "<gold>" + "x".repeat(200));

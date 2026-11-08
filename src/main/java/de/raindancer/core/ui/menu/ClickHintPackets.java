@@ -34,6 +34,14 @@ public final class ClickHintPackets {
 
     private volatile boolean broken;
     private volatile Types types;
+    private volatile de.raindancer.core.ui.badge.Badges badges;
+    private volatile java.util.function.Predicate<UUID> withoutPack = id -> false;
+
+    /** Badges in chat go out as their tags to whoever has no pack to draw them with. */
+    public void badges(de.raindancer.core.ui.badge.Badges badges, java.util.function.Predicate<UUID> withoutPack) {
+        this.badges = badges;
+        this.withoutPack = withoutPack == null ? id -> false : withoutPack;
+    }
 
     /** The server's own classes and how to take their packets apart and build them again. */
     private record Types(
@@ -150,9 +158,8 @@ public final class ClickHintPackets {
             Object sent = msg;
             try {
                 Types t = types;
-                ClickHints.Audience audience = ClickHints.audience(viewer);
-                if (t != null && audience != ClickHints.Audience.NONE) {
-                    sent = redraw(t, msg, audience);
+                if (t != null) {
+                    sent = redraw(t, msg, ClickHints.audience(viewer));
                 }
             } catch (Throwable unexpected) {
                 // Throwing here would take the player's connection with it; the packet goes as it was.
@@ -165,10 +172,16 @@ public final class ClickHintPackets {
             Class<?> type = msg.getClass();
             if (type == t.chat()) {
                 Component said = (Component) t.asAdventure().invoke(null, t.chatContent().invoke(msg));
-                Component drawn = ClickHints.rewrite(said, audience);
+                Component drawn = said;
+                de.raindancer.core.ui.badge.Badges known = badges;
+                if (known != null && withoutPack.test(viewer)) {
+                    drawn = known.asText(drawn);
+                }
+                drawn = ClickHints.rewrite(drawn, audience);
                 return drawn == said ? msg : t.newChat().newInstance(drawn, t.chatOverlay().invoke(msg));
             }
-            if (type != t.content() && type != t.slot() && type != t.inventory() && type != t.cursor()) {
+            if (audience == ClickHints.Audience.NONE
+                    || type != t.content() && type != t.slot() && type != t.inventory() && type != t.cursor()) {
                 return msg;
             }
             Player player = Bukkit.getPlayer(viewer);

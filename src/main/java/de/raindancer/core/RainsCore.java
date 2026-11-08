@@ -326,6 +326,15 @@ public interface RainsCore {
      */
     ResourcePacks resourcePacks();
 
+    /** Rank tags drawn as badges, shipped in the pack ({@link de.raindancer.core.ui.badge.Badges}). */
+    de.raindancer.core.ui.badge.Badges badges();
+
+    /**
+     * Whether this server shows badges instead of text tags: only where the pack is required, so every Java player
+     * has it. A badge reaching somebody without it in chat is turned back into its tag on the way out.
+     */
+    boolean badgesShown();
+
     /**
      * Who may do what on a piece of protected ground.
      *
