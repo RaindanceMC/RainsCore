@@ -997,6 +997,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new BukkitPackSink());
         de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks, () -> settings.current().menusPainted());
         menusSwitch = de.raindancer.core.ui.menu.MenuPack.profileSwitch(() -> settings.current().menusPainted());
+        de.raindancer.core.ui.menu.ClickHints.install(id -> de.raindancer.core.ui.menu.ClickHints.audience(
+                de.raindancer.core.ui.menu.ClickHints.isBedrock(id), resourcePacks.isWearing(id),
+                settings.current().clickIcons(), settings.current().clickIconsBedrock()));
+        try {
+            de.raindancer.core.ui.menu.ClickHints.writeBedrockPack(getDataFolder().toPath().resolve("bedrock"));
+        } catch (java.io.IOException failure) {
+            de.raindancer.core.platform.log.Log.of("gui").warn(
+                    "The Bedrock pack with the click icons could not be written ({}).", failure.getMessage());
+        }
         de.raindancer.core.ui.profile.ProfileExtensions.register(menusSwitch);
         startResourcePacks(settings.current());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
@@ -1390,6 +1399,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             companions.clear();
         }
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
+        de.raindancer.core.ui.menu.ClickHints.uninstall();
         if (menusSwitch != null) {
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
         }

@@ -52,3 +52,22 @@ carries MrMicky's header, and that must stay.
         -DoutputDirectory=target/fbsrc
 
 Unpack, re-apply the package rename, and check `THIRD-PARTY.md` and the version noted above.
+
+## Kenney — Input Prompts Pixel
+
+- **Where** `src/main/resources/de/raindancer/core/pack/assets/rainscore/textures/font/hints/` (Java) and
+  `src/main/resources/de/raindancer/core/bedrock/font/glyph_F8.png`, `pack_icon.png` (Bedrock)
+- **Upstream** <https://kenney.nl/assets/input-prompts-pixel> — version 1.0, tiles 77–79 (mouse buttons), the SHIFT
+  key and tile 166 (⇧ key, Bedrock)
+- **License** CC0 1.0 (public domain); credit not required, given here anyway
+- **Added** 2026-11-08, for RainsCore 2.61.0 — click hints in menus as mouse and key icons (`ui.menu.ClickHints`)
+- **Changes** cropped to the drawn width; the Bedrock glyph page places them in cells 0–3 of page F8
+
+## Kenney — Input Prompts Pixel
+
+- **Where** `src/main/resources/de/raindancer/core/pack/assets/rainscore/textures/font/hints/` (Java) and
+  `src/main/resources/de/raindancer/core/bedrock/font/glyph_F8.png`, `pack_icon.png` (Bedrock)
+- **Upstream** <https://kenney.nl/assets/input-prompts-pixel> — version 1.0: the mouse tiles 77–79 and the SHIFT key
+- **License** CC0 1.0 (public domain); credit not required, given here anyway
+- **Added** 2026-11-08, for RainsCore 2.61.0 — click hints in menus as mouse and key icons (`ui.menu.ClickHints`)
+- **Changes** cropped to the drawn width; on Bedrock's glyph page F8 the SHIFT key is split over cells 0 and 4

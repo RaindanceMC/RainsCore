@@ -1,0 +1,40 @@
+{
+ "providers": [
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/hints/shift.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\uf800"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/hints/left.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\uf801"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/hints/right.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\uf802"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "rainscore:font/hints/middle.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\uf803"
+   ]
+  }
+ ]
+}

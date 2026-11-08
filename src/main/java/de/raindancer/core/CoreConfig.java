@@ -416,7 +416,18 @@ public record CoreConfig(
         @In("config/screens") @Title("Screens only staff put up")
         @Describe("The kinds players may not put up, by name, comma separated (the names /screen place shows), "
                 + "e.g. moderation-staff, online. Empty: every kind.")
-        String staffOnlyScreens
+        String staffOnlyScreens,
+
+        @In("appearance") @Title("Click icons")
+        @Describe("Click hints in menus — 'Click', 'Right click', 'Shift click' — drawn as a mouse and keys for players "
+                + "wearing the server pack. Without the pack they read as words.")
+        boolean clickIcons,
+
+        @In("appearance") @Title("Click icons on Bedrock")
+        @Describe("The same icons for Bedrock players. Needs Core's Bedrock pack in Geyser's packs folder: Core writes "
+                + "it to plugins/RainsCore/bedrock/rainscore.mcpack. Without it Bedrock shows empty boxes — switch "
+                + "this off then.")
+        boolean clickIconsBedrock
 
 ) {
 
@@ -467,5 +478,6 @@ public record CoreConfig(
             "hub",
             true,
             // Players put up a few screens in their bases; three keeps a busy server's refresh cheap.
-            true, 3, "");
+            true, 3, "",
+            true, true);
 }

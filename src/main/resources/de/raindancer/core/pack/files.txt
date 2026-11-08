@@ -1,3 +1,4 @@
+assets/rainscore/font/hints.json
 assets/rainscore/font/menu.json
 assets/rainscore/font/title.json
 assets/rainscore/font/tree.json
@@ -13,6 +14,10 @@ assets/rainscore/models/item/ui/arrow_left.json
 assets/rainscore/models/item/ui/arrow_right.json
 assets/rainscore/models/item/ui/arrow_up.json
 assets/rainscore/models/item/ui/blank.json
+assets/rainscore/textures/font/hints/left.png
+assets/rainscore/textures/font/hints/middle.png
+assets/rainscore/textures/font/hints/right.png
+assets/rainscore/textures/font/hints/shift.png
 assets/rainscore/textures/font/menu/house_1.png
 assets/rainscore/textures/font/menu/house_2.png
 assets/rainscore/textures/font/menu/house_3.png

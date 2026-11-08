@@ -294,15 +294,21 @@ public final class Icons {
         if (item == null || !item.hasItemMeta()) {
             return item;
         }
-        String tag = item.getItemMeta().getPersistentDataContainer()
+        ItemMeta original = item.getItemMeta();
+        String tag = original.getPersistentDataContainer()
                 .get(ARROW, org.bukkit.persistence.PersistentDataType.STRING);
         java.util.Optional<Arrow> shown = Arrow.shown(tag, tag != null && MenuStyle.wearing(viewer));
-        if (shown.isEmpty()) {
+        List<net.kyori.adventure.text.Component> lore = original.lore();
+        List<net.kyori.adventure.text.Component> hinted = ClickHints.rewrite(lore, ClickHints.audience(viewer));
+        if (shown.isEmpty() && hinted == lore) {
             return item;
         }
         ItemStack painted = item.clone();
         ItemMeta meta = painted.getItemMeta();
-        meta.setItemModel(shown.get().model());
+        shown.ifPresent(arrow -> meta.setItemModel(arrow.model()));
+        if (hinted != lore) {
+            meta.lore(hinted);
+        }
         painted.setItemMeta(meta);
         return painted;
     }
