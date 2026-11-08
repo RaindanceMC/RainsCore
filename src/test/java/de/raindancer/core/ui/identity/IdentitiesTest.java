@@ -161,6 +161,24 @@ class IdentitiesTest {
         }
 
         @Test
+        @DisplayName("Raindancer118 wears Amethyst Flow without setting anything; it and its lookalikes are nobody else's")
+        void reservedStyle() {
+            java.util.UUID tom = ReservedNames.RAINDANCER118;
+            assertThat(identities.nameStyle(tom)).isEqualTo(ReservedNames.AMETHYST_FLOW);
+            assertThat(identities.chatName(tom, "Raindancer118").children()).as("painted letter by letter").isNotEmpty();
+
+            assertThat(identities.setNameStyle(ALICE, ReservedNames.AMETHYST_FLOW)).isFalse();
+            assertThat(identities.setNameStyle(ALICE, ReservedNames.AMETHYST_FLOW.animated(false)
+                    .with(net.kyori.adventure.text.format.TextDecoration.BOLD, false))).isFalse();
+            assertThat(identities.nameStyle(ALICE)).isEqualTo(de.raindancer.core.ui.text.NameStyle.NONE);
+
+            de.raindancer.core.ui.text.NameStyle gold = de.raindancer.core.ui.text.NameStyle.parse("#FFD200");
+            assertThat(identities.setNameStyle(tom, gold)).isTrue();
+            assertThat(identities.nameStyle(tom)).as("one he set himself wins").isEqualTo(gold);
+            assertThat(identities.setNameStyle(tom, ReservedNames.AMETHYST_FLOW)).isTrue();
+        }
+
+        @Test
         @DisplayName("is kept short, because the client draws it over the world")
         void isClipped() {
             identities.setNametagPrefix(ALICE, "<gold>" + "x".repeat(200));

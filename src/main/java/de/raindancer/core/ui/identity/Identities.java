@@ -122,7 +122,7 @@ public final class Identities {
         if (!identity.prefix().isEmpty()) {
             built = built.append(parse(identity.prefix()));
         }
-        built = built.append(colouredName(shownName(player, name), identity.colour()));
+        built = built.append(colouredName(shownName(player, name), shownColour(player)));
         if (!identity.suffix().isEmpty()) {
             built = built.append(parse(identity.suffix()));
         }
@@ -145,7 +145,7 @@ public final class Identities {
         if (!prefix.isEmpty()) {
             built = built.append(parse(prefix));
         }
-        built = built.append(colouredName(shownName(player, name), identity.colour()));
+        built = built.append(colouredName(shownName(player, name), shownColour(player)));
         return clip(built);
     }
 
@@ -173,7 +173,7 @@ public final class Identities {
         if (!identity.prefix().isEmpty()) {
             built = built.append(parse(identity.prefix()));
         }
-        built = built.append(colouredName(shownName(player, name), identity.colour()));
+        built = built.append(colouredName(shownName(player, name), shownColour(player)));
         if (!identity.suffix().isEmpty()) {
             built = built.append(parse(identity.suffix()));
         }
@@ -254,7 +254,20 @@ public final class Identities {
      * colour to the bare hex code the column always held.
      */
     public NameStyle nameStyle(UUID player) {
-        return NameStyle.parse(identityOf(player).colour());
+        return NameStyle.parse(shownColour(player));
+    }
+
+    /**
+     * What their name is painted in: their own style, else the one they have reserved ({@link ReservedNames}). A
+     * stored style that looks like somebody else's reserved one is not shown.
+     */
+    private String shownColour(UUID player) {
+        String stored = identityOf(player).colour();
+        NameStyle style = NameStyle.parse(stored);
+        if (!style.isEmpty()) {
+            return ReservedNames.reservedAgainst(player, style) ? "" : stored;
+        }
+        return ReservedNames.ownedBy(player).map(NameStyle::encode).orElse("");
     }
 
     /** Whether this player's name is painted at all — a colour, a gradient or a decoration. */
@@ -267,7 +280,7 @@ public final class Identities {
      * signature. Plain text when they have no style. Never markup: {@code text} is shown as written.
      */
     public Component painted(UUID player, String text) {
-        return colouredName(text, identityOf(player).colour());
+        return colouredName(text, shownColour(player));
     }
 
     /** Everybody who has anything set. */
@@ -320,6 +333,9 @@ public final class Identities {
             style = NameStyle.NONE;
         }
         if (style.colours().size() > NameStyle.MAX_STOPS) {
+            return false;
+        }
+        if (ReservedNames.reservedAgainst(player, style)) {
             return false;
         }
         return change(player, style.encode(), (identity, value) -> new Identity(identity.prefix(),
