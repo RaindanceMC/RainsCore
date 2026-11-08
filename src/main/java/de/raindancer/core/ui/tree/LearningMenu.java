@@ -282,12 +282,6 @@ public class LearningMenu extends TreeMenu {
                 }).open();
     }
 
-    private void cue(String cue) {
-        RainsCore core = RainsCore.get();
-        if (core != null) {
-            core.effects().play(viewer.getUniqueId(), cue);
-        }
-    }
 
     private int[] start(String branch) {
         int column = Integer.MAX_VALUE;

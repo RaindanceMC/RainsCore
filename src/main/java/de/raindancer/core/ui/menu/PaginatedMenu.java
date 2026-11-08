@@ -121,6 +121,16 @@ public abstract class PaginatedMenu<T> extends Menu {
         };
     }
 
+    /** A page turn sounds like one; everything else on the page clicks. */
+    @Override
+    protected String clickCue(int rawSlot) {
+        int chromeRow = layout().chromeRowStart();
+        if (rawSlot == chromeRow + MenuLayout.CHROME_PREVIOUS || rawSlot == chromeRow + MenuLayout.CHROME_NEXT) {
+            return de.raindancer.core.ui.effect.Cues.PAGE;
+        }
+        return super.clickCue(rawSlot);
+    }
+
     /** Whether this page put a destructive button on the chrome row, which the counter must dodge. */
     protected boolean hasDanger() {
         return false;

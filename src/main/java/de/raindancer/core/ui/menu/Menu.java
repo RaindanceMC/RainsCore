@@ -1,6 +1,8 @@
 package de.raindancer.core.ui.menu;
 
+import de.raindancer.core.RainsCore;
 import de.raindancer.core.ui.chat.Brand;
+import de.raindancer.core.ui.effect.Cues;
 import de.raindancer.core.platform.log.Log;
 import de.raindancer.core.platform.log.LogChannel;
 import net.kyori.adventure.text.Component;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -114,9 +117,111 @@ public abstract class Menu implements InventoryHolder {
     }
 
     public void open() {
+        adoptOpener();
         Inventory target = getInventory();
         paint();
         viewer.openInventory(target);
+    }
+
+    // ------------------------------------------------------------------- where a page came from
+
+    /** Where a player was a moment ago, for the page a command opens after the hub closed to run it. */
+    private record Origin(java.lang.ref.WeakReference<Menu> menu, long until) {
+    }
+
+    private static final Map<UUID, Origin> ORIGINS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** How long a closed page counts as where the next one came from — the command runs the same tick. */
+    private static final long ORIGIN_LASTS_MS = 1_500;
+
+    /**
+     * Says that whatever page this player opens next, with no parent of its own, was reached from {@code origin}.
+     *
+     * <p>For a page that has to close to run a command — the hub's doors, a "manual" button — because the
+     * command's page is built by the plugin with no idea it was opened from a menu. Remembered for a moment and
+     * used once; a page opened later, by hand, is nobody's child.
+     */
+    public static void cameFrom(Player viewer, Menu origin) {
+        cameFrom(viewer, origin, System.currentTimeMillis() + ORIGIN_LASTS_MS);
+    }
+
+    static void cameFrom(Player viewer, Menu origin, long until) {
+        if (viewer == null || origin == null || viewer.getUniqueId() == null) {
+            return;
+        }
+        ORIGINS.put(viewer.getUniqueId(), new Origin(new java.lang.ref.WeakReference<>(origin), until));
+    }
+
+    /**
+     * A page opened with no parent, while another page is on screen, was reached from that page — so Back goes
+     * there.
+     *
+     * <h2>Why the framework does this and not the plugins</h2>
+     * Every plugin has an opener — "open the bank for this player" — that builds the page with {@code null},
+     * because a command has nowhere to come from. Then a button on another page calls that opener, and the page
+     * it opens has Close and nothing else: the shop reached from the bank, the request list reached from the
+     * teleport hub, a category reached from the shop. Forty of those were found at once; fixing them one by one
+     * means each new plugin gets to make the mistake again.
+     *
+     * <h2>What is adopted</h2>
+     * The chain's root, not necessarily this page: an opener that builds a parent just for the page it opens (the
+     * shop a category hangs off) hands over a chain whose root is that stand-in, and the stand-in is what goes
+     * under the page the player was on. Going back up a chain adopts nothing: the page above is not a child of
+     * the page below. A page of the same kind as one already in the chain takes that one's place rather than
+     * nesting under it, so Shop › Bank › Shop › Bank cannot grow by clicking back and forth.
+     */
+    void adoptOpener() {
+        if (viewer == null) {
+            return;
+        }
+        Menu root = root();
+        if (root.parent != null) {
+            return;
+        }
+        Menu opener = onScreen();
+        if (opener == null) {
+            opener = remembered();
+        }
+        if (opener == null || opener == root || isInChain(root, opener)) {
+            return;
+        }
+        for (Menu above = opener; above != null; above = above.parent) {
+            if (above.getClass() == root.getClass()) {
+                root.parent = above.parent;
+                return;
+            }
+        }
+        root.parent = opener;
+    }
+
+    private Menu onScreen() {
+        org.bukkit.inventory.InventoryView open = viewer.getOpenInventory();
+        if (open == null || open.getTopInventory() == null) {
+            return null;
+        }
+        return open.getTopInventory().getHolder(false) instanceof Menu menu ? menu : null;
+    }
+
+    private Menu remembered() {
+        UUID id = viewer.getUniqueId();
+        if (id == null) {
+            return null;
+        }
+        Origin origin = ORIGINS.remove(id);
+        if (origin == null || origin.until() < System.currentTimeMillis()) {
+            return null;
+        }
+        Menu menu = origin.menu().get();
+        return menu == null || menu.viewer != viewer ? null : menu;
+    }
+
+    /** Whether {@code candidate} is {@code from} or one of the pages above it. */
+    private static boolean isInChain(Menu candidate, Menu from) {
+        for (Menu above = from; above != null; above = above.parent) {
+            if (above == candidate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -538,9 +643,18 @@ public abstract class Menu implements InventoryHolder {
         }
     }
 
-    /** Human-readable name, used in the Back button of a child page. */
+    /**
+     * Human-readable name, used in the Back button of a child page: the page's own title, unless it says
+     * otherwise. "Back to the previous menu" was the answer whenever a page did not — which was most pages, so
+     * most Back buttons said nothing.
+     */
     public String breadcrumb() {
-        return "the previous menu";
+        try {
+            String plain = PLAIN.serialize(title()).strip();
+            return plain.isEmpty() ? "the previous menu" : plain;
+        } catch (RuntimeException gone) {
+            return "the previous menu";
+        }
     }
 
     // ------------------------------------------------------------------------- events
@@ -551,12 +665,34 @@ public abstract class Menu implements InventoryHolder {
         if (handler == null) {
             return;
         }
+        cue(clickCue(event.getRawSlot()));
         try {
             handler.accept(event);
         } catch (RuntimeException failure) {
             // A click that throws must not leave the player stuck in a window with a cancelled
             // event and no feedback. The page stays open; the log gets the reason.
             log.error(failure, "A click on {} failed.", getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * The cue a click on a button of this page plays — {@link Cues#CLICK}, so every button on every page of every
+     * plugin answers the same way, and a server that rebinds the click rebinds all of them. {@code null} for a
+     * page with a sound of its own.
+     */
+    protected String clickCue() {
+        return Cues.CLICK;
+    }
+
+    /** The cue for a click on this slot; a paged list answers a page turn with a page turn. */
+    protected String clickCue(int rawSlot) {
+        return clickCue();
+    }
+
+    /** Plays one of Core's named cues for the viewer, if Core is here to play it. */
+    protected final void cue(String cue) {
+        if (cue != null && viewer != null && RainsCore.isAvailable()) {
+            RainsCore.get().effects().play(viewer.getUniqueId(), cue);
         }
     }
 

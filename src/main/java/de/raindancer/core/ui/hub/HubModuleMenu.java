@@ -96,6 +96,8 @@ public final class HubModuleMenu extends HubPage {
     }
 
     private void use(CommandNote note) {
+        // The command's page is the plugin's and knows nothing of the hub; this is how its Back finds the way here.
+        Menu.cameFrom(viewer(), this);
         viewer().closeInventory();
         if (runsDirectly(note)) {
             de.raindancer.core.platform.util.TypedCommands.run(viewer(), note.command());

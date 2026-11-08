@@ -123,6 +123,7 @@ public final class HubMenu extends HubPage {
     }
 
     private void run(String command) {
+        de.raindancer.core.ui.menu.Menu.cameFrom(viewer(), this);
         viewer().closeInventory();
         de.raindancer.core.platform.util.TypedCommands.run(viewer(), command);
     }

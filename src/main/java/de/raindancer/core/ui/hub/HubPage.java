@@ -86,6 +86,12 @@ abstract class HubPage extends Menu {
         };
     }
 
+    /** The hub chimes for itself. */
+    @Override
+    protected String clickCue() {
+        return null;
+    }
+
     final void chime(float pitch) {
         viewer().playSound(viewer().getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.5f, pitch);
     }
