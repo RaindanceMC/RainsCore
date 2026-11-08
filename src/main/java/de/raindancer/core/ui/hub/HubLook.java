@@ -46,6 +46,10 @@ public record HubLook(Material icon, String accent) {
     private static final Map<String, Material> COMMAND_HINTS = java.util.stream.Stream.of(new Object[][]{
             // The longer name first where a shorter one is inside it: "baltop" before "bal", "tpa" before "tp".
             {"baltop", Material.GOLDEN_HELMET}, {"treasury", Material.BEACON}, {"giveaway", Material.CHEST_MINECART},
+            {"baccarat", Material.DIAMOND}, {"blackjack", Material.DIAMOND}, {"crash", Material.DIAMOND},
+            {"hilo", Material.DIAMOND}, {"mines", Material.DIAMOND}, {"race", Material.DIAMOND},
+            {"roulette", Material.DIAMOND}, {"scratch", Material.DIAMOND}, {"withdraw", Material.RAW_GOLD},
+            {"deposit", Material.HOPPER}, {"advancement", Material.EXPERIENCE_BOTTLE},
             {"contract", Material.WRITABLE_BOOK}, {"hire", Material.IRON_PICKAXE}, {"repair", Material.ANVIL},
             {"season", Material.CLOCK}, {"cash", Material.GOLD_NUGGET}, {"fund", Material.ENDER_CHEST},
             {"raffle", Material.PAPER}, {"gamble", Material.DIAMOND}, {"eco", Material.COMMAND_BLOCK},
@@ -58,7 +62,7 @@ public record HubLook(Material icon, String accent) {
             {"playtime", Material.CLOCK}, {"send", Material.MINECART}, {"trade", Material.EMERALD},
             {"home", Material.RED_BED}, {"warp", Material.END_PORTAL_FRAME}, {"tpa", Material.ENDER_EYE},
             {"tp", Material.ENDER_PEARL}, {"spawn", Material.GRASS_BLOCK}, {"back", Material.RECOVERY_COMPASS},
-            {"pay", Material.GOLD_NUGGET}, {"bal", Material.GOLD_INGOT}, {"bank", Material.GOLD_BLOCK},
+            {"pay", Material.GOLD_NUGGET}, {"bal", Material.RAW_GOLD}, {"bank", Material.GOLD_BLOCK},
             {"shop", Material.EMERALD}, {"sell", Material.EMERALD}, {"auction", Material.CLOCK},
             {"loan", Material.PAPER}, {"bill", Material.MAP}, {"daily", Material.SUNFLOWER},
             {"casino", Material.DIAMOND}, {"slots", Material.DIAMOND}, {"dice", Material.DIAMOND},
