@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -124,6 +125,30 @@ class ResourcePacksTest {
             assertThat(packs.current().orElseThrow().digest())
                     .as("a disabled plugin's textures must not stay in the pack for ever")
                     .isNotEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("what is offered while a build runs is in the pack that build leaves")
+        void offeredDuringABuild() throws IOException {
+            ResourcePacks packs = packs();
+            packs.contribute(PackContribution.of("Claims", "icons", zip("a.zip", Map.of("assets/a", "a"))));
+            PackContribution late = PackContribution.of("RainsCore", "badges", zip("b.zip", Map.of("assets/b", "b")));
+            java.util.concurrent.atomic.AtomicBoolean first = new java.util.concurrent.atomic.AtomicBoolean(true);
+            PackBuilder real = new PackBuilder(directory.resolve("work2"));
+            packs.buildWith((library, description) -> {
+                Optional<PackBuild> built = real.build(library, description);
+                if (first.getAndSet(false)) {
+                    // Offered after this build read what there was: the badges at startup, on a busy server.
+                    packs.contribute(late);
+                }
+                return built;
+            });
+
+            packs.rebuild();
+
+            assertThat(packs.current().orElseThrow().contributions())
+                    .as("a pack built without the badges shows boxes on every nametag until the next restart")
+                    .isEqualTo(2);
         }
     }
 

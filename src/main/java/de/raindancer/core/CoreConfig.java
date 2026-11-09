@@ -432,7 +432,13 @@ public record CoreConfig(
         @In("appearance") @Title("Rank badge above the name")
         @Describe("Over a player's head, the rank badge on a line of its own above the name instead of in front "
                 + "of it. Chat and the tablist keep it in front.")
-        boolean nametagBadgeAbove
+        boolean nametagBadgeAbove,
+
+        @In("config/chat") @Title("No chat reports")
+        @Describe("Chat nobody can report to Mojang, and no 'Chat messages can't be verified' warning when joining: "
+                + "the clients' chat keys are kept from the server and player chat goes out unsigned. Bedrock players "
+                + "and clients without a key chat as before. Takes effect for whoever joins next.")
+        boolean noChatReports
 
 ) {
 
@@ -485,5 +491,6 @@ public record CoreConfig(
             // Players put up a few screens in their bases; three keeps a busy server's refresh cheap.
             true, 3, "",
             true, true,
+            false,
             false);
 }

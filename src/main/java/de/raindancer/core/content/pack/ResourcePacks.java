@@ -69,6 +69,9 @@ public final class ResourcePacks {
             Collections.synchronizedMap(new LinkedHashMap<>());
 
     private volatile PackBuild current;
+    /** Counts every change to what is offered, so a build can tell that something came in while it ran. */
+    private final java.util.concurrent.atomic.AtomicLong changes = new java.util.concurrent.atomic.AtomicLong();
+    private volatile java.util.function.BiFunction<PackLibrary, String, Optional<PackBuild>> build;
     private volatile boolean required;
     private volatile String description = "Server pack";
     private volatile Component prompt;
@@ -77,6 +80,7 @@ public final class ResourcePacks {
 
     public ResourcePacks(Path workFolder, PackSink sink) {
         this.builder = new PackBuilder(workFolder);
+        this.build = builder::build;
         this.sink = sink;
     }
 
@@ -178,17 +182,31 @@ public final class ResourcePacks {
 
     /** Takes a plugin's assets. False means the source is not there; see {@link #problems()}. */
     public boolean contribute(PackContribution contribution) {
-        return library.offer(contribution);
+        return changed(library.offer(contribution));
     }
 
     /** Takes one back, by {@link PackContribution#id()}. */
     public boolean withdraw(String id) {
-        return library.withdraw(id);
+        return changed(library.withdraw(id));
     }
 
     /** Takes back everything one plugin offered — for a plugin being disabled. */
     public int withdrawAllFrom(String owner) {
-        return library.withdrawAllFrom(owner);
+        int gone = library.withdrawAllFrom(owner);
+        changed(gone > 0);
+        return gone;
+    }
+
+    private boolean changed(boolean did) {
+        if (did) {
+            changes.incrementAndGet();
+        }
+        return did;
+    }
+
+    /** For tests: build some other way, around the real builder. */
+    void buildWith(java.util.function.BiFunction<PackLibrary, String, Optional<PackBuild>> build) {
+        this.build = build;
     }
 
     /** Everything offered, in the order it is applied. */
@@ -215,8 +233,21 @@ public final class ResourcePacks {
      * one in place and still servable, because a server whose pack fails to rebuild should keep
      * handing out the pack it already had rather than none at all.
      */
-    public Optional<PackBuild> rebuild() {
-        Optional<PackBuild> built = builder.build(library, description);
+    public synchronized Optional<PackBuild> rebuild() {
+        Optional<PackBuild> built;
+        int rounds = 0;
+        long seen;
+        do {
+            // A plugin that offers while this runs (the badges, two seconds into startup) would otherwise find
+            // no finished pack to rebuild and be left out of this one until the next restart.
+            seen = changes.get();
+            built = buildOnce();
+        } while (changes.get() != seen && ++rounds < 3);
+        return built;
+    }
+
+    private Optional<PackBuild> buildOnce() {
+        Optional<PackBuild> built = build.apply(library, description);
         if (built.isEmpty()) {
             if (library.isEmpty()) {
                 // Nothing offered is not a failure. It is a server with no custom assets, which is

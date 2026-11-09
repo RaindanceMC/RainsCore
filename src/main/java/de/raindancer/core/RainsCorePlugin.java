@@ -281,6 +281,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private Seclusion seclusion;
     private de.raindancer.core.ui.tablist.TabKeeper tabKeeper;
     private de.raindancer.core.ui.menu.ClickHintPackets clickHintPackets;
+    private de.raindancer.core.ui.chat.UnsignedChat unsignedChat;
     private final de.raindancer.core.ui.badge.Badges badges = new de.raindancer.core.ui.badge.Badges();
     private final java.util.concurrent.atomic.AtomicBoolean badgesPending = new java.util.concurrent.atomic.AtomicBoolean();
     private ResourcePacks resourcePacks;
@@ -697,6 +698,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         clickHintPackets.badges(badges, id -> !de.raindancer.core.ui.menu.ClickHints.isBedrock(id)
                 && (resourcePacks == null || !resourcePacks.isWearing(id)));
         getServer().getOnlinePlayers().forEach(clickHintPackets::inject);
+        ClassLoader serverClasses = getServer().getClass().getClassLoader();
+        unsignedChat = new de.raindancer.core.ui.chat.UnsignedChat(serverClasses,
+                () -> settings != null && settings.current().noChatReports());
+        unsignedChat.install(serverClasses, getServer().getOnlinePlayers());
         Scheduling.globalTimer(this, SECLUSION_PERIOD_TICKS, SECLUSION_PERIOD_TICKS,
                 task -> {
                     seclusion.refresh();
@@ -1421,6 +1426,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         de.raindancer.core.ui.menu.MenuPack.withdraw(resourcePacks);
         de.raindancer.core.ui.menu.ClickHints.uninstall();
+        if (unsignedChat != null) {
+            unsignedChat.uninstall(getServer().getClass().getClassLoader(), getServer().getOnlinePlayers());
+        }
         if (clickHintPackets != null) {
             getServer().getOnlinePlayers().forEach(clickHintPackets::eject);
         }
