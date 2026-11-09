@@ -1,6 +1,7 @@
 package de.raindancer.core.ui.camera;
 
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundGameEventPacket;
 import net.minecraft.network.protocol.game.ClientboundSetCameraPacket;
 import net.minecraft.world.entity.Entity;
 import org.junit.jupiter.api.DisplayName;
@@ -26,9 +27,14 @@ class PlayerCameraTest {
     /** The server's player: an entity with a public connection. */
     public static final class ServerPlayer extends Entity {
         public final Listener connection = new Listener();
+        public int abilitiesSent;
 
         public ServerPlayer(int id) {
             super(id);
+        }
+
+        public void onUpdateAbilities() {
+            abilitiesSent++;
         }
     }
 
@@ -51,6 +57,7 @@ class PlayerCameraTest {
     @DisplayName("fits a server with the camera packet")
     void works() {
         assertThat(camera.works()).isTrue();
+        assertThat(camera.hidesHud()).isTrue();
     }
 
     @Test
@@ -77,6 +84,41 @@ class PlayerCameraTest {
     }
 
     @Test
+    @DisplayName("pretending spectator tells only the viewer's client it is a spectator, nothing about abilities")
+    void pretend() {
+        ServerPlayer viewer = new ServerPlayer(1);
+
+        assertThat(camera.sendMode(new Craft(viewer), 3, false)).isTrue();
+
+        assertThat(viewer.connection.sent).singleElement()
+                .isInstanceOfSatisfying(ClientboundGameEventPacket.class, packet -> {
+                    assertThat(packet.getEvent()).isSameAs(ClientboundGameEventPacket.CHANGE_GAME_MODE);
+                    assertThat(packet.getParam()).isEqualTo(3f);
+                });
+        assertThat(viewer.abilitiesSent).isZero();
+    }
+
+    @Test
+    @DisplayName("the real mode goes back with the real abilities, so a player allowed to fly still may")
+    void realMode() {
+        ServerPlayer viewer = new ServerPlayer(1);
+
+        assertThat(camera.sendMode(new Craft(viewer), 0, true)).isTrue();
+
+        assertThat(((ClientboundGameEventPacket) viewer.connection.sent.getFirst()).getParam()).isZero();
+        assertThat(viewer.abilitiesSent).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("game mode numbers are the protocol's")
+    void modeNumbers() {
+        assertThat(PlayerCamera.number(org.bukkit.GameMode.SURVIVAL)).isZero();
+        assertThat(PlayerCamera.number(org.bukkit.GameMode.CREATIVE)).isEqualTo(1);
+        assertThat(PlayerCamera.number(org.bukkit.GameMode.ADVENTURE)).isEqualTo(2);
+        assertThat(PlayerCamera.number(org.bukkit.GameMode.SPECTATOR)).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("something that is no server object is refused, never thrown")
     void misfit() {
         assertThat(camera.send("not a player", new Craft(new Entity(1)))).isFalse();
@@ -90,6 +132,8 @@ class PlayerCameraTest {
         });
 
         assertThat(none.works()).isFalse();
+        assertThat(none.hidesHud()).isFalse();
+        assertThat(none.sendMode(new Craft(new ServerPlayer(1)), 3, false)).isFalse();
         assertThat(none.send(new Craft(new ServerPlayer(1)), new Craft(new Entity(2)))).isFalse();
     }
 }
