@@ -25,6 +25,9 @@ class ProfileLookupTest {
             asked.incrementAndGet();
             return name.equalsIgnoreCase("yeukoula") ? Optional.of(new ProfileLookup.Found(yeu, "Yeukoula"))
                     : Optional.empty();
+        }, id -> {
+            asked.incrementAndGet();
+            return id.equals(yeu) ? Optional.of("Yeukoula") : Optional.empty();
         }, Runnable::run);
     }
 
@@ -69,7 +72,7 @@ class ProfileLookupTest {
         ProfileLookup lookup = new ProfileLookup(new KnownNames(folder.resolve("known-names.yml")),
                 name -> {
                     throw new IllegalStateException("Mojang is down");
-                }, Runnable::run);
+                }, id -> Optional.empty(), Runnable::run);
 
         assertThat(lookup.byName("yeukoula").join()).isEmpty();
     }
@@ -84,5 +87,18 @@ class ProfileLookupTest {
         names.seen(yeu, "Yeukoula");
         assertThat(lookup.byNameOrId(yeu.toString()).join()).contains(new ProfileLookup.Found(yeu, "Yeukoula"));
         assertThat(asked.get()).isZero();
+    }
+
+    @Test
+    @DisplayName("the name of a uuid nobody here knows is asked of Mojang once and remembered; a known one is not asked")
+    void nameOfId() {
+        KnownNames names = new KnownNames(folder.resolve("known-names.yml"));
+        ProfileLookup lookup = lookup(names);
+
+        assertThat(lookup.nameOf(yeu)).contains("Yeukoula");
+        assertThat(names.nameOf(yeu)).contains("Yeukoula");
+        assertThat(lookup.nameOf(yeu)).contains("Yeukoula");
+        assertThat(lookup.nameOf(UUID.randomUUID())).isEmpty();
+        assertThat(asked.get()).isEqualTo(2);
     }
 }

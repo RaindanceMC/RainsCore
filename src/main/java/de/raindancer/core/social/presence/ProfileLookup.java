@@ -25,12 +25,18 @@ public final class ProfileLookup {
 
     private final KnownNames names;
     private final Function<String, Optional<Found>> mojang;
+    private final Function<UUID, Optional<String>> mojangById;
     private final Executor async;
 
-    /** @param mojang blocking lookup of a name; only ever called on {@code async} */
-    public ProfileLookup(KnownNames names, Function<String, Optional<Found>> mojang, Executor async) {
+    /**
+     * @param mojang     blocking lookup of a name; only ever called on {@code async}
+     * @param mojangById blocking lookup of the name a uuid has; only ever called by {@link #nameOf}, off the server thread
+     */
+    public ProfileLookup(KnownNames names, Function<String, Optional<Found>> mojang,
+                         Function<UUID, Optional<String>> mojangById, Executor async) {
         this.names = names;
         this.mojang = mojang;
+        this.mojangById = mojangById;
         this.async = async;
     }
 
@@ -69,5 +75,26 @@ public final class ProfileLookup {
             }
         }
         return byName(typed);
+    }
+
+    /**
+     * The name of a player id: Core's remembered one, else Mojang's, which is then remembered. Blocks on a miss —
+     * never on the server thread.
+     */
+    public Optional<String> nameOf(UUID id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        Optional<String> known = names.nameOf(id);
+        if (known.isPresent()) {
+            return known;
+        }
+        try {
+            Optional<String> found = mojangById.apply(id);
+            found.ifPresent(name -> names.seen(id, name));
+            return found;
+        } catch (RuntimeException failed) {
+            return Optional.empty();
+        }
     }
 }

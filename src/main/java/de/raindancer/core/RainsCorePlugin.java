@@ -836,6 +836,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     ? java.util.Optional.of(new de.raindancer.core.social.presence.ProfileLookup.Found(
                             profile.getId(), profile.getName()))
                     : java.util.Optional.empty();
+        }, id -> {
+            com.destroystokyo.paper.profile.PlayerProfile profile = getServer().createProfile(id);
+            return profile.complete(false) && profile.getName() != null
+                    ? java.util.Optional.of(profile.getName()) : java.util.Optional.empty();
         }, task -> Scheduling.async(this, task));
         // Everybody with a player file, once: a server older than this still finds the players its name cache
         // forgot. Off the server's threads — reading a name may read the player's file.
