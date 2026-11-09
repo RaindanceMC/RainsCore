@@ -247,6 +247,14 @@ public interface RainsCore {
     }
 
     /**
+     * Name to player id, also for somebody who never joined: Core's remembered names, then Mojang, off the
+     * calling thread. Callers on a Core older than 2.74.0 get a {@link LinkageError}.
+     */
+    default de.raindancer.core.social.presence.ProfileLookup profileLookup() {
+        return null;
+    }
+
+    /**
      * Bans, mutes, freezes and the record of who did what — for any plugin that needs to refuse
      * somebody something and remember that it did.
      */

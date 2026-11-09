@@ -67,6 +67,14 @@ class IdentitiesTest {
         return PlainTextComponentSerializer.plainText().serialize(component);
     }
 
+    @Test
+    @DisplayName("a name Core remembers answers nameOf, also for a player who never joined")
+    void nameOfKnownNames() {
+        identities.knownNames(id -> id.equals(BOB) ? java.util.Optional.of("Bobby") : java.util.Optional.empty());
+
+        assertThat(identities.nameOf(BOB)).contains("Bobby");
+    }
+
     // ------------------------------------------------------------------ chat
 
     @Nested

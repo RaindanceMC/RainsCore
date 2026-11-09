@@ -236,6 +236,10 @@ public final class Identities {
         if (player == null) {
             return Optional.empty();
         }
+        Optional<String> known = knownName.apply(player);
+        if (known.isPresent()) {
+            return known;
+        }
         Player online = Bukkit.getPlayer(player);
         if (online != null) {
             return Optional.of(online.getName());
@@ -467,6 +471,12 @@ public final class Identities {
 
     private volatile de.raindancer.core.platform.network.NetworkBus bus;
     private volatile java.util.function.BooleanSupplier badgesAbove = () -> false;
+    private volatile java.util.function.Function<UUID, Optional<String>> knownName = id -> Optional.empty();
+
+    /** Where {@link #nameOf} looks first: Core's remembered names, which also hold players who never joined. */
+    public void knownNames(java.util.function.Function<UUID, Optional<String>> names) {
+        knownName = names == null ? id -> Optional.empty() : names;
+    }
 
     /** The nametag's badges on a line of their own over the name, instead of in front of it. */
     public void badgesAbove(java.util.function.BooleanSupplier above) {

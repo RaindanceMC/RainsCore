@@ -300,6 +300,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
     private de.raindancer.core.moderation.chatlog.ChatLog chatLog;
     private de.raindancer.core.social.presence.KnownNames knownNames;
+    private de.raindancer.core.social.presence.ProfileLookup profileLookup;
     private de.raindancer.core.ui.changelog.Changelog changelog;
     private de.raindancer.core.moderation.maintenance.Maintenance maintenance;
     private de.raindancer.core.ui.chat.MentionCompletions mentionCompletions;
@@ -828,6 +829,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         knownNames = new de.raindancer.core.social.presence.KnownNames(getDataFolder().toPath().resolve("known-names.yml"));
         knownNames.load();
         de.raindancer.core.platform.command.PlayerTargets.useKnownNames(knownNames);
+        identities.knownNames(knownNames::nameOf);
+        profileLookup = new de.raindancer.core.social.presence.ProfileLookup(knownNames, name -> {
+            com.destroystokyo.paper.profile.PlayerProfile profile = getServer().createProfile(name);
+            return profile.complete(false) && profile.getId() != null && profile.getName() != null
+                    ? java.util.Optional.of(new de.raindancer.core.social.presence.ProfileLookup.Found(
+                            profile.getId(), profile.getName()))
+                    : java.util.Optional.empty();
+        }, task -> Scheduling.async(this, task));
         // Everybody with a player file, once: a server older than this still finds the players its name cache
         // forgot. Off the server's threads — reading a name may read the player's file.
         org.bukkit.OfflinePlayer[] everybody = getServer().getOfflinePlayers();
@@ -1926,6 +1935,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.platform.permission.PermissionGroups groups() {
         return groups;
+    }
+
+    @Override
+    public de.raindancer.core.social.presence.ProfileLookup profileLookup() {
+        return profileLookup;
     }
 
     private void startLeaveScreens() {
