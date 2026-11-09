@@ -115,7 +115,8 @@ public final class Chat {
      */
     public void tell(Audience recipient, String miniMessage, TagResolver... arguments) {
         if (recipient != null) {
-            recipient.sendMessage(prefixed(miniMessage, arguments));
+            recipient.sendMessage(CommandButtons.bare(prefixed(miniMessage, arguments),
+                    CommandButtons.drawnFor(recipient)));
         }
     }
 
@@ -148,7 +149,7 @@ public final class Chat {
      */
     public void row(Audience recipient, String miniMessage, TagResolver... arguments) {
         if (recipient != null) {
-            recipient.sendMessage(mm(miniMessage, arguments));
+            recipient.sendMessage(CommandButtons.bare(mm(miniMessage, arguments), CommandButtons.drawnFor(recipient)));
         }
     }
 

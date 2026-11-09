@@ -151,4 +151,52 @@ class CommandButtonsTest {
             assertThat(spaces.get(String.valueOf((char) (CommandButtons.FORWARD + power)))).isEqualTo(1 << power);
         }
     }
+
+    private static final net.kyori.adventure.text.minimessage.MiniMessage MM =
+            net.kyori.adventure.text.minimessage.MiniMessage.miniMessage();
+
+    @Test
+    @DisplayName("a command written on its own in a plugin's line becomes a button: /role in the middle of a sentence")
+    void bareCommandInTheMiddle() {
+        Component line = MM.deserialize("<gray>You have no role yet. <white>/role</white> — a cook, a builder…");
+
+        Component shown = CommandButtons.bare(line, false);
+
+        assertThat(pieces(shown)).filteredOn(p -> p.click() != null).extracting(Piece::click)
+                .containsOnly(ClickEvent.runCommand("/role"));
+        assertThat(plain(shown)).isEqualTo("You have no role yet. [/role] — a cook, a builder…");
+    }
+
+    @Test
+    @DisplayName("at the end of a line, with its words: /fishing skills")
+    void bareCommandWithWords() {
+        Component shown = CommandButtons.bare(MM.deserialize("<gray>Spend them — <white>/fishing skills</white>."), false);
+
+        assertThat(pieces(shown)).filteredOn(p -> p.click() != null).extracting(Piece::click)
+                .containsOnly(ClickEvent.runCommand("/fishing skills"));
+        assertThat(plain(shown)).isEqualTo("Spend them — [/fishing skills].");
+    }
+
+    @Test
+    @DisplayName("drawn for a player wearing the pack, in Core's button font")
+    void bareCommandDrawn() {
+        Component shown = CommandButtons.bare(MM.deserialize("<gray>You have 3 points. <white>/skills"), true);
+
+        assertThat(pieces(shown)).anySatisfy(p -> assertThat(p.font()).isEqualTo(CommandButtons.FONT));
+        assertThat(pieces(shown)).filteredOn(p -> "/skills".equals(p.text())).extracting(Piece::click)
+                .containsOnly(ClickEvent.runCommand("/skills"));
+    }
+
+    @Test
+    @DisplayName("a slash inside words, a placeholder or something already clickable stays as it is")
+    void notCommands() {
+        for (String text : new String[]{
+                "<gray>Use and/or <white>this</white>.",
+                "<gray>Type <white>/tpa [player]</white> to ask.",
+                "<gray>Read the <white>/rules and all the long explanations of what they mean</white>",
+                "<click:run_command:/help><white>/help</white></click>"}) {
+            Component line = MM.deserialize(text);
+            assertThat(CommandButtons.bare(line, false)).as(text).isSameAs(line);
+        }
+    }
 }

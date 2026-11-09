@@ -624,7 +624,8 @@ public final class Messages {
     public void send(Audience recipient, String key, Object... values) {
         if (recipient != null) {
             String text = prefixFor(key) + fill(raw(key), values);
-            recipient.sendMessage(render(withPlaceholders(recipient, text)));
+            recipient.sendMessage(de.raindancer.core.ui.chat.CommandButtons.bare(render(withPlaceholders(recipient, text)),
+                    de.raindancer.core.ui.chat.CommandButtons.drawnFor(recipient)));
         }
     }
 
@@ -632,7 +633,8 @@ public final class Messages {
     public void sendPlain(Audience recipient, String key, Object... values) {
         if (recipient != null) {
             String text = fill(raw(key), values);
-            recipient.sendMessage(render(withPlaceholders(recipient, text)));
+            recipient.sendMessage(de.raindancer.core.ui.chat.CommandButtons.bare(render(withPlaceholders(recipient, text)),
+                    de.raindancer.core.ui.chat.CommandButtons.drawnFor(recipient)));
         }
     }
 

@@ -88,6 +88,41 @@ public final class CommandButtons {
         return Runs.line(out);
     }
 
+    /** A command and a few plain words, nothing else: what a plugin's line writes on its own for "type this". */
+    private static final Pattern BARE = Pattern.compile("/[a-z][a-z0-9_:-]{0,31}(?: [a-z0-9_.:-]{1,24}){0,3}");
+
+    /**
+     * A plugin's line with each command it writes on its own — in a style of its own, {@code <white>/skills</white>}
+     * — as a button. Not for what players typed: their text could put any command on a button somebody else presses.
+     */
+    public static Component bare(Component line, boolean drawn) {
+        if (line == null) {
+            return null;
+        }
+        List<Runs.Run> runs = Runs.of(line);
+        List<Component> out = new ArrayList<>();
+        int made = 0;
+        for (Runs.Run run : runs) {
+            String text = run.text();
+            String command = text == null ? "" : text.strip();
+            if (made < MOST && !command.isEmpty() && run.style().clickEvent() == null
+                    && BARE.matcher(command).matches()) {
+                int start = text.indexOf(command);
+                if (start > 0) {
+                    out.add(Component.text(text.substring(0, start), run.style()));
+                }
+                out.add(button(command, run.style().decoration(TextDecoration.OBFUSCATED, false), drawn));
+                if (start + command.length() < text.length()) {
+                    out.add(Component.text(text.substring(start + command.length()), run.style()));
+                }
+                made++;
+            } else {
+                out.add(text == null ? run.opaque().style(run.style()) : Component.text(text, run.style()));
+            }
+        }
+        return made == 0 ? line : Runs.line(out);
+    }
+
     /** Whether this viewer gets the drawn button: a Java player wearing the pack. */
     public static boolean drawnFor(Audience viewer) {
         if (!(viewer instanceof Player player) || ClickHints.isBedrock(player.getUniqueId())
