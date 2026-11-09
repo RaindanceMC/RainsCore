@@ -2478,12 +2478,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             badgesPending.set(false);
             try {
                 java.nio.file.Path folder = getDataFolder().toPath().resolve("pack").resolve("badges");
-                boolean changed = badges.writeJava(folder);
+                badges.writeJava(folder);
                 de.raindancer.core.ui.menu.ClickHints.writeBedrockPack(getDataFolder().toPath().resolve("bedrock"),
                         badges.bedrockPages());
-                if (!changed || resourcePacks == null || badges.all().isEmpty()) {
+                if (resourcePacks == null || badges.all().isEmpty()) {
                     return;
                 }
+                // Contributed on every start, not only when the files changed: after a restart they are already on
+                // disk unchanged, and the pack would be built without them (boxes instead of badges).
                 resourcePacks.contribute(de.raindancer.core.content.pack.PackContribution
                         .of("RainsCore", "badges", folder).describedAs("Rank badges"));
                 String before = resourcePacks.current().map(de.raindancer.core.content.pack.PackBuild::digest)
