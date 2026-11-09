@@ -58,12 +58,13 @@ final class WelcomeScreen {
     }
 
     /**
-     * Four lines at most: who, a divider, the time and who else is on, then one optional extra — the newest
+     * Four lines at most: a welcome to the server, a divider, the time and who else is on, then one optional extra — the newest
      * changelog entry, or a tip (/help for a newcomer). Short on purpose: it floats in front of the player.
      */
     static String text(Facts facts) {
-        String who = MINI.escapeTags(facts.name());
-        StringBuilder text = new StringBuilder(brand((facts.newcomer() ? "✦ Welcome, " : "✦ Welcome back, ") + who + " ✦"));
+        // one title for everybody, the server's own name in its brand gradient (Tom: "Welcome to Hyades!")
+        String server = facts.serverName() == null || facts.serverName().isBlank() ? null : MINI.escapeTags(facts.serverName().strip());
+        StringBuilder text = new StringBuilder(brand(server == null ? "✦ Welcome! ✦" : "✦ Welcome to " + server + "! ✦"));
         text.append('\n').append(rule());
         int hour = facts.now().getHour();
         String sky = hour >= 6 && hour < 18 ? "<#F6B83D>☀</#F6B83D>" : "<#9FB6CC>☾</#9FB6CC>";

@@ -23,14 +23,14 @@ class WelcomeScreenTest {
     @DisplayName("a newcomer is welcomed to the server and pointed at /help")
     void newcomer() {
         String text = WelcomeScreen.text(facts("Ada", "Raindance", 3, true));
-        assertThat(text).contains("Welcome, Ada").contains("/help").doesNotContain("back");
+        assertThat(text).contains("Welcome to Raindance!").contains("/help").doesNotContain("back");
     }
 
     @Test
     @DisplayName("somebody returning is welcomed back, with no playtime in it")
     void returning() {
         String text = WelcomeScreen.text(facts("Bo", "Raindance", 1, false));
-        assertThat(text).contains("Welcome back, Bo");
+        assertThat(text).contains("Welcome to Raindance!").doesNotContain("back");
         assertThat(text.toLowerCase()).doesNotContain("played").doesNotContain("hour").doesNotContain("minute");
     }
 
@@ -45,7 +45,8 @@ class WelcomeScreenTest {
     @Test
     @DisplayName("names are escaped, and a missing server name still reads")
     void escaped() {
-        assertThat(WelcomeScreen.text(facts("<red>x", null, 0, true))).contains("\\<red>x");
+        assertThat(WelcomeScreen.text(facts("Bo", "<red>x", 0, true))).contains("\\<red>x");
+        assertThat(WelcomeScreen.text(facts("Bo", null, 0, true))).contains("✦ Welcome! ✦");
     }
 
     @Test
