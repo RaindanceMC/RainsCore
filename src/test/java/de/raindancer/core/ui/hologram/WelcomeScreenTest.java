@@ -23,39 +23,35 @@ class WelcomeScreenTest {
     @DisplayName("a newcomer is welcomed to the server and pointed at /help")
     void newcomer() {
         String text = WelcomeScreen.text(facts("Ada", "Raindance", 3, true));
-        assertThat(text).contains("Welcome, Ada!").contains("Raindance").contains("/help").doesNotContain("back");
+        assertThat(text).contains("Welcome, Ada").contains("/help").doesNotContain("back");
     }
 
     @Test
     @DisplayName("somebody returning is welcomed back, with no playtime in it")
     void returning() {
         String text = WelcomeScreen.text(facts("Bo", "Raindance", 1, false));
-        assertThat(text).contains("Welcome back, Bo!").contains("Raindance");
+        assertThat(text).contains("Welcome back, Bo");
         assertThat(text.toLowerCase()).doesNotContain("played").doesNotContain("hour").doesNotContain("minute");
     }
 
     @Test
     @DisplayName("says who else is around, and when nobody is")
     void others() {
-        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).contains("only one on");
-        assertThat(WelcomeScreen.text(facts("Bo", "S", 1, false))).contains("<white>1</white> other player on");
-        assertThat(WelcomeScreen.text(facts("Bo", "S", 4, false))).contains("<white>4</white> other players on");
+        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).contains("nobody else online");
+        assertThat(WelcomeScreen.text(facts("Bo", "S", 1, false))).contains("<white>1</white> <gray>other online");
+        assertThat(WelcomeScreen.text(facts("Bo", "S", 4, false))).contains("<white>4</white> <gray>others online");
     }
 
     @Test
     @DisplayName("names are escaped, and a missing server name still reads")
     void escaped() {
-        assertThat(WelcomeScreen.text(facts("<red>x", null, 0, true))).contains("\\<red>x").contains("the server");
+        assertThat(WelcomeScreen.text(facts("<red>x", null, 0, true))).contains("\\<red>x");
     }
 
     @Test
-    @DisplayName("the time of day picks the greeting and the clock is shown")
+    @DisplayName("the clock is shown, with a moon in the evening")
     void timeOfDay() {
-        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).contains("Good evening").contains("19:42")
-                .contains("Monday");
-        assertThat(WelcomeScreen.greeting(7)).isEqualTo("Good morning");
-        assertThat(WelcomeScreen.greeting(14)).isEqualTo("Good afternoon");
-        assertThat(WelcomeScreen.greeting(2)).isEqualTo("Up late");
+        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).contains("19:42").contains("☾");
     }
 
     @Test
@@ -63,8 +59,12 @@ class WelcomeScreenTest {
     void newsAndTip() {
         String text = WelcomeScreen.text(new WelcomeScreen.Facts("Bo", "S", 0, false, EVENING, "Shops <b>big",
                 new WelcomeScreen.Tip("spawn", "takes you back to spawn")));
-        assertThat(text).contains("New:").contains("Shops \\<b>big").contains("/spawn").contains("takes you back to spawn");
-        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).doesNotContain("New:").doesNotContain("Tip");
+        // one extra line only: the news wins over the tip
+        assertThat(text).contains("Shops \\<b>big").contains("/changelog").doesNotContain("/spawn");
+        String tipOnly = WelcomeScreen.text(new WelcomeScreen.Facts("Bo", "S", 0, false, EVENING, null,
+                new WelcomeScreen.Tip("spawn", "takes you back to spawn")));
+        assertThat(tipOnly).contains("/spawn").contains("takes you back to spawn");
+        assertThat(WelcomeScreen.text(facts("Bo", "S", 0, false))).doesNotContain("/changelog").doesNotContain("✧");
     }
 
     @Test
@@ -76,5 +76,16 @@ class WelcomeScreenTest {
         assertThat(WelcomeScreen.tip(usable, 0)).isEqualTo(WelcomeScreen.tip(usable, 14));
         assertThat(WelcomeScreen.tip(usable, 15)).isNotEqualTo(WelcomeScreen.tip(usable, 0));
         assertThat(WelcomeScreen.tip(List.of(), 0)).isNull();
+    }
+
+    @Test
+    @DisplayName("dressed in the server's own colours: the header and the rules in its brand gradient, a sun or a moon by the time")
+    void beautiful() {
+        String text = WelcomeScreen.text(facts("Bo", "Hyades", 0, false));
+        String gradient = "<gradient:" + de.raindancer.core.ui.chat.Style.brandFrom() + ":" + de.raindancer.core.ui.chat.Style.brandTo();
+        assertThat(text).contains(gradient).contains("✦").contains("☾").contains("━");
+        assertThat(text).doesNotContain("──────");
+        ZonedDateTime morning = EVENING.withHour(9);
+        assertThat(WelcomeScreen.text(new WelcomeScreen.Facts("Bo", "S", 0, false, morning, null, null))).contains("☀");
     }
 }

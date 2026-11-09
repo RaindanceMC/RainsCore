@@ -1,5 +1,7 @@
 package de.raindancer.core.ui.hologram;
 
+import de.raindancer.core.ui.chat.Style;
+
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import java.time.ZonedDateTime;
@@ -43,49 +45,40 @@ final class WelcomeScreen {
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEEE", Locale.ENGLISH);
-    private static final String RULE = "<dark_gray>──────────────";
-
     private WelcomeScreen() {
     }
 
-    static String text(Facts facts) {
-        String who = MINI.escapeTags(facts.name());
-        String where = "<white>" + MINI.escapeTags(facts.serverName() == null || facts.serverName().isBlank()
-                ? "the server" : facts.serverName()) + "</white>";
-        StringBuilder text = new StringBuilder(facts.newcomer()
-                ? "<gold><bold>Welcome, " + who + "!</bold></gold>\n<gray>Glad you found " + where + "."
-                : "<gold><bold>Welcome back, " + who + "!</bold></gold>\n<gray>Good to see you on " + where + " again.");
-        text.append('\n').append(RULE);
-        text.append("\n<gray>").append(greeting(facts.now().getHour())).append(" — it's <white>")
-                .append(TIME.format(facts.now())).append("</white>, ").append(DAY.format(facts.now())).append('.');
-        text.append(facts.others() == 0 ? "\n<gray>It's quiet — you're the only one on."
-                : "\n<gray><white>" + facts.others() + "</white> other player" + (facts.others() == 1 ? "" : "s")
-                + " on right now.");
-        if (facts.news() != null && !facts.news().isBlank()) {
-            text.append("\n<aqua>New: <white>").append(MINI.escapeTags(facts.news())).append("</white> <dark_gray>(/changelog)");
-        }
-        if (facts.tip() != null) {
-            text.append('\n').append(RULE).append("\n<yellow>Tip: <white>/").append(facts.tip().command())
-                    .append("</white> <gray>").append(facts.tip().does());
-        }
-        if (facts.newcomer()) {
-            text.append("\n<gray>New here? Try <white>/help</white>.");
-        }
-        return text.toString();
+    /** A divider in the server's own brand gradient, dimmed so it frames rather than shouts. */
+    private static String rule() {
+        return "<gradient:" + Style.brandFrom() + ":" + Style.brandTo() + ">━━━━━━━━━━━━━━━━━━━━</gradient>";
     }
 
-    static String greeting(int hour) {
-        if (hour >= 5 && hour < 12) {
-            return "Good morning";
+    private static String brand(String text) {
+        return "<bold><gradient:" + Style.brandFrom() + ":" + Style.brandTo() + ">" + text + "</gradient></bold>";
+    }
+
+    /**
+     * Four lines at most: who, a divider, the time and who else is on, then one optional extra — the newest
+     * changelog entry, or a tip (/help for a newcomer). Short on purpose: it floats in front of the player.
+     */
+    static String text(Facts facts) {
+        String who = MINI.escapeTags(facts.name());
+        StringBuilder text = new StringBuilder(brand((facts.newcomer() ? "✦ Welcome, " : "✦ Welcome back, ") + who + " ✦"));
+        text.append('\n').append(rule());
+        int hour = facts.now().getHour();
+        String sky = hour >= 6 && hour < 18 ? "<#F6B83D>☀</#F6B83D>" : "<#9FB6CC>☾</#9FB6CC>";
+        text.append('\n').append(sky).append(" <white>").append(TIME.format(facts.now())).append("</white> <dark_gray>·</dark_gray> ")
+                .append(facts.others() == 0 ? "<gray>nobody else online"
+                        : "<green>●</green> <white>" + facts.others() + "</white> <gray>other" + (facts.others() == 1 ? "" : "s") + " online");
+        if (facts.news() != null && !facts.news().isBlank()) {
+            text.append('\n').append(brand("✦")).append(" <white>").append(MINI.escapeTags(facts.news()))
+                    .append("</white> <dark_gray>/changelog");
+        } else if (facts.newcomer()) {
+            text.append("\n<gold>✧</gold> <white>/help</white> <gray>explains everything here");
+        } else if (facts.tip() != null) {
+            text.append("\n<gold>✧</gold> <white>/").append(facts.tip().command()).append("</white> <gray>").append(facts.tip().does());
         }
-        if (hour >= 12 && hour < 18) {
-            return "Good afternoon";
-        }
-        if (hour >= 18 && hour < 23) {
-            return "Good evening";
-        }
-        return "Up late";
+        return text.toString();
     }
 
     static List<Tip> usable(List<Tip> tips, Predicate<String> installed) {
