@@ -588,6 +588,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         punishments.load();
         punishments.connect(bus);
         punishments.feed(moderationFeed);
+        de.raindancer.core.moderation.players.AdminModes.listen(
+                new de.raindancer.core.moderation.feed.AdminModeLog(moderationFeed, System::currentTimeMillis));
         punishments.writeSoon(write -> Scheduling.async(this, write));
         punishmentGuard = new PunishmentGuard(punishments, System::currentTimeMillis);
         punishmentGuard.messages(messages);

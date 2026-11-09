@@ -61,4 +61,15 @@ class ModerationFeedTest {
         feed.anticheat(new AnticheatAlert(ALICE, "Alice", "Fly", 1, "", 0, null, null));
         assertThat(heard).containsExactly("ok");
     }
+
+    @Test
+    @DisplayName("listeners hear admin mode switches")
+    void adminModes() {
+        List<AdminModeNotice> heard = new ArrayList<>();
+        var subscription = feed.onAdminMode(heard::add);
+        feed.adminMode(new AdminModeNotice(ALICE, true, 0));
+        subscription.close();
+        feed.adminMode(new AdminModeNotice(ALICE, false, 5));
+        assertThat(heard).containsExactly(new AdminModeNotice(ALICE, true, 0));
+    }
 }

@@ -31,6 +31,16 @@ public final class ModerationFeed {
     private final List<Consumer<AnticheatAlert>> alerts = new CopyOnWriteArrayList<>();
     private final List<Consumer<ReportNotice>> reports = new CopyOnWriteArrayList<>();
 
+    private final List<Consumer<AdminModeNotice>> adminModes = new CopyOnWriteArrayList<>();
+
+    public Subscription onAdminMode(Consumer<AdminModeNotice> listener) {
+        return add(adminModes, listener);
+    }
+
+    public void adminMode(AdminModeNotice notice) {
+        tell(adminModes, notice);
+    }
+
     public Subscription onPunishment(Consumer<PunishmentNotice> listener) {
         return add(punishments, listener);
     }
