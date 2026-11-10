@@ -3,7 +3,6 @@ package de.raindancer.core.world.companion;
 import io.papermc.paper.entity.TeleportFlag;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Cat;
@@ -15,9 +14,7 @@ import org.bukkit.entity.Sittable;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-import java.util.EnumSet;
 import java.util.Random;
-import java.util.Set;
 
 /**
  * How a companion gets somewhere on its own thread: a walker along a short {@link Pathing} route (around walls, up
@@ -26,9 +23,6 @@ import java.util.Set;
  */
 final class Legs {
 
-    private static final Set<Material> HARMFUL = EnumSet.of(Material.LAVA, Material.FIRE, Material.SOUL_FIRE,
-            Material.MAGMA_BLOCK, Material.CAMPFIRE, Material.SOUL_CAMPFIRE, Material.CACTUS,
-            Material.SWEET_BERRY_BUSH, Material.POWDER_SNOW, Material.WITHER_ROSE);
     private static final int BUDGET = 1500;
     private static final int REPLAN = 30;
 
@@ -319,31 +313,6 @@ final class Legs {
     }
 
     private static Pathing.Terrain terrain(World world) {
-        return (x, y, z) -> {
-            if (!world.isChunkLoaded(x >> 4, z >> 4) || y < world.getMinHeight() || y >= world.getMaxHeight()) {
-                return Pathing.Ground.SOLID;
-            }
-            Block block = world.getBlockAt(x, y, z);
-            Pathing.Ground ground = ground(block);
-            if (ground == Pathing.Ground.OPEN && y - 1 >= world.getMinHeight()) {
-                Block below = world.getBlockAt(x, y - 1, z);
-                // fences and walls stand a block and a half: the air over them is no place to step
-                if (!below.isPassable() && below.getBoundingBox().getHeight() > 1.05) {
-                    return Pathing.Ground.SOLID;
-                }
-            }
-            return ground;
-        };
-    }
-
-    private static Pathing.Ground ground(Block block) {
-        Material type = block.getType();
-        if (HARMFUL.contains(type)) {
-            return Pathing.Ground.HARMFUL;
-        }
-        if (type == Material.WATER || type == Material.BUBBLE_COLUMN) {
-            return Pathing.Ground.WATER;
-        }
-        return block.isPassable() ? Pathing.Ground.OPEN : Pathing.Ground.SOLID;
+        return Terrains.of(world);
     }
 }
