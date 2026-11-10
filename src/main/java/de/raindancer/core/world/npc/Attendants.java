@@ -75,8 +75,7 @@ public final class Attendants {
      */
     public static void dress(Mannequin attendant, String skins) {
         ResolvableProfile look = look(Skins.pick(skins, attendant.getUniqueId()));
-        attendant.setProfile(look);
-        Skins.waitingFor(look).ifPresent(id -> Skins.dressWhenHere(id, attendant));
+        Skins.wear(attendant, look);
     }
 
     /**

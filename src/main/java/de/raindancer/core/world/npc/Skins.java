@@ -129,6 +129,12 @@ public final class Skins {
         return id == null ? Optional.empty() : Optional.ofNullable(standIns.get(id));
     }
 
+    /** {@code look} on {@code body} now; a stand-in is swapped for its MineSkin skin once that arrives. */
+    static void wear(Mannequin body, ResolvableProfile look) {
+        body.setProfile(look);
+        waitingFor(look).ifPresent(id -> dressWhenHere(id, body));
+    }
+
     /** Dresses {@code attendant} in the skin once it arrives (now, if it already has). */
     static void dressWhenHere(String mineSkinId, Mannequin attendant) {
         if (known.containsKey(mineSkinId)) {

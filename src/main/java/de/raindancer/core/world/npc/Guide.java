@@ -66,7 +66,6 @@ public final class Guide {
         Mannequin body = world.spawn(at, Mannequin.class, m -> {
             m.setPersistent(false);
             m.setVisibleByDefault(false);
-            m.setProfile(look);
             m.setDescription(null);
             m.customName(name);
             m.setCustomNameVisible(true);
@@ -75,6 +74,8 @@ public final class Guide {
             m.setInvulnerable(true);
             m.setCollidable(false);
         });
+        // After the spawn: a stand-in's skin is fetched and swapped in by the body's id.
+        Skins.wear(body, look);
         TextDisplay bubble = world.spawn(at, TextDisplay.class, t -> {
             t.setPersistent(false);
             t.setVisibleByDefault(false);
