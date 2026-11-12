@@ -3188,6 +3188,20 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         return de.raindancer.core.ui.text.ServerName.resolve(serverNameSetting(), "", getServer().motd());
     }
 
+    @Override
+    public String serverName(String serverId) {
+        if (serverId == null || serverId.isBlank()) {
+            return serverId == null ? "" : serverId;
+        }
+        if (serverId.equals(network.serverId())) {
+            return serverName();
+        }
+        de.raindancer.core.platform.network.NetworkServers servers = networkServers;
+        return servers == null ? serverId : servers.byId(serverId)
+                .map(de.raindancer.core.platform.network.NetworkServers.Server::name)
+                .filter(name -> name != null && !name.isBlank()).orElse(serverId);
+    }
+
     /**
      * What the other servers of the network are told this one is called: the setting, else link.yml's own
      * server-name — not the MOTD, which is a sentence for the server list rather than a name.

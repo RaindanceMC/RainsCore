@@ -753,6 +753,14 @@ public interface RainsCore {
     }
 
     /**
+     * What a server of the network is called to players — the name it gives itself ({@link #serverName()} over there),
+     * not its id: "Hyades", never "beta". Its id when nothing is known about it.
+     */
+    default String serverName(String serverId) {
+        return serverId == null ? "" : serverId;
+    }
+
+    /**
      * Every link of this server, the peers of link.yml included — to talk to one server of the network by name, or to
      * whichever one a player is on right now. {@link #link()} is the main one; this has it under the key {@code ""}.
      */
