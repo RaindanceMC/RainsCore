@@ -136,7 +136,8 @@ public record CoreConfig(
         String tablistHeader,
 
         @In("appearance/tablist") @Title("Footer")
-        @Describe("What sits below it. Empty lists how many players are in each world.")
+        @Describe("What sits below it. Empty lists how many players are in each world. Header and footer "
+                + "take <until:2026-11-21T16:00+01:00|text afterwards> for a countdown to a moment.")
         String tablistFooter,
 
         @In("appearance/tablist") @Title("Title")

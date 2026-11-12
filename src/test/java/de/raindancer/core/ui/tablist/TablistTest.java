@@ -296,6 +296,15 @@ class TablistTest {
         }
 
         @Test
+        @DisplayName("a countdown to a moment, and what to say once it has passed")
+        void fillsACountdown() {
+            assertThat(plain(model.custom("<gold><until:2020-01-01T00:00|We're open></gold>", online, "x")))
+                    .isEqualTo("We're open");
+            assertThat(plain(model.custom("In <until:2999-01-01T00:00>", online, "x")))
+                    .matches("In \\d+d \\d+h \\d+m");
+        }
+
+        @Test
         @DisplayName("colours work, because it is MiniMessage")
         void keepsColours() {
             assertThat(plain(model.custom("<gold><players></gold> on", online, "x")))

@@ -424,7 +424,7 @@ public final class TablistModel {
     public Component custom(String miniMessage, List<TablistEntry> online, String serverName) {
         int count = online == null ? 0 : online.size();
         String name = serverName == null || serverName.isBlank() ? "This server" : serverName.trim();
-        String filled = miniMessage
+        String filled = Until.fill(miniMessage, System.currentTimeMillis(), java.time.ZoneId.systemDefault())
                 .replace("<players>", String.valueOf(count))
                 .replace("<server>", escape(name))
                 .replace("<worlds>", worldCounts(online))
