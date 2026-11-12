@@ -70,6 +70,24 @@ public final class Audit {
     private final AtomicLong queued = new AtomicLong();
     private final AtomicLong dropped = new AtomicLong();
     private final AtomicLong written = new AtomicLong();
+    private final java.util.List<java.util.function.Consumer<AuditEntry>> listeners =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /** Stops listening when closed. */
+    @FunctionalInterface
+    public interface Subscription extends AutoCloseable {
+        @Override
+        void close();
+    }
+
+    /**
+     * Hears every entry as it is recorded — even one the full queue then drops — on the recording thread, so it must
+     * be quick. One that throws is skipped.
+     */
+    public Subscription listen(java.util.function.Consumer<AuditEntry> listener) {
+        listeners.add(listener);
+        return () -> listeners.remove(listener);
+    }
 
     public Audit(Database database, LongSupplier clock) {
         this.database = database;
@@ -86,6 +104,13 @@ public final class Audit {
     public boolean record(AuditEntry entry) {
         if (entry == null) {
             return false;
+        }
+        for (java.util.function.Consumer<AuditEntry> listener : listeners) {
+            try {
+                listener.accept(entry);
+            } catch (RuntimeException failed) {
+                log.warn("An audit listener failed: {}", failed.toString());
+            }
         }
         if (queued.get() >= QUEUE_LIMIT) {
             // Counted rather than logged per entry: whatever is wrong is already being logged by the

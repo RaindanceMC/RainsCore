@@ -55,6 +55,24 @@ class AdminModeLogTest {
     }
 
     @Test
+    @DisplayName("with a recorder, the way out carries the recap of the stay; the way in carries none")
+    void recapOnLeave() {
+        AdminSessionRecorder recorder = new AdminSessionRecorder(now::get);
+        AdminModeLog recording = new AdminModeLog(feed, now::get, recorder);
+
+        recording.switched(STAFF, true);
+        recorder.command(STAFF, "/gamemode creative");
+        now.set(4_000);
+        recording.switched(STAFF, false);
+
+        assertThat(heard.get(0).recap()).isNull();
+        assertThat(heard.get(1).recap().commands()).extracting(AdminSessionRecap.Line::text)
+                .containsExactly("/gamemode creative");
+        assertThat(heard.get(1).durationMillis()).isEqualTo(3_000);
+        assertThat(recorder.recording(STAFF)).isFalse();
+    }
+
+    @Test
     @DisplayName("a second stay is timed from its own start")
     void twoStays() {
         log.switched(STAFF, true);

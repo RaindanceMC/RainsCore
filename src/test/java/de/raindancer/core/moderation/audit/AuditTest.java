@@ -99,6 +99,24 @@ class AuditTest {
         }
 
         @Test
+        @DisplayName("whoever listens hears each entry as it is recorded, stamped; a listener that throws is skipped")
+        void listenersHear() {
+            List<AuditEntry> heard = new java.util.ArrayList<>();
+            audit.listen(entry -> {
+                throw new IllegalStateException("broken listener");
+            });
+            Audit.Subscription subscription = audit.listen(heard::add);
+
+            assertThat(audit.record(AuditEntry.of("invsee", "opened").by(steve, "Steve"))).isTrue();
+            subscription.close();
+            audit.record(AuditEntry.of("invsee", "closed").by(steve, "Steve"));
+
+            assertThat(heard).extracting(AuditEntry::action).containsExactly("opened");
+            assertThat(heard.getFirst().at()).isEqualTo(Instant.ofEpochMilli(now.get()));
+            assertThat(audit.waiting()).isEqualTo(2);
+        }
+
+        @Test
         @DisplayName("flushing with nothing waiting does nothing at all")
         void flushingNothing() {
             assertThat(audit.flush()).isZero();
