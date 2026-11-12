@@ -1026,6 +1026,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         resourcePacks = new ResourcePacks(getDataFolder().toPath().resolve("packs"),
                 new BukkitPackSink());
         de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks, () -> settings.current().menusPainted());
+        de.raindancer.core.content.pack.ServerAssets.offer(getDataFolder().toPath(), resourcePacks);
         menusSwitch = de.raindancer.core.ui.menu.MenuPack.profileSwitch(() -> settings.current().menusPainted());
         de.raindancer.core.ui.menu.ClickHints.install(id -> de.raindancer.core.ui.menu.ClickHints.audience(
                 de.raindancer.core.ui.menu.ClickHints.isBedrock(id), resourcePacks.isWearing(id),

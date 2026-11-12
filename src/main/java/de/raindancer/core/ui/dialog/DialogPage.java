@@ -483,6 +483,13 @@ public final class DialogPage {
             return tooltip;
         }
 
+        /** The tooltip as this player sees it: "Click to go" drawn as the mouse, as on a chest page's lore. */
+        public Component tooltipFor(java.util.UUID player) {
+            return tooltip == null ? null
+                    : de.raindancer.core.ui.menu.ClickHints.rewrite(tooltip,
+                    de.raindancer.core.ui.menu.ClickHints.audience(player));
+        }
+
         public int width() {
             return width;
         }
@@ -503,7 +510,7 @@ public final class DialogPage {
         private ActionButton toButton(Player player) {
             DialogAction action = fixed != null ? fixed : DialogAction.customClick(
                     (response, audience) -> press(player, DialogAnswers.of(response)), CALLBACK);
-            return ActionButton.builder(label).tooltip(tooltip).width(width > 0 ? width : NARROW).action(action).build();
+            return ActionButton.builder(label).tooltip(tooltipFor(player.getUniqueId())).width(width > 0 ? width : NARROW).action(action).build();
         }
     }
 
