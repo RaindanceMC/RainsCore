@@ -45,4 +45,22 @@ public interface LandProvider {
      * caller is about to delete something.
      */
     boolean hasAnyIn(World world);
+
+    /**
+     * Puts a rectangle of ground, the full height of the world, under the server's own protection — a
+     * server claim, for a claims plugin. Holding a name already held moves it there.
+     *
+     * <p>For a plugin that places something the server owns (a teleport point, a pad) and wants it kept
+     * safe without knowing who keeps the claims. Corners arrive sorted.
+     *
+     * @return empty when it is held, otherwise why not, readable
+     */
+    default Optional<String> holdForServer(World world, String name, int x1, int z1, int x2, int z2) {
+        return Optional.of(name() + " cannot hold ground for the server");
+    }
+
+    /** Gives back ground held with {@link #holdForServer}. @return whether anything was held under that name */
+    default boolean releaseForServer(String name) {
+        return false;
+    }
 }

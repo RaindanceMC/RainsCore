@@ -205,6 +205,30 @@ public final class Land {
         return answering.hasAnyIn(world) ? LandVerdict.REFUSED : LandVerdict.ALLOWED;
     }
 
+    /**
+     * Asks whoever keeps the claims to hold this rectangle for the server — see
+     * {@link LandProvider#holdForServer}.
+     *
+     * @return empty when it is held, otherwise why not
+     */
+    public Optional<String> holdForServer(World world, String name, int x1, int z1, int x2, int z2) {
+        if (world == null || name == null || name.isBlank()) {
+            return Optional.of("no world or no name to hold it under");
+        }
+        LandProvider answering = provider.get();
+        if (answering == null) {
+            return Optional.of("nothing on this server keeps claims");
+        }
+        return answering.holdForServer(world, name, Math.min(x1, x2), Math.min(z1, z2),
+                Math.max(x1, x2), Math.max(z1, z2));
+    }
+
+    /** Gives back ground held for the server. @return whether anything was held under that name */
+    public boolean releaseForServer(String name) {
+        LandProvider answering = provider.get();
+        return answering != null && name != null && answering.releaseForServer(name);
+    }
+
     // ------------------------------------------------------------------------ the admin bypass
 
     public boolean isBypassing(Player player) {
