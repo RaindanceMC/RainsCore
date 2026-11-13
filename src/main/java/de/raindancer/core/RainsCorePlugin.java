@@ -924,6 +924,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         screens.start();
         startNetworkWhitelist();
         startLeaveScreens();
+        startMountSpeeds();
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
                 getDataFolder().toPath().resolve("maintenance.yml"), System::currentTimeMillis);
         maintenance.load();
@@ -2000,6 +2001,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.social.presence.ProfileLookup profileLookup() {
         return profileLookup;
+    }
+
+    private void startMountSpeeds() {
+        var mounts = settingsFor(SettingsSchema.of(
+                de.raindancer.core.world.movement.MountSettings.class,
+                de.raindancer.core.world.movement.MountSettings.DEFAULTS),
+                getDataFolder().toPath().resolve("config.yml"));
+        var speeds = new de.raindancer.core.world.movement.MountSpeeds(this, mounts::current);
+        getServer().getPluginManager().registerEvents(speeds, this);
+        speeds.start();
     }
 
     private void startLeaveScreens() {
