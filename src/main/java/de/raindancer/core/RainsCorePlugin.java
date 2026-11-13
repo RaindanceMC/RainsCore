@@ -1514,6 +1514,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.presence.PresenceLines.clear();
         de.raindancer.core.moderation.rules.ServerRules.clear();
         de.raindancer.core.moderation.rules.RuleBreaches.clear();
+        de.raindancer.core.moderation.punishment.ExternalBans.clear();
         de.raindancer.core.moderation.reports.AutoReports.clear();
         de.raindancer.core.moderation.players.AdminModes.clear();
         de.raindancer.core.moderation.players.CheatRecords.clear();
@@ -3129,6 +3130,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.presence.PresenceLines.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.ServerRules.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.RuleBreaches.forgetFrom(loader)
+                + de.raindancer.core.moderation.punishment.ExternalBans.forgetFrom(loader)
                 + de.raindancer.core.moderation.reports.AutoReports.forgetFrom(loader)
                 + de.raindancer.core.moderation.players.AdminModes.forgetFrom(loader)
                 + de.raindancer.core.world.protection.LockedWorlds.forgetFrom(loader)
