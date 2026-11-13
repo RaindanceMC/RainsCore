@@ -459,7 +459,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         Style.configure(this::colourFor);
 
         actionBars = new ActionBars(new BukkitActionBarSink(), System::currentTimeMillis);
-        scoreboards = new Scoreboards(new FastBoardFactory());
+        scoreboards = new Scoreboards(new de.raindancer.core.ui.scoreboard.RoutedBoardFactory(new FastBoardFactory(), clients));
+        // Every player is vanilla for their first moments here. When their mod says hello, the sidebar they
+        // were already shown moves into its HUD. Nothing else does: the action bar is the game's for everybody.
+        clients.onReady(session -> scoreboards.redraw(session.player()));
         bossBars = new BossBars(new BukkitBarViewers());
         getServer().getPluginManager().registerEvents(worldEntryPoints, this);
 

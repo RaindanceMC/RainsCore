@@ -213,6 +213,34 @@ public final class Scoreboards {
         }
     }
 
+    /**
+     * Takes this player's board away and draws what they should see on a fresh one — for when the way to draw
+     * for them has changed, which is what a client mod saying hello a moment after joining is. Who claims the
+     * sidebar is untouched.
+     */
+    public void redraw(UUID player) {
+        Slot slot = slots.get(player);
+        if (slot == null) {
+            return;
+        }
+        synchronized (slot) {
+            if (slots.get(player) != slot) {
+                return;
+            }
+            if (slot.board != null) {
+                try {
+                    slot.board.delete();
+                } catch (RuntimeException | LinkageError failure) {
+                    log.debug("Could not remove {}'s sidebar: {}", player, String.valueOf(failure));
+                }
+            }
+            slot.board = null;
+            slot.onScreen = null;
+            slot.showingOwner = null;
+            repaint(player, slot);
+        }
+    }
+
     // -------------------------------------------------------------------------- internals
 
     /** Draws whatever wins, creating or deleting the board as that changes. Under the slot lock. */
