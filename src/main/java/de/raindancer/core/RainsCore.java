@@ -496,6 +496,12 @@ public interface RainsCore {
     /** Gives every supporter {@code rains.supporter}; {@code sync} a player to apply a change at once. */
     de.raindancer.core.social.support.SupporterPermission supporterPermission();
 
+    /** Who holds the Prime subscription across the network, and every month they paid for. */
+    de.raindancer.core.social.support.PrimeMembers prime();
+
+    /** {@code rains.prime} and the {@code prime} group for current Prime members; {@code sync} a player to apply a change at once. */
+    de.raindancer.core.social.support.PrimePermission primePermission();
+
     /** Everybody's ping over the last hour on this server, sampled every few seconds — also for a while after they left. */
     de.raindancer.core.moderation.players.PingHistory pingHistory();
 

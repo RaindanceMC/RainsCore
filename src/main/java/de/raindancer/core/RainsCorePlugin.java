@@ -297,6 +297,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.social.support.Supporters supporters;
     private de.raindancer.core.social.support.SupporterPermission supporterPermission;
     private de.raindancer.core.platform.network.NetworkBus.Subscription supportersWatch;
+    private de.raindancer.core.social.support.PrimeMembers prime;
+    private de.raindancer.core.social.support.PrimePermission primePermission;
+    private de.raindancer.core.platform.network.NetworkBus.Subscription primeWatch;
     private final de.raindancer.core.moderation.players.PingHistory pingHistory =
             new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
     private final de.raindancer.core.platform.client.ClientMods clients = new de.raindancer.core.platform.client.ClientMods(
@@ -835,6 +838,22 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // A coffee can arrive on any server of the network; whoever is online here gets the node within half a minute.
         Scheduling.globalTimer(this, 20L * 30, 20L * 30, ignored -> getServer().getOnlinePlayers().forEach(online ->
                 Scheduling.entity(this, online, () -> supporterPermission.sync(online))));
+        prime = new de.raindancer.core.social.support.PrimeMembers(
+                de.raindancer.core.data.store.YamlStore.network(getDataFolder().toPath().resolve("prime.yml")));
+        prime.load();
+        primeWatch = prime.watch();
+        de.raindancer.core.social.support.PrimePermission.permission(getServer().getPluginManager());
+        primePermission = new de.raindancer.core.social.support.PrimePermission(this, prime, this::groups,
+                java.time.Instant::now);
+        getServer().getPluginManager().registerEvents(primePermission, this);
+        // Granted on another server, or run out: applied here within half a minute; the group once a minute.
+        Scheduling.globalTimer(this, 20L * 30, 20L * 30, ignored -> getServer().getOnlinePlayers().forEach(online ->
+                Scheduling.entity(this, online, () -> primePermission.sync(online))));
+        Scheduling.asyncLater(this, 20, TimeUnit.SECONDS, () -> {
+            primePermission.seedGroup();
+            primePermission.reconcileGroup();
+        });
+        Scheduling.asyncTimer(this, 60, 60, task -> primePermission.reconcileGroup());
         // Every player's inventory into the network's database, per server: staff see it from anywhere, and it
         // outlives the server's files. Not applied on join — inventories stay each server's own.
         savedInventories = new de.raindancer.core.data.inventory.SavedInventories(databases.core(), System::currentTimeMillis);
@@ -943,6 +962,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             }
             if (supporters.isDirty()) {
                 Scheduling.async(this, supporters::save);
+            }
+            if (prime.isDirty()) {
+                Scheduling.async(this, prime::save);
             }
             if (knownNames.isDirty()) {
                 Scheduling.async(this, knownNames::save);
@@ -1452,6 +1474,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(ownNametagSwitch);
         }
         groupsFollowing.close();
+        if (primeWatch != null) {
+            primeWatch.close();
+        }
         if (supportersWatch != null) {
             supportersWatch.close();
         }
@@ -1503,6 +1528,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (playtime != null && playtime.isDirty()) {
             playtime.save();
+        }
+        if (prime != null && prime.isDirty()) {
+            prime.save();
         }
         if (supporters != null && supporters.isDirty()) {
             supporters.save();
@@ -2729,6 +2757,16 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public de.raindancer.core.social.support.PrimeMembers prime() {
+        return prime;
+    }
+
+    @Override
+    public de.raindancer.core.social.support.PrimePermission primePermission() {
+        return primePermission;
+    }
+
+    @Override
     public de.raindancer.core.moderation.players.PingHistory pingHistory() {
         return pingHistory;
     }
@@ -3134,6 +3172,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         }
         if (mentionCompletions != null) {
             mentionCompletions.forget(event.getPlayer().getUniqueId());
+        }
+        if (primePermission != null) {
+            primePermission.forget(event.getPlayer().getUniqueId());
         }
         if (supporterPermission != null) {
             supporterPermission.forget(event.getPlayer().getUniqueId());
