@@ -84,4 +84,28 @@ class StaffReviewsTest {
         assertThat(waiting().failed("Mo", "404").reason()).isEqualTo("404");
         assertThat(waiting().withDetail("could not load").detail()).isEqualTo("could not load");
     }
+
+    @Test
+    @DisplayName("a request from outside the game goes to the intake of its kind; none here says so; a throwing one fails")
+    void intake() {
+        List<StaffReviews.Submission> got = new ArrayList<>();
+        StaffReviews.Subscription open = reviews.intake("mapart", submission -> {
+            got.add(submission);
+            return new StaffReviews.Answer("asked", "k3x9q", "Asked!");
+        });
+        StaffReviews.Submission from = new StaffReviews.Submission("mapart", ada, "Ada",
+                "https://cdn.example/a.png", "2x2", "discord");
+
+        assertThat(reviews.submit(from)).isEqualTo(new StaffReviews.Answer("asked", "k3x9q", "Asked!"));
+        assertThat(got).containsExactly(from);
+        assertThat(reviews.submit(new StaffReviews.Submission("statue", ada, "Ada", "", "", "discord")).outcome())
+                .isEqualTo("not_here");
+        open.close();
+        assertThat(reviews.submit(from).outcome()).isEqualTo("not_here");
+
+        reviews.intake("mapart", submission -> {
+            throw new IllegalStateException("boom");
+        });
+        assertThat(reviews.submit(from).outcome()).isEqualTo("failed");
+    }
 }

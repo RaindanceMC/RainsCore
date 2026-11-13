@@ -94,6 +94,35 @@ public final class StaffReviews {
         Outcome decide(String id, boolean approve, String by, String reason);
     }
 
+    /**
+     * A request made outside the game (e.g. a picture uploaded on Discord) for a player's own account.
+     *
+     * @param options what the kind needs besides the link, e.g. a map art size "2x2"
+     * @param via     where it came from, e.g. {@code discord}
+     */
+    public record Submission(String kind, UUID player, String name, String link, String options, String via) {
+    }
+
+    /**
+     * @param outcome lower case, e.g. {@code asked}, {@code not_prime}; {@code not_here} when nothing takes the kind
+     * @param ref     the new request's id when it was taken, else empty
+     * @param text    one plain sentence for the person who sent it
+     */
+    public record Answer(String outcome, String ref, String text) {
+
+        public Answer {
+            outcome = outcome == null ? "failed" : outcome;
+            ref = ref == null ? "" : ref;
+            text = text == null ? "" : text;
+        }
+    }
+
+    /** Takes a {@link Submission} of its kind. Any thread. */
+    @FunctionalInterface
+    public interface Intake {
+        Answer submit(Submission submission);
+    }
+
     @FunctionalInterface
     public interface Subscription extends AutoCloseable {
         @Override
@@ -102,6 +131,7 @@ public final class StaffReviews {
 
     private final List<Consumer<Review>> listeners = new CopyOnWriteArrayList<>();
     private final Map<String, Decider> deciders = new ConcurrentHashMap<>();
+    private final Map<String, Intake> intakes = new ConcurrentHashMap<>();
 
     public Subscription onReview(Consumer<Review> listener) {
         listeners.add(listener);
@@ -136,6 +166,27 @@ public final class StaffReviews {
         } catch (RuntimeException failed) {
             log.warn("Deciding {} {} failed: {}", kind, id, failed.toString());
             return Outcome.FAILED;
+        }
+    }
+
+    /** One per kind; a second one replaces the first. Since 2.95.0. */
+    public Subscription intake(String kind, Intake intake) {
+        String key = kind.toLowerCase(Locale.ROOT);
+        intakes.put(key, intake);
+        return () -> intakes.remove(key, intake);
+    }
+
+    public Answer submit(Submission submission) {
+        Intake intake = submission.kind() == null ? null : intakes.get(submission.kind().toLowerCase(Locale.ROOT));
+        if (intake == null) {
+            return new Answer("not_here", "", "This server does not take that kind of request.");
+        }
+        try {
+            Answer answer = intake.submit(submission);
+            return answer == null ? new Answer("failed", "", "Something went wrong.") : answer;
+        } catch (RuntimeException failed) {
+            log.warn("Taking {} from {} failed: {}", submission.kind(), submission.via(), failed.toString());
+            return new Answer("failed", "", "Something went wrong.");
         }
     }
 }
