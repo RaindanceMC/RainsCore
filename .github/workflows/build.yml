@@ -56,7 +56,13 @@ jobs:
           server-username: REPOSILITE_USERNAME
           server-password: REPOSILITE_PASSWORD
 
+      # rains-client-protocol is read from packages.tstieh.de, so the build itself needs the registry's
+      # credentials now, not only the publish steps further down.
       - name: Build and run tests
+        env:
+          REPOSILITE_USERNAME: ci-deploy
+          REPOSILITE_PASSWORD: ${{ secrets.REPOSILITE_PASSWORD }}
+          MAVEN_OPTS: -Djdk.tls.client.protocols=TLSv1.2
         run: mvn --batch-mode --no-transfer-progress verify
 
       # The version out of the pom, so a tag can be checked against what actually built rather than
