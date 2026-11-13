@@ -40,6 +40,20 @@ public record Punishment(String id, UUID target, PunishmentKind kind, UUID moder
         return endsAt == null || now.isBefore(endsAt);
     }
 
+    /**
+     * When it stopped applying: its lifting, its end, or — a warning, a kick, a fine — the moment it was given.
+     * Empty while it still applies.
+     */
+    public Optional<Instant> endedAt(Instant now) {
+        if (isActiveAt(now)) {
+            return Optional.empty();
+        }
+        if (liftedAt != null) {
+            return Optional.of(liftedAt);
+        }
+        return Optional.of(kind.isLasting() && endsAt != null ? endsAt : givenAt);
+    }
+
     /** Whether it was meant to last until somebody says otherwise. */
     public boolean isPermanent() {
         return endsAt == null && kind.isLasting();

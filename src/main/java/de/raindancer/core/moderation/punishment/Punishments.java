@@ -37,9 +37,12 @@ import java.util.Map;
  * cannot build. Any plugin can ask this one, and the claims module can freeze somebody's hands
  * without having an opinion about whether they should be on the server at all.
  *
- * <h2>Nothing is ever deleted</h2>
+ * <h2>Nothing is deleted, until it is old</h2>
  * Lifting a ban adds the lifting to it; the ban stays. That is what makes a second offence
- * answerable, and it is the difference between this and a set of flags.
+ * answerable, and it is the difference between this and a set of flags. The one way out is
+ * {@link #forgetEndedBefore}: records are personal data, and under the GDPR a server may keep them only
+ * as long as it has a reason to — so a moderation plugin's retention setting can drop what stopped
+ * applying long ago. Nothing still in force is ever dropped.
  *
  * <h2>Thread safety</h2>
  * Safe from any thread. Each player's record is an immutable list, swapped whole under the map's
@@ -104,6 +107,55 @@ public final class Punishments {
 
     private Instant now() {
         return Instant.ofEpochMilli(clock.getAsLong());
+    }
+
+    // ---------------------------------------------------------------------------- retention
+
+    /**
+     * Deletes every punishment that stopped applying before {@code cutoff} — expired, lifted, or a warning,
+     * kick or fine given before it — from this cache and the database, and tells the other servers. Never one
+     * still in force, and never one this server has not finished writing.
+     *
+     * <p>Must be called off the server's threads.
+     *
+     * @return how many were deleted; 0 when the database could not be written
+     */
+    public int forgetEndedBefore(Instant cutoff) {
+        if (cutoff == null || !database.isUsable()) {
+            return 0;
+        }
+        Instant now = now();
+        List<Punishment> old = byPlayer.values().stream().flatMap(List::stream)
+                .filter(punishment -> !changed.contains(punishment.id()) && !inFlight.contains(punishment.id()))
+                .filter(punishment -> punishment.endedAt(now).map(ended -> ended.isBefore(cutoff)).orElse(false))
+                .toList();
+        if (old.isEmpty()) {
+            return 0;
+        }
+        boolean deleted = database.write(connection -> {
+            try (PreparedStatement statement = connection.prepareStatement("DELETE FROM punishment WHERE id = ?")) {
+                for (Punishment punishment : old) {
+                    statement.setString(1, punishment.id());
+                    statement.executeUpdate();
+                }
+            }
+        });
+        if (!deleted) {
+            return 0;
+        }
+        Set<String> gone = new java.util.HashSet<>();
+        old.forEach(punishment -> gone.add(punishment.id()));
+        List<UUID> targets = old.stream().map(Punishment::target).distinct().toList();
+        targets.forEach(target -> byPlayer.computeIfPresent(target, (key, records) -> {
+            List<Punishment> left = records.stream().filter(each -> !gone.contains(each.id())).toList();
+            return left.isEmpty() ? null : left;
+        }));
+        NetworkBus network = bus;
+        if (network != null) {
+            targets.forEach(target -> network.publish(TOPIC, target.toString()));
+        }
+        log.info("Forgot {} punishment record(s) that ended before {}.", old.size(), cutoff);
+        return old.size();
     }
 
     // ---------------------------------------------------------------------------- punishing

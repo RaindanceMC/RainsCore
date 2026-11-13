@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -314,6 +315,95 @@ class PunishmentsTest {
     }
 
     // ------------------------------------------------------------------ persistence
+
+    @Nested
+    @DisplayName("forgetting old records (retention)")
+    class Retention {
+
+        private Punishments reopened() {
+            database.close();
+            database = openDatabase();
+            Punishments again = new Punishments(database, clock::get);
+            again.load();
+            return again;
+        }
+
+        @Test
+        @DisplayName("a record that stopped applying before the cutoff is gone, from the database too")
+        void forgetsWhatEndedLongAgo() {
+            punishments.punish(ALICE, PunishmentKind.MUTE, MOD, "spam", Duration.ofHours(1));
+            punishments.punish(BOB, PunishmentKind.WARNING, MOD, "rude", null);
+            punishments.flush();
+            advance(Duration.ofDays(800));
+
+            int forgotten = punishments.forgetEndedBefore(Instant.ofEpochMilli(clock.get()).minus(Duration.ofDays(730)));
+
+            assertThat(forgotten).isEqualTo(2);
+            assertThat(punishments.history(ALICE)).isEmpty();
+            assertThat(punishments.history(BOB)).isEmpty();
+            Punishments again = reopened();
+            assertThat(again.history(ALICE)).isEmpty();
+            assertThat(again.history(BOB)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a ban still in force is never forgotten, however old")
+        void neverForgetsWhatStillApplies() {
+            punishments.punish(ALICE, PunishmentKind.BAN, MOD, "griefing", null);
+            punishments.punish(BOB, PunishmentKind.BAN, MOD, "long one", Duration.ofDays(3000));
+            punishments.flush();
+            advance(Duration.ofDays(2000));
+
+            assertThat(punishments.forgetEndedBefore(Instant.ofEpochMilli(clock.get()).minus(Duration.ofDays(730)))).isZero();
+
+            Punishments again = reopened();
+            assertThat(again.isActive(ALICE, PunishmentKind.BAN)).isTrue();
+            assertThat(again.isActive(BOB, PunishmentKind.BAN)).isTrue();
+        }
+
+        @Test
+        @DisplayName("an old punishment lifted recently counts from its lifting, and stays")
+        void countsFromTheEnd() {
+            punishments.punish(ALICE, PunishmentKind.BAN, MOD, "griefing", null);
+            punishments.flush();
+            advance(Duration.ofDays(900));
+            punishments.lift(ALICE, PunishmentKind.BAN, MOD, "appealed");
+            punishments.punish(BOB, PunishmentKind.KICK, MOD, "afk", null);
+            punishments.flush();
+            advance(Duration.ofDays(10));
+
+            assertThat(punishments.forgetEndedBefore(Instant.ofEpochMilli(clock.get()).minus(Duration.ofDays(730)))).isZero();
+            assertThat(reopened().history(ALICE)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("only the old ones go; a player's recent record stays beside them")
+        void keepsTheRecentOnes() {
+            punishments.punish(ALICE, PunishmentKind.WARNING, MOD, "first", null);
+            punishments.flush();
+            advance(Duration.ofDays(800));
+            punishments.punish(ALICE, PunishmentKind.WARNING, MOD, "second", null);
+            punishments.flush();
+
+            assertThat(punishments.forgetEndedBefore(Instant.ofEpochMilli(clock.get()).minus(Duration.ofDays(730)))).isEqualTo(1);
+            assertThat(reopened().history(ALICE)).extracting(Punishment::reason).containsExactly("second");
+        }
+
+        @Test
+        @DisplayName("Punishment.endedAt: when it stopped applying, empty while it still does")
+        void endedAt() {
+            Instant given = Instant.ofEpochMilli(1_000_000L);
+            Instant now = given.plus(Duration.ofDays(30));
+            Punishment warning = new Punishment(null, ALICE, PunishmentKind.WARNING, MOD, "x", given, null, null, null, null);
+            Punishment perm = new Punishment(null, ALICE, PunishmentKind.BAN, MOD, "x", given, null, null, null, null);
+            Punishment over = new Punishment(null, ALICE, PunishmentKind.MUTE, MOD, "x", given, given.plus(Duration.ofDays(1)), null, null, null);
+            Punishment lifted = new Punishment(null, ALICE, PunishmentKind.BAN, MOD, "x", given, null, MOD, "ok", given.plus(Duration.ofDays(2)));
+            assertThat(warning.endedAt(now)).contains(given);
+            assertThat(perm.endedAt(now)).isEmpty();
+            assertThat(over.endedAt(now)).contains(given.plus(Duration.ofDays(1)));
+            assertThat(lifted.endedAt(now)).contains(given.plus(Duration.ofDays(2)));
+        }
+    }
 
     @Nested
     @DisplayName("across a restart")
