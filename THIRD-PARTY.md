@@ -71,3 +71,9 @@ Unpack, re-apply the package rename, and check `THIRD-PARTY.md` and the version 
 - **License** CC0 1.0 (public domain); credit not required, given here anyway
 - **Added** 2026-11-08, for RainsCore 2.61.0 — click hints in menus as mouse and key icons (`ui.menu.ClickHints`)
 - **Changes** cropped to the drawn width; on Bedrock's glyph page F8 the SHIFT key is split over cells 0 and 4
+
+## Not third party, but shaded in: rains-client-protocol
+
+- **Where** shaded under its own package `de.raindancer.client.protocol` (it is part of `platform.client`'s API)
+- **Upstream** <https://github.com/RaindanceMC/client-protocol> — our own, no dependencies; the client mod carries the same jar
+- **Added** 2026-11-13, for RainsCore 2.90.0 — see `NoExternalDependenciesTest.SHADED` for why it is not copied in

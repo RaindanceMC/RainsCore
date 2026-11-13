@@ -299,6 +299,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private de.raindancer.core.platform.network.NetworkBus.Subscription supportersWatch;
     private final de.raindancer.core.moderation.players.PingHistory pingHistory =
             new de.raindancer.core.moderation.players.PingHistory(System::currentTimeMillis);
+    private final de.raindancer.core.platform.client.ClientMods clients = new de.raindancer.core.platform.client.ClientMods(
+            de.raindancer.core.platform.client.ClientWire.through(this), System::currentTimeMillis, this::serverName,
+            () -> de.raindancer.client.protocol.Theme.HARBOR_SUNSET, new ClientReports());
     private de.raindancer.core.moderation.chatlog.ChatLog chatLog;
     private de.raindancer.core.social.presence.KnownNames knownNames;
     private de.raindancer.core.social.presence.ProfileLookup profileLookup;
@@ -720,6 +723,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         // does nothing — see ChatButtons and CoreCommands.
         buttons = new ChatButtons(clickActions, "");
         chat = chatFor("Core");
+        de.raindancer.core.platform.client.ClientChannel.open(this, clients);
         getServer().getPluginManager().registerEvents(
                 new MistypedCommand.Listener(getServer()::getCommandMap, messages, buttons), this);
         // Core's own sections, signed with Core's own brand. Until this, they were unowned, and an
@@ -2727,6 +2731,35 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     }
 
     @Override
+    public de.raindancer.core.platform.client.ClientMods clients() {
+        return clients;
+    }
+
+    /** What the client channel has to say to people: staff read the log, the player with the old mod reads chat. */
+    private final class ClientReports implements de.raindancer.core.platform.client.ClientMods.Reports {
+
+        @Override
+        public void flooding(java.util.UUID player) {
+            log.warn("{} keeps sending more on the client-mod channel than a mod would; the surplus is dropped.",
+                    java.util.Optional.ofNullable(getServer().getPlayer(player)).map(Player::getName).orElse(player.toString()));
+        }
+
+        @Override
+        public void outdated(java.util.UUID player, String modVersion) {
+            Player online = getServer().getPlayer(player);
+            if (online != null && chat != null) {
+                chat.warn(online, "Your client mod (<version>) is too old for this server. Until you update it, "
+                        + "you see everything the way players without it do.", Chat.arg("version", modVersion));
+            }
+        }
+
+        @Override
+        public void failed(String what, Throwable why) {
+            log.warn("{} failed: {}", what, why.toString());
+        }
+    }
+
+    @Override
     public de.raindancer.core.ui.changelog.Changelog changelog() {
         return changelog;
     }
@@ -3038,6 +3071,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.world.blocks.PlacedBlocks.forgetFrom(loader)
                 + de.raindancer.core.world.activity.Activities.forgetFrom(loader)
                 + de.raindancer.core.ui.tree.Skills.forgetFrom(loader)
+                + clients.forgetFrom(loader)
                 + de.raindancer.core.social.economy.EconomyLevers.forgetFrom(loader)
                 + de.raindancer.core.social.economy.PriceIndex.forgetFrom(loader)
                 + de.raindancer.core.social.economy.Debts.forgetFrom(loader)

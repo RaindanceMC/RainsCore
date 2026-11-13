@@ -500,6 +500,12 @@ public interface RainsCore {
     de.raindancer.core.moderation.players.PingHistory pingHistory();
 
     /**
+     * Who is playing with Rain's client mod, and the way to its HUD. For the services that draw — a plugin keeps
+     * calling those and never asks this. See {@link de.raindancer.core.platform.client.ClientMods}.
+     */
+    de.raindancer.core.platform.client.ClientMods clients();
+
+    /**
      * Styled names above heads — off until something that offers name styles switches it on.
      * See {@link de.raindancer.core.ui.identity.Nametags}.
      */

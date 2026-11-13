@@ -65,13 +65,34 @@ class NoExternalDependenciesTest {
         }
         shipped.removeAll(SHADED);
         assertThat(shipped)
-                .as("a compile-scoped dependency ships inside the jar. Only the PostgreSQL driver does "
-                        + "(NETWORK-PLAN.md N10); anything else is copied in, or not used.")
+                .as("a compile-scoped dependency ships inside the jar. Only the PostgreSQL driver "
+                        + "(NETWORK-PLAN.md N10) and our own client protocol do; anything else is copied in, or "
+                        + "not used.")
                 .isEmpty();
     }
 
-    /** What ships inside the jar, shaded and relocated: the PostgreSQL driver and nothing else. */
-    private static final List<String> SHADED = List.of("postgresql (scope compile)");
+    /**
+     * What ships inside the jar, shaded: the PostgreSQL driver (relocated), and rains-client-protocol.
+     *
+     * <p>The protocol is not somebody else's code: it is RaindanceMC/client-protocol, has no dependencies of its
+     * own, and is the one artifact the client mod carries too — copying it in would be the two sides of a wire
+     * format kept in step by hand. Nothing is downloaded at startup for it either. It keeps its own package
+     * because its packets are part of Core's API ({@code platform.client}).
+     */
+    private static final List<String> SHADED = List.of("postgresql (scope compile)",
+            "rains-client-protocol (scope compile)");
+
+    @Test
+    @DisplayName("the client protocol is shaded in and brings nothing of its own along")
+    void clientProtocolIsShadedAndBare() throws IOException {
+        assertThat(Files.readString(POM)).contains("<include>de.raindancer:rains-client-protocol</include>");
+        try (var jar = new java.util.jar.JarFile(Path.of(de.raindancer.client.protocol.Wire.class
+                .getProtectionDomain().getCodeSource().getLocation().getPath()).toFile())) {
+            assertThat(jar.stream().map(java.util.jar.JarEntry::getName).filter(name -> name.endsWith(".class")))
+                    .as("only the protocol's own package")
+                    .allMatch(name -> name.startsWith("de/raindancer/client/protocol/"));
+        }
+    }
 
     @Test
     @DisplayName("the shaded driver is relocated under core.internal and recorded with its licence")
