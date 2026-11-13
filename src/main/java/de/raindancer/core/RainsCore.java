@@ -269,6 +269,14 @@ public interface RainsCore {
     }
 
     /**
+     * Requests waiting for staff (map art, …) for a plugin that shows them elsewhere, e.g. Discord with Approve and
+     * Deny, and the decisions made there. Since 2.94.0; an unconnected one on older Cores.
+     */
+    default de.raindancer.core.moderation.review.StaffReviews staffReviews() {
+        return new de.raindancer.core.moderation.review.StaffReviews();
+    }
+
+    /**
      * What actually stops a punished player, and what they are told.
      *
      * <p>Here rather than in whichever plugin owns the moderation commands, because any plugin can

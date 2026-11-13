@@ -255,6 +255,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private GrantListener grantListener;
     private Punishments punishments;
     private final de.raindancer.core.moderation.feed.ModerationFeed moderationFeed = new de.raindancer.core.moderation.feed.ModerationFeed();
+    private final de.raindancer.core.moderation.review.StaffReviews staffReviews = new de.raindancer.core.moderation.review.StaffReviews();
     private PunishmentGuard punishmentGuard;
     private de.raindancer.core.moderation.punishment.BlockedAttempts blockedAttempts;
     private VanillaBanBridge banBridge;
@@ -1948,6 +1949,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.moderation.feed.ModerationFeed moderationFeed() {
         return moderationFeed;
+    }
+
+    @Override
+    public de.raindancer.core.moderation.review.StaffReviews staffReviews() {
+        return staffReviews;
     }
 
     @Override
