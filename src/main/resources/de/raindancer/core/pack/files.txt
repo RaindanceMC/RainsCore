@@ -1,3 +1,4 @@
+assets/rainscore/font/below.json
 assets/rainscore/font/buttons.json
 assets/rainscore/font/face.json
 assets/rainscore/font/hints.json
