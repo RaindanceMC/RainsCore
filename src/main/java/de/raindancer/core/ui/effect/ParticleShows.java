@@ -27,6 +27,14 @@ public final class ParticleShows {
     /** Core's own particle, not one of Minecraft's: cocoa beans tumbling down, every fourth point a curl of steam. */
     public static final String COFFEE = "COFFEE";
 
+    /** Core's own: Twitch-purple pixels, every fifth one glitching aside. Cosmetics gives it to creators. */
+    public static final String TWITCH = "TWITCH";
+
+    /** Core's own: gold dust and end-rod sparks. Cosmetics gives it to Prime. */
+    public static final String STARDUST = "STARDUST";
+
+    private static final java.util.Set<String> OWN = java.util.Set.of(COFFEE, TWITCH, STARDUST);
+
     /** The most people one draw is sent to; the nearest win. A crowd at the spawn must not multiply every point. */
     public static final int MAX_VIEWERS = 40;
 
@@ -64,7 +72,21 @@ public final class ParticleShows {
 
     /** Whether this is one of Core's own particles rather than Minecraft's. */
     public static boolean isOwn(String particle) {
-        return particle != null && COFFEE.equalsIgnoreCase(particle.trim());
+        return particle != null && OWN.contains(particle.trim().toUpperCase(Locale.ROOT));
+    }
+
+    /** Every particle that is Core's own, in no particular order. */
+    public static java.util.Set<String> owns() {
+        return OWN;
+    }
+
+    /** Own, and drawn point by point by {@link OwnShows} rather than as beans. */
+    private static boolean isPixels(String particle) {
+        return isOwn(particle) && !COFFEE.equalsIgnoreCase(particle.trim());
+    }
+
+    private static Object pixelData(OwnShows.Point point) {
+        return point.rgb() == null ? null : new Particle.DustOptions(Color.fromRGB(point.rgb()), point.size());
     }
 
     /** Which points of {@link #COFFEE} are steam rather than beans. */
@@ -164,6 +186,7 @@ public final class ParticleShows {
         boolean trail = drawn == Particle.TRAIL && found != Particle.TRAIL;
         int from = colour == null ? 0xFFFFFF : colour;
         boolean own = isOwn(particle);
+        boolean pixels = isPixels(particle);
         Object single = own ? beans() : BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
         boolean blended = colourTo != null && takesColour(particle);
         List<double[]> offsets = shape.offsets(tick, yaw, count);
@@ -179,6 +202,12 @@ public final class ParticleShows {
             Object data = trail ? trailData(new Location(world, x, y, z), rgb, lifetimeTicks)
                     : blended ? BukkitEffectSink.dataFor(found.getDataType(), rgb, dustSize(count)) : single;
             boolean everyone = index % 2 == 0;
+            if (pixels) {
+                OwnShows.Point point = OwnShows.point(particle, index, tick);
+                send(world, point.particle(), audience, everyone, source, x + point.dx(), y + point.dy(),
+                        z + point.dz(), 0, 0, pixelData(point));
+                continue;
+            }
             if (own && isSteam(index)) {
                 send(world, Particle.WHITE_SMOKE, audience, everyone, source, x, y + 0.2, z, 0.02, 0.01, null);
                 continue;
@@ -213,6 +242,9 @@ public final class ParticleShows {
 
     /** What is actually spawned: a coloured particle given a lifetime becomes a trail point, which has one. */
     public static Particle drawnAs(String particle, Integer lifetimeTicks) {
+        if (isPixels(particle)) {
+            return STARDUST.equalsIgnoreCase(particle.trim()) ? Particle.END_ROD : Particle.DUST;
+        }
         if (isOwn(particle)) {
             return Particle.ITEM;
         }
@@ -270,6 +302,7 @@ public final class ParticleShows {
         }
         int from = colour == null ? 0xFFFFFF : colour;
         boolean own = isOwn(particle);
+        boolean pixels = isPixels(particle);
         Object single = own ? beans() : BukkitEffectSink.dataFor(found.getDataType(), from, dustSize(count));
         boolean blended = colourTo != null && takesColour(particle);
         long rounds = Math.max(1, seconds) * 10L;
@@ -285,6 +318,13 @@ public final class ParticleShows {
             List<double[]> points = shape.offsets(frame, eye.getYaw() + 180, count);
             for (int index = 0; index < points.size(); index++) {
                 double[] offset = points.get(index);
+                if (pixels) {
+                    OwnShows.Point point = OwnShows.point(particle, index, frame);
+                    viewer.spawnParticle(point.particle(), feet.getX() + offset[0] + point.dx(),
+                            feet.getY() + offset[1] + point.dy(), feet.getZ() + offset[2] + point.dz(), 1, 0, 0, 0, 0,
+                            pixelData(point));
+                    continue;
+                }
                 if (own && isSteam(index)) {
                     viewer.spawnParticle(Particle.WHITE_SMOKE, feet.getX() + offset[0], feet.getY() + offset[1] + 0.2,
                             feet.getZ() + offset[2], 1, 0, 0.02, 0, 0.01);

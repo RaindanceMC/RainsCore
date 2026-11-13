@@ -195,6 +195,8 @@ public final class ParticleCatalogue {
             case "BLOCK", "BLOCK_MARKER", "FALLING_DUST" -> "GRASS_BLOCK";
             case "ITEM" -> "ITEM_FRAME";
             case "COFFEE" -> "COCOA_BEANS";
+            case "TWITCH" -> "PURPLE_DYE";
+            case "STARDUST" -> "GLOWSTONE_DUST";
             default -> groupOf(name).icon();
         };
     }
