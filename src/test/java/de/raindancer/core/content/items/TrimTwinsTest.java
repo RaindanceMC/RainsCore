@@ -46,4 +46,16 @@ class TrimTwinsTest {
         assertThat(twins.materials()).containsExactlyInAnyOrder(Material.IRON_HORSE_ARMOR, Material.DIAMOND_HORSE_ARMOR);
         assertThat(twins.prefix()).isEqualTo("horse");
     }
+
+    @Test
+    @DisplayName("another plugin's twin is never mirrored again: one twin per vanilla recipe and base, whoever starts first")
+    void twinsOfTwinsAreSkipped() {
+        NamespacedKey elytraTwin = new NamespacedKey("rainselytra", "elytra/minecraft/coast_armor_trim_smithing_template_smithing_trim");
+        assertThat(TrimTwins.isTwin(elytraTwin)).isFalse();
+        TrimTwins.remember(elytraTwin);
+        assertThat(TrimTwins.isTwin(elytraTwin)).isTrue();
+        assertThat(TrimTwins.isTwin(COAST)).isFalse();
+        TrimTwins.forget(elytraTwin);
+        assertThat(TrimTwins.isTwin(elytraTwin)).isFalse();
+    }
 }

@@ -30,6 +30,8 @@ public final class TrimTwins {
     private final String prefix;
     private final Set<Material> materials;
     private final List<NamespacedKey> added = new ArrayList<>();
+    /** Every twin any plugin has added: a twin is a trim recipe too, and mirroring it again would duplicate it. */
+    private static final java.util.Set<NamespacedKey> ALL_TWINS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /**
      * @param namespace the twins' namespace, the plugin's own
@@ -65,11 +67,23 @@ public final class TrimTwins {
                 && choice.getChoices().stream().anyMatch(materials::contains);
     }
 
+    static boolean isTwin(NamespacedKey key) {
+        return ALL_TWINS.contains(key);
+    }
+
+    static void remember(NamespacedKey key) {
+        ALL_TWINS.add(key);
+    }
+
+    static void forget(NamespacedKey key) {
+        ALL_TWINS.remove(key);
+    }
+
     List<SmithingTrimRecipe> mirror(Iterable<? extends Recipe> recipes) {
         RecipeChoice base = new RecipeChoice.MaterialChoice(materials.stream().sorted().toList());
         List<SmithingTrimRecipe> twins = new ArrayList<>();
         for (Recipe recipe : recipes) {
-            if (recipe instanceof SmithingTrimRecipe trim) {
+            if (recipe instanceof SmithingTrimRecipe trim && !isTwin(trim.getKey())) {
                 twinKey(trim.getKey(), namespace, prefix, trim.getTrimPattern() != null, takes(trim.getBase()))
                         .ifPresent(key -> twins.add(new SmithingTrimRecipe(key, trim.getTemplate(), base,
                                 trim.getAddition(), trim.getTrimPattern(), trim.willCopyDataComponents())));
@@ -90,6 +104,7 @@ public final class TrimTwins {
             SmithingTrimRecipe twin = twins.get(i);
             if (server.addRecipe(twin, i == twins.size() - 1)) {
                 added.add(twin.getKey());
+                remember(twin.getKey());
             }
         }
         return added.size();
@@ -98,6 +113,7 @@ public final class TrimTwins {
     public synchronized void unregister() {
         for (int i = 0; i < added.size(); i++) {
             server.removeRecipe(added.get(i), i == added.size() - 1);
+            forget(added.get(i));
         }
         added.clear();
     }
