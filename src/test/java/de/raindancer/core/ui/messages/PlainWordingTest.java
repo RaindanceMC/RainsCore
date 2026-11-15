@@ -34,6 +34,10 @@ class PlainWordingTest {
             "(?i)\\b(oops|whoops|woohoo|hooray|yay|awesome|amazing|let's|have fun|enjoy|boom"
                     + "|not just|not only|not merely)\\b");
 
+    /** Help keys holding ids, search words and command names; {cmd:/boom} is a command, not cheer. */
+    private static final Pattern HELP_KEYS = Pattern.compile("^(aliases|keywords|commands|related|id|icon|category)(\\[\\d+])?$");
+    private static final Pattern COMMAND_SYNTAX = Pattern.compile("\\{(cmd|run):[^}]*}");
+
     private static final Pattern LITERAL = Pattern.compile("\"\"\"(.*?)\"\"\"|\"((?:[^\"\\\\\\n]|\\\\.)*)\"", Pattern.DOTALL);
 
     static List<String> problems(String text, boolean phrases) {
@@ -68,7 +72,12 @@ class PlainWordingTest {
         assertThat(lines).as("%s has no lines, so this test reads nothing", file).isNotEmpty();
         List<String> found = new ArrayList<>();
         for (Map.Entry<String, String> line : lines) {
-            for (String problem : problems(line.getValue(), phrases)) {
+            List<String> problems = new ArrayList<>(problems(line.getValue(), false));
+            if (phrases && !HELP_KEYS.matcher(line.getKey()).find()) {
+                problems(COMMAND_SYNTAX.matcher(line.getValue()).replaceAll(""), true).stream()
+                        .filter(problem -> problem.startsWith("'")).forEach(problems::add);
+            }
+            for (String problem : problems) {
                 found.add(file.getFileName() + ": " + line.getKey() + ": " + problem + ": " + line.getValue().strip());
             }
         }
@@ -98,6 +107,8 @@ class PlainWordingTest {
         assertThat(problems("Oops, that did not work.", true)).containsExactly("'Oops'");
         assertThat(problems("(?![a-z])", false)).isEmpty();
         assertThat(problems("Range 1-10, a well-known e-mail.", true)).isEmpty();
+        assertThat(problems(COMMAND_SYNTAX.matcher("{cmd:/boom} blows up").replaceAll(""), true)).isEmpty();
+        assertThat(HELP_KEYS.matcher("aliases[2]").find()).isTrue();
         assertThat(literals("// \"Saved — no\"\nString s = \"Saved.\"; /* \"— no\" */"))
                 .containsExactly(Map.entry(2, "Saved."));
     }
