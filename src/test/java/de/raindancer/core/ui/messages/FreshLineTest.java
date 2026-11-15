@@ -87,7 +87,7 @@ class FreshLineTest {
     }
 
     @Test
-    @DisplayName("a list that changed size, from a reload or the tone, starts a new round rather than breaking")
+    @DisplayName("a list that changed size after a reload starts a new round rather than breaking")
     void followsTheList() {
         Messages messages = with("""
                 fun:

@@ -147,56 +147,23 @@ public final class Messages {
         old.forEach((key, value) -> retired.computeIfAbsent(key, any -> ConcurrentHashMap.newKeySet()).add(value));
     }
 
-    // ------------------------------------------------------------------------------- tone
-
-    /** How the server talks: with a dry joke after a refusal, or without one. */
-    public enum Tone { PLAYFUL, SERIOUS }
-
-    private volatile Tone tone = Tone.PLAYFUL;
-
-    /** The plain-spoken version of the lines that have a joke in them, from Core and every module. */
-    private final Map<String, Object> serious = new ConcurrentHashMap<>();
-
-    public Tone tone() {
-        return tone;
-    }
-
-    /** Takes hold on the next message; nothing is cached anywhere that would need telling. */
-    public void tone(Tone tone) {
-        this.tone = tone == null ? Tone.PLAYFUL : tone;
-    }
-
     /**
-     * Takes a {@code messages-serious.yml}: the same keys as the playful file, said plainly.
+     * Plugins built while there were two tones still hand over their {@code messages-serious.yml}.
+     * There is one wording now, so the file is only closed.
      *
-     * <p>Only the lines that need it — a key missing here keeps its one wording in both tones. Like
-     * {@link #defineFrom}, the first file to name a key keeps it, so load order between modules cannot
-     * reword somebody else's lines.
-     *
-     * @param bundled the serious file, from {@code getResourceAsStream}; closed here, null is nothing
-     * @return how many lines were taken up
+     * @deprecated nothing to hand over any more; kept so already-built plugins still load
+     * @return always 0
      */
+    @Deprecated
     public int seriousFrom(InputStream bundled) {
-        if (bundled == null) {
-            return 0;
-        }
-        Map<String, Object> wording = new LinkedHashMap<>();
-        try (InputStream stream = bundled) {
-            flatten(parse(stream), "", wording);
-        } catch (Exception broken) {
-            problems.add("a serious wording file could not be read (" + broken.getMessage() + ")");
-            log.warn("A serious wording file could not be read ({}); those lines keep their playful "
-                    + "wording in serious mode. This is a fault in the plugin, not in your configuration.",
-                    broken.getMessage());
-            return 0;
-        }
-        int taken = 0;
-        for (Map.Entry<String, Object> line : wording.entrySet()) {
-            if (serious.putIfAbsent(line.getKey(), line.getValue()) == null) {
-                taken++;
+        if (bundled != null) {
+            try {
+                bundled.close();
+            } catch (IOException ignored) {
+                // Nothing was read from it, so nothing is lost.
             }
         }
-        return taken;
+        return 0;
     }
 
     /**
@@ -692,7 +659,7 @@ public final class Messages {
         Deck deck = decks.computeIfAbsent(key, any -> new Deck());
         synchronized (deck) {
             if (!deck.dealtFrom.equals(options)) {
-                // Reloaded, reworded or switched tone: a new list is a new game.
+                // Reloaded or reworded: a new list is a new game.
                 deck.dealtFrom = List.copyOf(options);
                 deck.left.clear();
                 deck.last = -1;
@@ -765,15 +732,6 @@ public final class Messages {
         }
         Object owner = theirs.get(key);
         Object bundled = shipped.get(key);
-        if (tone == Tone.SERIOUS) {
-            Object plain = serious.get(key);
-            // The owner's file holds every line we shipped, written out on the first start, so a line
-            // there is only theirs if it differs from ours. One that still reads like the playful
-            // default was never chosen by anybody, and serious mode is the owner choosing now.
-            if (plain != null && (owner == null || owner.equals(bundled) || owner.equals(defined.get(key)))) {
-                return plain;
-            }
-        }
         if (owner != null) {
             return owner;
         }

@@ -120,11 +120,11 @@ class PlainWordingTest {
     }
 
     @Test
-    @DisplayName("there is one tone only, so messages-serious.yml has no lines")
-    void oneTone() throws IOException {
-        assertThat(yaml(RESOURCES.resolve("messages-serious.yml")))
+    @DisplayName("there is one tone only, so there is no messages-serious.yml")
+    void oneTone() {
+        assertThat(RESOURCES.resolve("messages-serious.yml"))
                 .as("messages.yml already is the plain wording; a second one would drift from it")
-                .isNull();
+                .doesNotExist();
     }
 
     @Test

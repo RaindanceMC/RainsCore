@@ -506,10 +506,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             de.raindancer.core.platform.log.Log.of("core").warn("The list of older message wordings could not be read: {}", unreadable.toString());
         }
         messages.load(getResource("messages.yml"));
-        // The same lines without the jokes, for a server that set the tone to serious. Modules hand
-        // theirs over the same way, next to their messages.yml.
-        messages.seriousFrom(getResource("messages-serious.yml"));
-        messages.tone(settings.current().messageTone());
         if (!messages.problems().isEmpty()) {
             log.warn("messages.yml: {}", String.join("; ", messages.problems()));
         }
@@ -1348,9 +1344,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 de.raindancer.core.social.desk.ServiceDesk.BANK, config.bankerSkins());
         if (chatLog != null) {
             chatLog.enabled(config.chatLogEnabled());
-        }
-        if (messages != null) {
-            messages.tone(config.messageTone());
         }
         if (travelShow != null) {
             travelShow.densities(config.teleportWaitParticles(), config.teleportArrivalParticles());
