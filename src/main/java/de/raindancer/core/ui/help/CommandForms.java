@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Locale;
 import java.util.Set;
 
@@ -18,12 +20,15 @@ import java.util.Set;
  *   <li>{@code fire|quit} is a pick between fixed words; {@code [heads|tails]} the same, optional.</li>
  *   <li>{@code a | b} — spaced — is two separate ways to use the command.</li>
  *   <li>A line wholly in brackets ({@code [take <amount>]}) means the command works without it too.</li>
- *   <li>{@code (nothing)} means it takes nothing; {@code — console only} after a dash is a note, not a word.</li>
+ *   <li>{@code (nothing)} means it takes nothing; {@code : console only} after a colon is a note, not a word.</li>
  * </ul>
- * A line that cannot be read sensibly still becomes a form — the worst case is a field too many, never a command
+ * A line that cannot be read sensibly still becomes a form: the worst case is a field too many, never a command
  * run with words its plugin did not ask for.
  */
 public final class CommandForms {
+
+    /** ": " before the remark; the dash is what plugins built before Core 2.101 still write. */
+    private static final Pattern REMARK = Pattern.compile(": | \u2014 ");
 
     private CommandForms() {
     }
@@ -39,10 +44,10 @@ public final class CommandForms {
         for (String option : note.options()) {
             String text = option.strip();
             String remark = "";
-            int dash = text.indexOf(" — ");
-            if (dash >= 0) {
-                remark = text.substring(dash + 3).strip();
-                text = text.substring(0, dash).strip();
+            Matcher remarkAt = REMARK.matcher(text);
+            if (remarkAt.find()) {
+                remark = text.substring(remarkAt.end()).strip();
+                text = text.substring(0, remarkAt.start()).strip();
             }
             if (text.isEmpty() || text.equalsIgnoreCase("(nothing)")) {
                 add(forms, seen, new CommandForm(command, List.of(), remark));

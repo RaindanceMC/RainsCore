@@ -49,10 +49,22 @@ class CommandFormsTest {
         assertThat(fire.fields().getFirst().choices()).containsExactly("fire", "quit");
         assertThat(fire.build(Map.of("f0", "quit", "f1", "Bo"))).contains("/hire quit Bo");
 
-        List<CommandForm> token = forms("discordlink", "token <token> | token clear — console only");
+        List<CommandForm> token = forms("discordlink", "token <token> | token clear: console only");
         assertThat(token).hasSize(2);
         assertThat(token.get(1).build(Map.of())).contains("/discordlink token clear");
         assertThat(token.get(1).note()).isEqualTo("console only");
+    }
+
+    @Test
+    @DisplayName("a remark follows ': ', or a dash in plugins built before that")
+    void remarks() {
+        assertThat(forms("warp", "<name>: go there").getFirst())
+                .satisfies(form -> assertThat(form.note()).isEqualTo("go there"))
+                .satisfies(form -> assertThat(form.usage()).isEqualTo("/warp <name>"));
+        assertThat(forms("warp", "<name> \u2014 go there").getFirst())
+                .satisfies(form -> assertThat(form.note()).isEqualTo("go there"))
+                .satisfies(form -> assertThat(form.usage()).isEqualTo("/warp <name>"));
+        assertThat(forms("tp", "<x>:<z>").getFirst().note()).as("a colon inside the syntax is no remark").isEmpty();
     }
 
     @Test
