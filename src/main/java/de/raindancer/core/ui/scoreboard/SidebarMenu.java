@@ -67,14 +67,14 @@ public final class SidebarMenu extends Menu {
             lore.add(switch (fits.getOrDefault(owner, on ? SidebarSections.Fit.SHOWN : SidebarSections.Fit.HIDDEN)) {
                 case SHOWN -> "<green>Shown";
                 case SHORTENED -> "<yellow>Shown, made smaller to fit";
-                case NO_ROOM -> "<red>Does not fit <gray>— move it up, or hide another";
+                case NO_ROOM -> "<red>Does not fit. <gray>Move it up, or hide another";
                 case EMPTY -> "<green>Shown <dark_gray>(nothing to say right now)";
                 case HIDDEN -> "<gray>Hidden";
             });
             SidebarSections.Size size = section.size();
             if (size != null) {
                 lore.add("<gray>Showing <white>" + size.clamp(mine.sizeOf(owner, size.fallback())) + "</white> "
-                        + MINI.escapeTags(size.unit()) + " <dark_gray>(" + size.min() + "–" + Math.min(9, size.max()) + ")");
+                        + MINI.escapeTags(size.unit()) + " <dark_gray>(" + size.min() + " to " + Math.min(9, size.max()) + ")");
             }
             lore.add("");
             lore.add("<yellow>Click<gray> to " + (on ? "hide" : "show") + " it");
@@ -85,7 +85,7 @@ public final class SidebarMenu extends Menu {
                 lore.add("<yellow>Right click<gray> to move it down");
             }
             if (size != null) {
-                lore.add("<yellow>1</yellow><gray>–</gray><yellow>" + Math.min(9, size.max())
+                lore.add("<yellow>1</yellow><gray> to </gray><yellow>" + Math.min(9, size.max())
                         + "</yellow><gray> while pointing at it: how many");
             }
             // Left to right, then the next row, in the sidebar's order: seven to a row, twenty-one at most.

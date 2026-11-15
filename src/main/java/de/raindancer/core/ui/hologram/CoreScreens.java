@@ -59,7 +59,7 @@ public final class CoreScreens {
     /** The server's health and history: status now, charts of the last hours, the record of players at once. */
     public static void registerStats(Screens screens, Plugin core, Server server, ServerStats stats) {
         screens.register(core, ScreenKind.everyone("server-status", "Server status",
-                "Ticks per second, tick time, memory, processor and players — right now, with meters.",
+                "Ticks per second, tick time, memory, processor and players right now, with meters.",
                 Material.REDSTONE_LAMP, () -> status(server, stats)));
         screens.register(core, ScreenKind.everyone("chart-tps", "TPS chart", "Ticks per second over the last six hours.",
                 Material.REPEATER, () -> tpsChart(stats)));

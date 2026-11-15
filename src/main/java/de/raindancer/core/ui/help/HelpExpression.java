@@ -295,7 +295,7 @@ public final class HelpExpression {
                 index++;
             }
             if (start == index) {
-                throw new IllegalArgumentException("'" + c + "' on its own in '" + expression + "' — did you mean "
+                throw new IllegalArgumentException("'" + c + "' on its own in '" + expression + "'. Did you mean "
                         + c + c + "?");
             }
             tokens.add(expression.substring(start, index));

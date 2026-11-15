@@ -31,7 +31,7 @@ public final class ChecklistChat {
     public static List<Component> lines(Checklist list, UUID reader, ChatButtons buttons) {
         List<Component> lines = new ArrayList<>();
         lines.add(MINI.deserialize("<" + Style.titleLabel() + ">" + Text.literal(list.title())
-                + " <dark_gray>— " + (list.ready() ? "<" + Style.ok() + ">" : "<" + Style.bad() + ">")
+                + "<dark_gray>: " + (list.ready() ? "<" + Style.ok() + ">" : "<" + Style.bad() + ">")
                 + Text.literal(list.summary())));
         for (Map.Entry<String, List<Checklist.Check>> group : list.byGroup().entrySet()) {
             if (!group.getKey().isEmpty()) {
@@ -54,7 +54,7 @@ public final class ChecklistChat {
         String colour = check.ok() ? Style.ok() : check.blocks() ? Style.bad() : Style.warn();
         String mark = check.ok() ? "✔" : check.blocks() ? "✘" : "⚠";
         Component line = MINI.deserialize(" <" + colour + ">" + mark + " " + Text.literal(check.label())
-                + (check.detail().isEmpty() ? "" : " <dark_gray>— <gray>" + Text.literal(check.detail())));
+                + (check.detail().isEmpty() ? "" : "<dark_gray>: <gray>" + Text.literal(check.detail())));
         if (reader == null || buttons == null || !buttons.isClickable()) {
             return line;
         }

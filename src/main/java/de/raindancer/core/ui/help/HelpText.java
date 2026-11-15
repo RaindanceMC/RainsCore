@@ -89,7 +89,7 @@ public final class HelpText {
                 String lower = content.toLowerCase(Locale.ROOT);
                 if (lower.startsWith("if:")) {
                     if (chosen != null) {
-                        problems.add("an {if} inside another {if} — write two sentences instead: " + content);
+                        problems.add("an {if} inside another {if}. Write two sentences instead: " + content);
                         continue;
                     }
                     chosen = condition(content.substring(3), context, problems);
@@ -256,7 +256,7 @@ public final class HelpText {
             case "topic" -> topic(rest, context, problems);
             case "url" -> url(rest, problems);
             default -> {
-                problems.add("{" + content + "} is no placeholder this help knows — see HelpText");
+                problems.add("{" + content + "} is no placeholder this help knows (see HelpText)");
                 yield Text.literal("{" + content + "}");
             }
         };
@@ -457,7 +457,7 @@ public final class HelpText {
             if (c == '{') {
                 int end = text.indexOf('}', index + 1);
                 if (end < 0) {
-                    problems.add("a '{' that is never closed — write {{ for a brace");
+                    problems.add("a '{' that is never closed. Write {{ for a brace");
                     literal.append(text.substring(index));
                     break;
                 }
@@ -467,7 +467,7 @@ public final class HelpText {
                 }
                 String content = text.substring(index + 1, end);
                 if (content.indexOf('{') >= 0) {
-                    problems.add("{" + content + "} — a placeholder cannot hold another one");
+                    problems.add("{" + content + "}: a placeholder cannot hold another one");
                 }
                 tokens.add(new Tag(content));
                 index = end + 1;

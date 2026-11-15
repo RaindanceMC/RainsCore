@@ -90,7 +90,7 @@ public record CommandNote(String plugin, String command, String sentence, List<S
             // Said here rather than tolerated, because the failure otherwise is a book that reads
             // fine on the page it was written for and overruns three pages later.
             throw new IllegalArgumentException("/" + command + " describes itself in " + said.length()
-                    + " characters. The directory takes one sentence — at most " + LONGEST_SENTENCE
+                    + " characters. The directory takes one sentence, at most " + LONGEST_SENTENCE
                     + ". Anything longer belongs in that plugin's own manual.");
         }
         return said;

@@ -73,7 +73,7 @@ public final class VanishChatGuard implements Listener {
     private void ask(Player player, String line, boolean command) {
         UUID id = player.getUniqueId();
         ChatButton send = buttons.label("<green>[Send anyway]</green>")
-                .tooltip("<gray>Everybody will see it — and know you are here")
+                .tooltip("<gray>Everybody will see it and know you are here")
                 .forOnly(id).expiringIn(VanishedSpeech.ALLOW_FOR)
                 .does(clicker -> resend(player, line, command));
         ChatButton sendAndStop = buttons.label("<yellow>[Send, and stop asking]</yellow>")

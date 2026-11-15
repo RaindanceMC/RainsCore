@@ -87,7 +87,7 @@ public record AuditEntry(long id, Instant at, String feature, String action,
             said.append(' ').append(to);
         }
         if (detail != null && !detail.isBlank()) {
-            said.append(" — ").append(detail);
+            said.append(": ").append(detail);
         }
         return said.toString();
     }

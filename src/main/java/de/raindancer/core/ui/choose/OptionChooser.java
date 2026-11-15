@@ -112,7 +112,7 @@ public final class OptionChooser extends PaginatedMenu<String> {
      */
     public static String readable(String option) {
         if (option == null || option.isBlank()) {
-            return "—";
+            return "-";
         }
         String spaced = option.replace('_', ' ').replace('-', ' ').toLowerCase(Locale.ROOT).trim();
         return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);

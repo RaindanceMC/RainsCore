@@ -49,7 +49,7 @@ public final class Parsers {
         return typed -> {
             String clean = typed == null ? "" : typed.strip();
             if (clean.isEmpty()) {
-                return Parsed.no("Type something — or say cancel.");
+                return Parsed.no("Type something, or say cancel.");
             }
             if (clean.length() > maxLength) {
                 return Parsed.no("At most " + maxLength + " characters; that was " + clean.length() + ".");
@@ -74,7 +74,7 @@ public final class Parsers {
         return typed -> {
             try {
                 int value = Integer.parseInt(typed == null ? "" : typed.strip());
-                return value < min || value > max ? Parsed.no("Not in range — " + range + ".") : Parsed.ok(value);
+                return value < min || value > max ? Parsed.no("Not in range: " + range + ".") : Parsed.ok(value);
             } catch (NumberFormatException notANumber) {
                 return Parsed.no("That is not " + range + ".");
             }
@@ -88,7 +88,7 @@ public final class Parsers {
             try {
                 double value = Double.parseDouble((typed == null ? "" : typed.strip()).replace(',', '.'));
                 if (Double.isNaN(value) || value < min || value > max) {
-                    return Parsed.no("Not in range — " + range + ".");
+                    return Parsed.no("Not in range: " + range + ".");
                 }
                 return Parsed.ok(value);
             } catch (NumberFormatException notANumber) {
@@ -107,7 +107,7 @@ public final class Parsers {
     public static Parser<de.raindancer.core.social.economy.Money> money(
             de.raindancer.core.social.economy.Currency currency, boolean zero,
             de.raindancer.core.social.economy.Money most) {
-        String example = zero ? "an amount like 12, 12.50 or 1.5k — or 0 for none" : "an amount like 12, 12.50 or 1.5k";
+        String example = zero ? "an amount like 12, 12.50 or 1.5k, or 0 for none" : "an amount like 12, 12.50 or 1.5k";
         return typed -> {
             var read = currency.parse(typed == null ? "" : typed.strip());
             if (read.isEmpty() || read.get().isNegative() || (!zero && !read.get().isPositive())) {

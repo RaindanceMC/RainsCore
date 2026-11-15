@@ -80,7 +80,7 @@ public final class SettingsSchema<T> {
         if (!type.isRecord()) {
             throw new IllegalArgumentException(type.getSimpleName()
                     + " is not a record. Settings are a record because the snapshot handed to a "
-                    + "plugin has to be immutable — a mutable one would let one caller's edit "
+                    + "plugin has to be immutable. A mutable one would let one caller's edit "
                     + "appear in another's copy without anything being saved.");
         }
         Settings declaration = type.getAnnotation(Settings.class);
@@ -145,7 +145,7 @@ public final class SettingsSchema<T> {
             for (String other : all) {
                 if (other.startsWith(key + ".") && (mine.contains(key) || mine.contains(other))) {
                     found.add("'" + key + "' is a value and also holds '" + other
-                            + "' — YAML keeps one or the other, so saving one would wipe the other");
+                            + "'. YAML keeps one or the other, so saving one would wipe the other");
                 }
             }
         }

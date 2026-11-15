@@ -21,7 +21,7 @@ class RunTextTest {
         assertThat(RunText.clock(Duration.ofMillis(3_723_004))).isEqualTo("1:02:03.004");
         assertThat(RunText.clock(Duration.ofMillis(5_000))).isEqualTo("0:05.000");
         assertThat(RunText.clock(Duration.ZERO)).isEqualTo("0:00.000");
-        assertThat(RunText.clock(null)).isEqualTo("—");
+        assertThat(RunText.clock(null)).isEqualTo("-");
     }
 
     @Test

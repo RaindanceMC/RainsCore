@@ -36,7 +36,7 @@ public final class SupporterPermission implements Listener {
     public static Permission permission(org.bukkit.plugin.PluginManager manager) {
         Permission found = manager.getPermission(NODE);
         if (found == null) {
-            found = new Permission(NODE, "Bought the owner a coffee — given and taken by RainsCore", PermissionDefault.FALSE);
+            found = new Permission(NODE, "Bought the owner a coffee, given and taken by RainsCore", PermissionDefault.FALSE);
             manager.addPermission(found);
         }
         return found;

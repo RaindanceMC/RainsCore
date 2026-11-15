@@ -162,7 +162,7 @@ public final class MaintenanceCommand implements BasicCommand {
         // Never on this server: asked of Mojang, off the server's threads. Bedrock players have to have joined once.
         Bukkit.createProfile(name).update().whenComplete((profile, failure) -> {
             if (failure != null || profile == null || profile.getId() == null) {
-                say(sender, "<red>No player called " + MINI.escapeTags(name) + " — not on this server and not at Mojang. "
+                say(sender, "<red>No player called " + MINI.escapeTags(name) + ", not on this server and not at Mojang. "
                         + "Bedrock players need to have joined once.");
                 return;
             }
@@ -249,7 +249,7 @@ public final class MaintenanceCommand implements BasicCommand {
 
     private static void warnIfNotSaved(CommandSender sender, boolean saved) {
         if (!saved) {
-            say(sender, "<yellow>maintenance.yml could not be written — this lasts until the next restart. The console says why.");
+            say(sender, "<yellow>maintenance.yml could not be written. This lasts until the next restart. The console says why.");
         }
     }
 

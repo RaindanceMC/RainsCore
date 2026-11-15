@@ -164,6 +164,6 @@ public enum TeamEmblem {
     public String describe() {
         return isVisible()
                 ? "Shown as " + glyph + " before the team's name, so two teams may share a colour"
-                : "No emblem — this team is told apart by its colour alone";
+                : "No emblem. This team is told apart by its colour alone";
     }
 }

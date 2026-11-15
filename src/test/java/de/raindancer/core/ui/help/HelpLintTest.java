@@ -75,7 +75,7 @@ public class HelpLintTest {
                 .anyMatch(p -> p.contains("/balance is in no topic"))
                 .anyMatch(p -> p.contains("'shop'"))
                 .anyMatch(p -> p.contains("'economy:pay.tax' does not exist"))
-                .anyMatch(p -> p.contains("'features.pay' — write settings as plugin:key"))
+                .anyMatch(p -> p.contains("'features.pay': write settings as plugin:key"))
                 .anyMatch(p -> p.contains("'economy:features.paying' does not exist"))
                 .anyMatch(p -> p.contains("fact 'nobody'"));
     }

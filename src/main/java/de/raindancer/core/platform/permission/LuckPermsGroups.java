@@ -146,7 +146,7 @@ public final class LuckPermsGroups implements PermissionGroups {
             group.data().add(DisplayNameNode.builder(seed.displayName()).build());
         }
         groups.saveGroup(group).join();
-        log.info("Created the LuckPerms group {} with its default permissions — edit it in /lp editor, "
+        log.info("Created the LuckPerms group {} with its default permissions. Edit it in /lp editor, "
                 + "it will not be changed by Rain's plugins again.", seed.name());
         return true;
     }

@@ -33,21 +33,21 @@ public final class CoreHealth {
                 .check(Check.of("database", "Homes, warps, bans and items are being saved", facts.coreDatabase())
                         .in("Saving")
                         .because(facts.coreDatabase() ? "core.db is open."
-                                : "core.db could not be opened — see the server log. Changes are kept until "
+                                : "core.db could not be opened. See the server log. Changes are kept until "
                                         + "restart but not saved; nothing on disk is touched."))
                 .check(Check.of("audit", "What moderators do is being recorded", facts.auditDatabase())
                         .in("Saving")
                         .because(facts.auditDatabase() ? "audit.db is open."
-                                : "audit.db could not be opened — see the server log."))
+                                : "audit.db could not be opened. See the server log."))
                 .check(Check.of("config", "config.yml reads cleanly", facts.configProblems().isEmpty())
                         .in("Files")
                         .because(facts.configProblems().isEmpty() ? "Every setting is as written."
-                                : first(facts.configProblems()) + " — fix it in plugins/RainsCore/config.yml, "
+                                : first(facts.configProblems()) + ". Fix it in plugins/RainsCore/config.yml, "
                                         + "or change it with /settings."))
                 .check(Check.warning("messages", "messages.yml reads cleanly", facts.messageProblems().isEmpty())
                         .in("Files")
                         .because(facts.messageProblems().isEmpty() ? "Every message is defined."
-                                : first(facts.messageProblems()) + " — the built-in wording is used meanwhile."))
+                                : first(facts.messageProblems()) + ". The built-in wording is used meanwhile."))
                 .check(Check.warning("sidebars", "Sidebars can be drawn", facts.sidebars())
                         .in("Display")
                         .because(facts.sidebars() ? "The scoreboard code recognises this server."
@@ -62,7 +62,7 @@ public final class CoreHealth {
                                         + "reach. Set packs-public-address in /settings."))
                 .check(Check.warning("permissions", "Permissions are kept somewhere that lasts", true)
                         .in("Server")
-                        .because(facts.luckPerms() ? "Through LuckPerms." : "In Core's own grants.yml — "
+                        .because(facts.luckPerms() ? "Through LuckPerms." : "In Core's own grants.yml. "
                                 + "install LuckPerms for groups and inheritance."))
                 .check(Check.warning("scheduler", "Scheduling matches the server", true)
                         .in("Server")

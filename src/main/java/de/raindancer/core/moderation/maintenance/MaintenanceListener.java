@@ -43,7 +43,7 @@ public final class MaintenanceListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         if (maintenance.isOn()) {
             event.getPlayer().sendMessage(MiniMessage.miniMessage().deserialize(
-                    "<gold>Maintenance mode is on</gold> <gray>— only ops and the maintenance list can join. "
+                    "<gold>Maintenance mode is on.</gold> <gray>Only ops and the maintenance list can join. "
                             + "<white>/maintenance off</white> opens the server."));
         }
     }

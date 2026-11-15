@@ -108,7 +108,7 @@ public final class InventoryWindow implements InventoryHolder {
         if (words != null) {
             return words.get("invsee.title", "who", ownerName, "access", access.saying(words));
         }
-        return Component.text(ownerName + " — " + access.saying())
+        return Component.text(ownerName + ": " + access.saying())
                 .color(access.canEdit() ? NamedTextColor.GOLD : NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false);
     }
@@ -220,7 +220,7 @@ public final class InventoryWindow implements InventoryHolder {
         }
         if (missing > 0) {
             log.warn("{} kept {} stack(s) taken out of {}'s saved inventory although the change was "
-                    + "not written — they are no longer in the moderator's inventory to take back.",
+                    + "not written. They are no longer in the moderator's inventory to take back.",
                     watcher.getName(), missing, ownerName);
         }
         return missing;
@@ -262,7 +262,7 @@ public final class InventoryWindow implements InventoryHolder {
                 ? button(Material.ENDER_CHEST,
                         say("invsee.ender-chest-button.name", "Ender Chest"),
                         say("invsee.ender-chest-button.lore",
-                                "Their ender chest — " + carried.countIn(Section.ENDER_CHEST)
+                                "Their ender chest: " + carried.countIn(Section.ENDER_CHEST)
                                         + " of 27 used",
                                 "used", carried.countIn(Section.ENDER_CHEST),
                                 "total", Section.ENDER_CHEST.size()),

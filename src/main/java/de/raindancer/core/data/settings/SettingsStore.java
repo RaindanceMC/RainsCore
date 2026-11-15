@@ -433,7 +433,7 @@ public final class SettingsStore<T> {
         if (!SettingCodec.isInRange(setting, value)) {
             Object clamped = SettingCodec.clamp(setting, value);
             found.add(setting.key() + " is " + SettingCodec.display(value) + ", outside "
-                    + setting.min() + "–" + setting.max() + ", so "
+                    + setting.min() + " to " + setting.max() + ", so "
                     + SettingCodec.display(clamped) + " is used");
             return clamped;
         }

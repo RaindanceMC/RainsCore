@@ -228,7 +228,7 @@ public final class HelpDialogs {
             buttons.add(formButton(note, form, dialogs -> dialogs.command(note, backTo)));
         }
         show(note.slashed(), List.of(DialogBody.plainMessage(MINI.deserialize("<" + HelpText.LINK + ">"
-                        + Text.literal(note.slashed()) + "</" + HelpText.LINK + "> <gray>— " + Text.literal(note.sentence())
+                        + Text.literal(note.slashed()) + "</" + HelpText.LINK + "><gray>: " + Text.literal(note.sentence())
                         + "\n\n").append(line("help.command-pick", false)), TEXT_WIDTH)),
                 List.of(), buttons, back(backTo), 1);
     }
@@ -294,7 +294,7 @@ public final class HelpDialogs {
         List<io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
         if (!field.required()) {
             entries.add(io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput.OptionEntry.create(
-                    LEAVE_OUT, Component.text("—"), true));
+                    LEAVE_OUT, Component.text("-"), true));
         }
         boolean first = field.required();
         for (String choice : choices) {

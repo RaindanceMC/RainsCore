@@ -152,8 +152,8 @@ public class LearningMenu extends TreeMenu {
             case BARRED -> "<dark_red>";
         };
         List<String> lore = new ArrayList<>();
-        String kind = node.mastery() ? "Mastery — earned by finishing the branch"
-                : node.capstone() ? "Capstone" : node.choice() ? "Choice — shuts the other side" : null;
+        String kind = node.mastery() ? "Mastery: earned by finishing the branch"
+                : node.capstone() ? "Capstone" : node.choice() ? "Choice: shuts the other side" : null;
         if (kind != null) {
             lore.add("<gold>" + kind);
         }

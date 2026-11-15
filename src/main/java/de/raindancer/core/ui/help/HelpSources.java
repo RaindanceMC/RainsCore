@@ -54,7 +54,7 @@ public final class HelpSources {
             try {
                 found.addAll(fromJar(plugin.getName(), jar));
             } catch (IOException unreadable) {
-                problems.add(plugin.getName() + ": its jar could not be read for help files — " + unreadable.getMessage());
+                problems.add(plugin.getName() + ": its jar could not be read for help files: " + unreadable.getMessage());
             }
         }
         return found;

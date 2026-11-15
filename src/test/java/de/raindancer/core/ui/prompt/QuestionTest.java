@@ -119,7 +119,7 @@ class QuestionTest {
         @DisplayName("numbers, decimals with a comma, yes/no in two languages")
         void numbers() {
             assertThat(Parsers.number(0, 10).parse("2,5").value()).isEqualTo(2.5);
-            assertThat(Parsers.number(0, 10).parse("11").problem()).isEqualTo("Not in range — a number from 0 to 10.");
+            assertThat(Parsers.number(0, 10).parse("11").problem()).isEqualTo("Not in range: a number from 0 to 10.");
             assertThat(Parsers.yesNo().parse("Ja").value()).isTrue();
             assertThat(Parsers.yesNo().parse("off").value()).isFalse();
         }

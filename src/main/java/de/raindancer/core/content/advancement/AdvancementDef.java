@@ -25,7 +25,7 @@ public record AdvancementDef(String plugin, String id, String parent, String tit
         plugin = clean(plugin, "plugin");
         id = clean(id, "id");
         if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException("An advancement needs a title — it is what the player is shown.");
+            throw new IllegalArgumentException("An advancement needs a title. It is what the player is shown.");
         }
         description = description == null ? "" : description;
         icon = icon == null ? Material.BOOK : icon;

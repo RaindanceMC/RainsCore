@@ -171,7 +171,7 @@ public final class StyleEditor extends Menu {
                 Icons.of(flowing ? Material.LIME_DYE : Material.GRAY_DYE,
                         flowing ? "<green>Flowing" : "<white>Flowing",
                         "<gray>Lets the gradient drift along,", "<gray>round and round.", "",
-                        flowing ? "<green>On — click to hold it still." : "<gray>Off — click to set it moving."),
+                        flowing ? "<green>On. Click to hold it still." : "<gray>Off. Click to set it moving."),
                 flowRefusal.orElse(""),
                 click -> wear(style.animated(!flowing)));
 
@@ -242,7 +242,7 @@ public final class StyleEditor extends Menu {
         String label = Character.toUpperCase(word.charAt(0)) + word.substring(1);
         return Icons.of(on ? Material.LIME_DYE : Material.GRAY_DYE,
                 (on ? "<green>" : "<gray>") + "<" + word + ">" + label,
-                on ? "<green>On — click to turn off." : "<gray>Off — click to turn on.");
+                on ? "<green>On. Click to turn off." : "<gray>Off. Click to turn on.");
     }
 
     /** "a gradient of 3 colours, bold, flowing" — what a style is, in words. */

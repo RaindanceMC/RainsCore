@@ -170,7 +170,7 @@ public final class PrefixMenu extends Menu {
     static Parsed<String> tag(String typed) {
         String cleaned = typed == null ? "" : typed.strip();
         if (cleaned.length() > 32) {
-            return Parsed.no("At most 32 characters — it goes in front of every message.");
+            return Parsed.no("At most 32 characters. It goes in front of every message.");
         }
         return Parsed.ok(cleaned);
     }

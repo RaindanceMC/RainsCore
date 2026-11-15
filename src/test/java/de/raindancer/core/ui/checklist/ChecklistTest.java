@@ -85,9 +85,9 @@ class ChecklistTest {
 
         List<String> plain = lines.stream().map(PlainTextComponentSerializer.plainText()::serialize).toList();
         assertThat(plain).containsExactly(
-                "Before the start — 1 of 3 fine; 1 thing stops the start.",
-                " ✘ The arena world exists — 'arena' is not loaded.",
-                " ⚠ A real run — Practice kit is on.",
+                "Before the start: 1 of 3 fine; 1 thing stops the start.",
+                " ✘ The arena world exists: 'arena' is not loaded.",
+                " ⚠ A real run: Practice kit is on.",
                 "Manhunt",
                 " ✔ Hunters");
     }

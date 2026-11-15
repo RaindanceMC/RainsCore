@@ -183,7 +183,7 @@ public final class WorldRegenerator {
         }
         if (isServerDimension(world)) {
             log.error("Cannot delete or regenerate '{}': it is the primary level's own dimension. Stop "
-                    + "the server and delete its folder instead — at runtime it cannot be made again "
+                    + "the server and delete its folder instead. At runtime it cannot be made again "
                     + "as the same dimension.", world.getName());
             return true;
         }
@@ -413,7 +413,7 @@ public final class WorldRegenerator {
             return false;
         }
         if (!deleteFolder(folder, name)) {
-            log.fatal("'{}' was only partly deleted. Its folder is at {} — remove it by hand.",
+            log.fatal("'{}' was only partly deleted. Its folder is at {}. Remove it by hand.",
                     name, folder);
             return false;
         }

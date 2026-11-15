@@ -83,7 +83,7 @@ public final class RecipeMenu extends Menu {
 
     @Override
     protected Component title() {
-        return MINI.deserialize("<dark_gray>Recipe — " + item.id());
+        return MINI.deserialize("<dark_gray>Recipe: " + item.id());
     }
 
     @Override
@@ -167,7 +167,7 @@ public final class RecipeMenu extends Menu {
             // Said out loud: a grid with an empty outer ring is a shape Bukkit refuses, and cropping is what
             // makes it acceptable. Somebody who is not told will think the page lost their layout.
             lore.add("");
-            lore.add("<gray>Empty rows and columns are trimmed — a shape with an");
+            lore.add("<gray>Empty rows and columns are trimmed: a shape with an");
             lore.add("<gray>empty edge is one the server refuses.");
         }
         return lore;

@@ -14,7 +14,7 @@ import org.bukkit.Material;
 public record WhitelistSettings(
 
         @In("moderation/whitelist") @Title("Share the network's whitelist")
-        @Describe("On: this server's whitelist is the network's — /whitelist add or remove here changes it "
+        @Describe("On: this server's whitelist is the network's. /whitelist add or remove here changes it "
                 + "everywhere that shares it. Off: this server keeps a whitelist of its own.")
         @Key("whitelist.network")
         boolean shared) {

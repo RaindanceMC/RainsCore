@@ -165,7 +165,7 @@ public final class HelpDesk {
         List<HelpTopic> owners = new ArrayList<>();
         Set<String> hidden = new LinkedHashSet<>();
         if (!ownersPagesReadable) {
-            problems.add("help.yml could not be read — the owner's topics are left out until it is fixed");
+            problems.add("help.yml could not be read. The owner's topics are left out until it is fixed");
         }
         YamlConfiguration file = ownersPages;
         ConfigurationSection topics = file.getConfigurationSection("topics");
@@ -195,7 +195,7 @@ public final class HelpDesk {
         }
         HelpLibrary built = HelpLibrary.of(shipped, owners, hidden, features, problems);
         log.info("The guide knows {} topic(s){}.", built.all().size(),
-                built.problems().isEmpty() ? "" : " — " + built.problems().size() + " problem(s), see /help check");
+                built.problems().isEmpty() ? "" : ", " + built.problems().size() + " problem(s), see /help check");
         return built;
     }
 
@@ -254,7 +254,7 @@ public final class HelpDesk {
 
     private static final String EXAMPLE = """
             # ─────────────────────────────────────────────────────────────────────────────
-            #  The guide's own pages — what /help and the guide at spawn explain beyond
+            #  The guide's own pages: what /help and the guide at spawn explain beyond
             #  what the plugins ship.
             #
             #  A topic here with a NEW id adds a page ("rules", "voting", "staff-team").

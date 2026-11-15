@@ -173,7 +173,7 @@ public final class LocalGroups implements PermissionGroups {
                 if (node.everywhere() || node.context().keySet().equals(Set.of(Duty.POWERS))) {
                     due.add(node.permission());
                 } else if (warnedContextual.add(group + " " + node.permission())) {
-                    log.info("{} in group {} only applies in {} — without LuckPerms it is not granted "
+                    log.info("{} in group {} only applies in {}. Without LuckPerms it is not granted "
                             + "at all.", node.permission(), group, node.context());
                 }
             }

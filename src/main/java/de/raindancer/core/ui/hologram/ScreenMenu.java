@@ -74,7 +74,7 @@ final class ScreenMenu extends PaginatedMenu<ScreenKind> {
                 "<gray>/screen list shows yours"));
         if (!staff) {
             lore.addFirst("<gray>Up now: <white>" + screens.countOf(viewer.getUniqueId()) + "/" + screens.limit());
-            lore.add("<dark_gray>Only where you may build — your base.");
+            lore.add("<dark_gray>Only where you may build, like your base.");
         }
         toolbar(4, Icons.of(Material.BOOK, staff ? "<white>Screens" : "<white>Your screens", lore), click -> { });
     }

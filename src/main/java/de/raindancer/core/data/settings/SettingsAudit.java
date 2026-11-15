@@ -178,7 +178,7 @@ public final class SettingsAudit {
         long broken = all.stream().filter(Finding::isBroken).count();
 
         String heading = broken > 0
-                ? "{} has {} problem(s) — {} that will not work as written:"
+                ? "{} has {} problem(s), {} that will not work as written:"
                 : "{} has {} thing(s) worth a look:";
         if (broken > 0) {
             log.warn(heading, subject, all.size(), broken);
@@ -194,7 +194,7 @@ public final class SettingsAudit {
         }
 
         log.warn("None of this stops the plugin running. Every one of them may have been chosen on "
-                + "purpose — they are said out loud so that the ones that were not are noticed now.");
+                + "purpose. They are said out loud so that the ones that were not are noticed now.");
         return all.size();
     }
 

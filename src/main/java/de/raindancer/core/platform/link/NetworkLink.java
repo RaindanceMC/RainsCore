@@ -23,14 +23,14 @@ public final class NetworkLink {
     private static final Duration RETRY = Duration.ofSeconds(3);
 
     private static final String DEFAULT = """
-            # The direct link between this server and another of the same network — for example an arena server
+            # The direct link between this server and another of the same network, for example an arena server
             # behind the same proxy. One server hosts, the other connects as its guest; both need the same secret.
             # Plugins share it: whatever wants to talk to the other server sends on its own topic.
             #
             # role: off | host | guest
             role: off
 
-            # host: where to listen. Inside a container, 0.0.0.0 — with the port mapped to a private address only.
+            # host: where to listen. Inside a container, 0.0.0.0, with the port mapped to a private address only.
             # This is not for the open internet.
             listen-address: 0.0.0.0
             listen-port: 25594
@@ -41,10 +41,10 @@ public final class NetworkLink {
             # At least 24 characters, the same on both servers. Treat it like a password.
             secret: ""
 
-            # What this server is called to the others, e.g. SMP, Arena, Hub — shown where people are listed.
+            # What this server is called to the others, e.g. SMP, Arena, Hub. Shown where people are listed.
             server-name: ""
 
-            # true on a server that shows the other one's player data — name styles, prefixes, nicknames — fetched
+            # true on a server that shows the other one's player data (name styles, prefixes, nicknames), fetched
             # when a player arrives (an arena next to a survival server). The other server keeps it.
             follows: false
 

@@ -47,7 +47,7 @@ public final class Times {
         Matcher matcher = SINGLE.matcher(raw == null ? "" : raw.trim());
         if (!matcher.matches()) {
             throw new IllegalArgumentException(
-                    "'" + raw + "' is not a length. Use 30m, 12h, 7d, 2w — or perm.");
+                    "'" + raw + "' is not a length. Use 30m, 12h, 7d, 2w or perm.");
         }
         try {
             return of(Long.parseLong(matcher.group(1)), matcher.group(2).charAt(0));

@@ -65,7 +65,7 @@ final class HelpChat {
         if (!notes.isEmpty()) {
             say(line("help.which-commands"));
             for (CommandNote note : notes) {
-                say(MINI.deserialize("  <#7DD3FC>" + Text.literal(note.slashed()) + "</#7DD3FC> <gray>— "
+                say(MINI.deserialize("  <#7DD3FC>" + Text.literal(note.slashed()) + "</#7DD3FC><gray>: "
                         + Text.literal(note.sentence())).clickEvent(ClickEvent.suggestCommand(note.slashed() + " ")));
             }
         }

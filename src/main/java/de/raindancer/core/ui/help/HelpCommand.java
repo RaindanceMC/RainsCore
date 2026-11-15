@@ -53,7 +53,7 @@ public final class HelpCommand implements BasicCommand {
         CommandSender sender = source.getSender();
         Optional<HelpDesk> found = HelpDesk.current();
         if (found.isEmpty() || !RainsCore.isAvailable()) {
-            sender.sendRichMessage("<gray>The guide is not here yet — try again in a moment.");
+            sender.sendRichMessage("<gray>The guide is not here yet. Try again in a moment.");
             return;
         }
         HelpDesk desk = found.get();

@@ -146,15 +146,15 @@ public record CoreConfig(
         String tablistTitle,
 
         @In("appearance/tablist") @Title("Logo")
-        @Describe("Lines of glyphs above the title, separated by | — block characters, or glyphs "
+        @Describe("Lines of glyphs above the title, separated by |: block characters, or glyphs "
                 + "from a resource pack you contribute. The word 'auto' draws one from the server "
                 + "name using the same block letters as the startup banner.")
         String tablistLogo,
 
         @In("appearance/tablist") @Title("Show the ping as a number")
         @Describe("Writes the latency on each line. The five bars at the right-hand end are drawn "
-                + "by the client and no server can remove them — but 30ms and 130ms look identical "
-                + "in them, which is the half worth having.")
+                + "by the client and no server can remove them, but 30ms and 130ms look identical "
+                + "in them.")
         boolean tablistShowPing,
 
         @In("appearance/tablist") @Title("Sort by rank")
@@ -163,7 +163,7 @@ public record CoreConfig(
         boolean tablistSortByRank,
 
         @In("appearance/tablist") @Title("Animated header frames")
-        @Describe("Extra header lines to cycle through, separated by | — the rules, an event, a "
+        @Describe("Extra header lines to cycle through, separated by |: the rules, an event, a "
                 + "vote that is running. Empty leaves the header still.")
         String tablistHeaderFrames,
 
@@ -209,7 +209,7 @@ public record CoreConfig(
         boolean packsEnabled,
 
         @In("config/packs") @Title("Combine into a single pack")
-        @Describe("Off sends each plugin's pack separately, stacked in order — the client has "
+        @Describe("Off sends each plugin's pack separately, stacked in order. The client has "
                 + "supported that since 1.20.3, and it means adding a plugin only costs players "
                 + "that plugin's download. On merges everything into one zip: one download and one "
                 + "entry in the client's list, but any change rebuilds all of it.")
@@ -246,7 +246,7 @@ public record CoreConfig(
 
         @In("config/packs") @Title("Public address")
         @Describe("What clients are told to download from, when that is not what the server binds "
-                + "to — behind a proxy, or on 0.0.0.0. Empty uses the bind address. Example: "
+                + "to (behind a proxy, or on 0.0.0.0). Empty uses the bind address. Example: "
                 + "https://packs.example.com")
         String packsPublicAddress,
 
@@ -289,13 +289,13 @@ public record CoreConfig(
         boolean invseeShowEnderChest,
 
         @In("moderation/audit") @Title("Keep a record of what moderators do")
-        @Describe("Every moderation action is written down with who did it, to whom, and when — "
+        @Describe("Every moderation action is written down with who did it, to whom, and when, "
                 + "searchable by moderator and by feature. Switching this off does not make the "
                 + "actions stop, only the record of them.")
         boolean auditEnabled,
 
         @In("world/combat") @Title("Players may hurt each other")
-        @Describe("PvP. Off means one player cannot damage another anywhere — a plugin may still "
+        @Describe("PvP. Off means one player cannot damage another anywhere. A plugin may still "
                 + "allow it in one world, or in an arena.")
         boolean combatPvp,
 
@@ -305,8 +305,8 @@ public record CoreConfig(
 
         @In("world/combat") @Title("Creatures may hurt players")
         @Describe("Off makes monsters harmless. Separate from the setting above because turning "
-                + "only one off is usually a mistake — a server where zombies are dangerous and "
-                + "cannot be fought back is a worse game, not a gentler one.")
+                + "only one off is usually a mistake: zombies that are dangerous and cannot be "
+                + "fought back make the game worse.")
         boolean combatMobsMayHurtPlayers,
 
         @In("moderation/audit") @Title("Keep the record for this many days")
@@ -326,8 +326,8 @@ public record CoreConfig(
         int effectsRepeatGapMillis,
 
         @In("appearance/effects") @Title("Teleport: particles while waiting") @Range(min = 1, max = 20)
-        @Describe("How many are drawn at a time around somebody standing still for a teleport — the "
-                + "server's portal swirl and a player's own choice alike.")
+        @Describe("How many are drawn at a time around somebody standing still for a teleport, for "
+                + "the server's portal swirl and a player's own choice alike.")
         int teleportWaitParticles,
 
         @In("appearance/effects") @Title("Teleport: particles where somebody lands") @Range(min = 0, max = 300)
@@ -357,12 +357,12 @@ public record CoreConfig(
         @In("moderation/chatlog") @Title("Keep the chat log for this many days")
         @Range(min = 1, max = 730)
         @Describe("Older lines are deleted. What people said, beside their names, is personal data: under the "
-                + "GDPR it may be kept while there is a reason — moderating — and no longer, so there is no "
+                + "GDPR it may be kept while there is a reason (moderating) and no longer, so there is no "
                 + "'for ever'. Say how long in your privacy notice.")
         int chatLogRetentionDays,
 
         @In("world/desks") @Title("Insurance only at an insurance agent")
-        @Describe("Players take out and change every insurance — bets, death, items — by talking to an "
+        @Describe("Players take out and change every insurance (bets, death, items) by talking to an "
                 + "insurance agent standing in the world, not by command. Staff place agents with "
                 + "/eco agent place or /insurance agent place.")
         boolean insuranceInPersonOnly,
@@ -390,7 +390,7 @@ public record CoreConfig(
 
         @In("appearance/tablist") @Title("Server performance")
         @Describe("A line under the list with the ticks per second, how long a tick takes and the memory in "
-                + "use — green while all is well, yellow when it strains, red when it lags.")
+                + "use: green while all is well, yellow when it strains, red when it lags.")
         boolean tablistShowPerformance,
 
         @In("config/chat") @Title("Command for the panel")
@@ -406,7 +406,7 @@ public record CoreConfig(
         boolean menusPainted,
 
         @In("config/screens") @Title("Players put up screens")
-        @Describe("Whether players may put up screens of their own — /screen — where they may build, their base: the "
+        @Describe("Whether players may put up screens of their own (/screen) where they may build, like their base: the "
                 + "server's status, their money, their guild… Staff always may, anywhere.")
         boolean playerScreens,
 
@@ -420,14 +420,14 @@ public record CoreConfig(
         String staffOnlyScreens,
 
         @In("appearance") @Title("Click icons")
-        @Describe("Click hints in menus — 'Click', 'Right click', 'Shift click' — drawn as a mouse and keys for players "
+        @Describe("Click hints in menus ('Click', 'Right click', 'Shift click') drawn as a mouse and keys for players "
                 + "wearing the server pack. Without the pack they read as words.")
         boolean clickIcons,
 
         @In("appearance") @Title("Click icons on Bedrock")
         @Describe("The same icons for Bedrock players. Needs Core's Bedrock pack in Geyser's packs folder: Core writes "
-                + "it to plugins/RainsCore/bedrock/rainscore.mcpack. Without it Bedrock shows empty boxes — switch "
-                + "this off then.")
+                + "it to plugins/RainsCore/bedrock/rainscore.mcpack. Without it Bedrock shows empty boxes, so "
+                + "switch this off then.")
         boolean clickIconsBedrock,
 
         @In("appearance") @Title("Rank badge above the name")

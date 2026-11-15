@@ -59,7 +59,7 @@ public record HostedPack(String id, String url, String sha1) {
             return "'" + id + "' has nowhere to be downloaded from";
         }
         if (!SHA1.matcher(sha1).matches()) {
-            return "'" + id + "' has no usable sha1 — without one a client re-downloads it on every "
+            return "'" + id + "' has no usable sha1. Without one a client re-downloads it on every "
                     + "join, so it is refused rather than sent";
         }
         return "";

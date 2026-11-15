@@ -30,7 +30,7 @@ public record Achievement(String plugin, String id, String title, String descrip
         }
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException(
-                    "An achievement needs a title — it is what the player is shown.");
+                    "An achievement needs a title. It is what the player is shown.");
         }
         plugin = plugin.trim().toLowerCase(Locale.ROOT);
         id = id.trim().toLowerCase(Locale.ROOT);

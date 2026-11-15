@@ -49,7 +49,7 @@ public final class HelpTopicParser {
         try {
             file.loadFromString(yaml == null ? "" : yaml);
         } catch (InvalidConfigurationException broken) {
-            problems.add(source + ": not valid YAML — " + firstLine(broken.getMessage()));
+            problems.add(source + ": not valid YAML: " + firstLine(broken.getMessage()));
             return new Parsed(Optional.empty(), problems);
         }
         return fromSection(file, source, problems);
@@ -65,7 +65,7 @@ public final class HelpTopicParser {
         }
         String id = text(file.get("id")).toLowerCase(Locale.ROOT);
         if (!ID.matcher(id).matches()) {
-            problems.add(source + ": needs an id — lower case letters, digits and dashes — not '" + id + "'");
+            problems.add(source + ": needs an id of lower case letters, digits and dashes, not '" + id + "'");
             return new Parsed(Optional.empty(), problems);
         }
         String where = source + " (" + id + ")";
@@ -76,7 +76,7 @@ public final class HelpTopicParser {
         }
         String summary = text(file.get("summary"));
         if (summary.isEmpty()) {
-            problems.add(where + ": needs a summary — the one line the guide's list shows");
+            problems.add(where + ": needs a summary, the one line the guide's list shows");
         } else if (summary.length() > 140) {
             problems.add(where + ": the summary is " + summary.length() + " characters; one line is 140 at most");
         }
@@ -127,7 +127,7 @@ public final class HelpTopicParser {
                     emptyToNull(text(section.get("permission")))));
         }
         if (sections.isEmpty() && list.isEmpty()) {
-            problems.add(where + ": has no sections — what would the guide answer?");
+            problems.add(where + ": has no sections, so the guide has nothing to answer");
         }
         if (sections.size() > MOST_SECTIONS) {
             problems.add(where + ": " + sections.size() + " questions is more than one dialog holds well ("
@@ -152,7 +152,7 @@ public final class HelpTopicParser {
         try {
             return HelpExpression.parse(text);
         } catch (IllegalArgumentException broken) {
-            problems.add(where + ": when — " + broken.getMessage());
+            problems.add(where + ": when: " + broken.getMessage());
             // Unreadable means hidden: a section about a feature that may be off must not show by accident.
             return HelpExpression.parse("@perm:rainscore.help.never.shown");
         }

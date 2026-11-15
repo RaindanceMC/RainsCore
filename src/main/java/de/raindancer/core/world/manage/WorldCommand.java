@@ -137,7 +137,7 @@ public final class WorldCommand implements BasicCommand {
 
     private void doSwitch(CommandSender sender, String[] args) {
         if (!sender.hasPermission(SWITCH)) {
-            chat().no(sender, "Switching worlds needs the permission <perm> — an owner can grant it.",
+            chat().no(sender, "Switching worlds needs the permission <perm>. An owner can grant it.",
                     Chat.arg("perm", SWITCH));
             return;
         }
@@ -172,7 +172,7 @@ public final class WorldCommand implements BasicCommand {
      */
     private void regen(CommandSender sender, String[] args) {
         if (!sender.hasPermission(REGEN)) {
-            chat().no(sender, "Regenerating worlds needs the permission <perm> — an owner can grant it.",
+            chat().no(sender, "Regenerating worlds needs the permission <perm>. An owner can grant it.",
                     Chat.arg("perm", REGEN));
             return;
         }
@@ -190,7 +190,7 @@ public final class WorldCommand implements BasicCommand {
         if (args.length >= 3) {
             toReturn = Bukkit.getPlayerExact(args[2]);
             if (toReturn == null) {
-                chat().no(sender, "<name> is not online — name somebody who is, or leave it out to send nobody back.",
+                chat().no(sender, "<name> is not online. Name somebody who is, or leave it out to send nobody back.",
                         Chat.arg("name", args[2]));
                 return;
             }
@@ -238,7 +238,7 @@ public final class WorldCommand implements BasicCommand {
             chat().no(sender, "<name> is not loaded any more, so nothing was regenerated.", Chat.arg("name", name));
             return;
         }
-        chat().tell(sender, "<gray>Regenerating <name> — the server will pause.", Chat.arg("name", name));
+        chat().tell(sender, "<gray>Regenerating <name>. The server will pause.", Chat.arg("name", name));
         regenerator().regenerate(world, ok -> {
             if (!ok) {
                 chat().no(sender, "Something went wrong; the server log has it.");

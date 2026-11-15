@@ -401,8 +401,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             log.info("This server is '{}' (group '{}') on a network; its data is in {}.",
                     network.serverId(), network.group(), network.postgres().describe());
         } else {
-            log.error("THE NETWORK DATABASE AT {} CANNOT BE REACHED. Nothing this server keeps — bans, homes, "
-                    + "balances, settings — can be read or saved until it can. Check network.yml and that the "
+            log.error("THE NETWORK DATABASE AT {} CANNOT BE REACHED. Nothing this server keeps (bans, homes, "
+                    + "balances, settings) can be read or saved until it can. Check network.yml and that the "
                     + "database is running, then restart.", network.postgres().describe());
         }
         return Databases.central(pool, network.serverId(), onServerThread, getDataFolder().toPath());
@@ -564,8 +564,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         grants.load();
         log.info(grants.usesLuckPerms()
                 ? "Permissions granted through moderation and elsewhere are managed through LuckPerms."
-                : "Permissions granted through moderation and elsewhere use the built-in local store — "
-                        + "install LuckPerms for groups, inheritance and contexts.");
+                : "Permissions granted through moderation and elsewhere use the built-in local store. "
+                        + "Install LuckPerms for groups, inheritance and contexts.");
         grantListener = new GrantListener(this, grants);
         startGroups();
         // What makes a promotion or a demotion take effect while the player is standing there. Without
@@ -749,34 +749,34 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         commandDirectory.declareAll(List.of(
                 CommandNote
                         .of("Core", "commands", "This book.",
-                                "[plugin] — only that plugin's"),
+                                "[plugin]: only that plugin's"),
                 CommandNote
                         .of("Core", "changelog", "What changed on this server lately."),
                 CommandNote
                         .of("Core", "help", "Ask the guide anything: every feature here, explained as it is set up.",
-                                "<topic> — one subject, e.g. /help economy", "<topic> <question> — one answer",
-                                "search <words> — whatever mentions them", "… chat — the answer in chat"),
+                                "<topic>: one subject, e.g. /help economy", "<topic> <question>: one answer",
+                                "search <words>: whatever mentions them", "… chat: the answer in chat"),
                 CommandNote
                         .of("Core", "maintenance", "Close the server for maintenance: only ops and its own list can join.",
-                                "on [reason] — close it", "off — open it", "add|remove <player> — the list", "list")
+                                "on [reason]: close it", "off: open it", "add|remove <player>: the list", "list")
                         .needing("rainscore.maintenance"),
                 CommandNote
                         .of("Core", "settings", "Read and change what every plugin on this server does.")
                         .needing("rainscore.settings"),
                 CommandNote
                         .of("Core", "documents", "Edit a plugin's settings or texts by hand: they are kept in the database.",
-                                "list [plugin] — what there is", "export <plugin> <name> — write it to edit/",
-                                "import — read every edited file back")
+                                "list [plugin]: what there is", "export <plugin> <name>: write it to edit/",
+                                "import: read every edited file back")
                         .needing("rainscore.documents"),
                 CommandNote
                         .of("Core", "warp", "Go to a named place.",
-                                "<name> — go there",
-                                "list — every warp you may use")
+                                "<name>: go there",
+                                "list: every warp you may use")
                         .needing("rainscore.warp.use"),
                 CommandNote
                         .of("Core", "farmworld", "Go to a farm world, where digging is meant to happen.",
-                                "<name> — go to that one",
-                                "regen <name> confirm — rebuild it, which deletes it first")
+                                "<name>: go to that one",
+                                "regen <name> confirm: rebuild it, which deletes it first")
                         .needing("rainscore.farmworld.use")));
 
         navigation = new SettingsNavigation(registry);
@@ -927,7 +927,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         maintenance = new de.raindancer.core.moderation.maintenance.Maintenance(
                 getDataFolder().toPath().resolve("maintenance.yml"), System::currentTimeMillis);
         maintenance.load();
-        maintenance.problems().forEach(problem -> log.error("maintenance.yml: {} — kept closed (ops only) until it is fixed or /maintenance off.", problem));
+        maintenance.problems().forEach(problem -> log.error("maintenance.yml: {}. The server stays closed (ops only) until it is fixed or /maintenance off.", problem));
         if (maintenance.isOn()) {
             log.warn("Maintenance mode is on: only ops and the maintenance list can join. /maintenance off opens the server.");
         }
@@ -1177,7 +1177,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                     linkedEconomy = new de.raindancer.core.social.economy.LinkedEconomy(link);
                     de.raindancer.core.social.economy.Economies.provide(this, linkedEconomy);
                     linkedEconomy.refreshCurrency().exceptionally(unreachable -> null);
-                    log.info("Server link: money is the other server's — one balance on both.");
+                    log.info("Server link: money is the other server's, one balance on both.");
                 }
             });
         }
@@ -1812,7 +1812,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
             land.postponeBypassReminder(id);
 
             ChatButton stillWorking = buttons.label("<green>[Still working]</green>")
-                    .tooltip("<gray>Keep the bypass on — ask again in ten minutes")
+                    .tooltip("<gray>Keep the bypass on and ask again in ten minutes")
                     .forOnly(id).expiringIn(BYPASS_REMINDER_AFTER)
                     .does(clicker -> {
                         land.postponeBypassReminder(clicker);

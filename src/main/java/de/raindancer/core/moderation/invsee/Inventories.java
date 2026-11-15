@@ -62,7 +62,7 @@ public final class Inventories {
         YOURSELF("invsee.yourself", "Your own inventory is a key rather than a menu."),
         BEING_EDITED("invsee.being-edited", "Somebody else is editing that inventory."),
         NEVER_SEEN("invsee.never-seen", "This server has never seen that player."),
-        UNREADABLE("invsee.unreadable", "Their inventory could not be read — see the log."),
+        UNREADABLE("invsee.unreadable", "Their inventory could not be read. The log says why."),
         NOT_ALLOWED("invsee.not-allowed", "You may not do that."),
         SWITCHED_OFF("invsee.switched-off", "Looking inside inventories is switched off on this server.");
 
@@ -381,7 +381,7 @@ public final class Inventories {
                 // written" means "the items are gone"; without the second, it means "copied".
                 window.undoUnwritten();
                 told(watcher, say("invsee.not-saved"));
-                told(watcher, Component.text("Their inventory was not saved — nothing was changed, "
+                told(watcher, Component.text("Their inventory was not saved. Nothing was changed, "
                                 + "and what you added is back with you.")
                         .color(NamedTextColor.RED));
             });

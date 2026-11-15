@@ -194,7 +194,7 @@ public class LeaderboardMenu extends PaginatedMenu<Run> {
         if (best.isEmpty()) {
             return Icons.of(Material.CLOCK, "<gray>No run of yours yet", "<gray>Your best and your place show here.");
         }
-        String place = history.placeOf(viewer.getUniqueId(), category).map(RunText::ordinal).orElse("—");
+        String place = history.placeOf(viewer.getUniqueId(), category).map(RunText::ordinal).orElse("-");
         return Icons.of(Material.CLOCK, "<green>Your best: " + Text.literal(shown.apply(best.get())),
                 "<gray>Place: <white>" + place,
                 "<dark_gray>" + Text.literal(Times.ago(best.get().startedAt().toEpochMilli())));

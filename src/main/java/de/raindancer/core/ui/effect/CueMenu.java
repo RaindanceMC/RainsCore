@@ -232,7 +232,7 @@ public final class CueMenu extends Menu {
         if (!asked) {
             // Somebody else is already waiting on this player's next line; told to type here, it
             // would have gone to public chat.
-            viewer.sendMessage(Messages.spoken("cues.busy", "<red>You are already being asked something else — answer or cancel that first."));
+            viewer.sendMessage(Messages.spoken("cues.busy", "<red>You are already being asked something else. Answer or cancel that first."));
             open();
         }
     }

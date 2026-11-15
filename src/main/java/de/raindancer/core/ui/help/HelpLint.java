@@ -117,7 +117,7 @@ public final class HelpLint {
     public List<String> problems() {
         List<String> problems = new ArrayList<>();
         if (!Files.isDirectory(directory)) {
-            problems.add(directory + " does not exist — a module's guide lives in src/main/resources/rains-help");
+            problems.add(directory + " does not exist. A module's guide lives in src/main/resources/rains-help");
             return problems;
         }
         List<HelpTopic> topics = new ArrayList<>();
@@ -182,7 +182,7 @@ public final class HelpLint {
                 String plain = HelpText.plain(HelpText.render(section.text(), context, new ArrayList<>()));
                 if (plain.length() > 1_800) {
                     problems.add(where + ": the answer to '" + section.question() + "' is " + plain.length()
-                            + " characters — a wall; split it into two questions");
+                            + " characters, too long. Split it into two questions");
                 }
             }
             for (String condition : conditions) {
@@ -205,7 +205,7 @@ public final class HelpLint {
         }
         for (String command : commands) {
             if (!covered.contains(command) && !undocumented.contains(command)) {
-                problems.add("/" + command + " is in no topic's commands — explain it, or mark it undocumented(\""
+                problems.add("/" + command + " is in no topic's commands. Explain it, or mark it undocumented(\""
                         + command + "\") with a reason");
             }
         }
@@ -215,7 +215,7 @@ public final class HelpLint {
     private void checkKey(String where, String key, List<String> problems) {
         int colon = key.indexOf(':');
         if (colon < 0) {
-            problems.add(where + ": '" + key + "' — write settings as plugin:key; a bare key reaches whichever "
+            problems.add(where + ": '" + key + "': write settings as plugin:key; a bare key reaches whichever "
                     + "plugin declared it first");
             return;
         }
@@ -225,7 +225,7 @@ public final class HelpLint {
         }
         if (!settings.containsKey(key)) {
             problems.add(where + ": the setting '" + key + "' does not exist" + (schemaIds.contains(id) ? ""
-                    : " (settings of '" + id + "' are not known here — pass its record, or foreignSettings(\"" + id
+                    : " (settings of '" + id + "' are not known here; pass its record, or foreignSettings(\"" + id
                     + "\"))"));
         }
     }

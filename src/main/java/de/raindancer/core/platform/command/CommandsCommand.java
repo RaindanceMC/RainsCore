@@ -72,7 +72,7 @@ public final class CommandsCommand implements BasicCommand {
         // The console, or anything else that is not holding a book.
         sender.sendMessage(MINI.deserialize("<dark_aqua>" + visible.size() + " command(s):"));
         for (CommandNote note : visible) {
-            sender.sendMessage(MINI.deserialize("<blue>" + note.slashed() + " <gray>— "
+            sender.sendMessage(MINI.deserialize("<blue>" + note.slashed() + "<gray>: "
                     + Text.literal(note.sentence())));
             for (String option : note.options()) {
                 sender.sendMessage(MINI.deserialize("<dark_gray>    " + Text.literal(option)));

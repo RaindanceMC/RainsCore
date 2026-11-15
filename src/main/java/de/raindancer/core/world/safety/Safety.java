@@ -190,7 +190,7 @@ public final class Safety {
     private void warnIfOnTheServerThread() {
         if (Bukkit.isPrimaryThread() && warnedAboutBlocking.compareAndSet(false, true)) {
             Log.of("safety").warn(
-                    "findSafe was called on the server thread. That is fine — but if you then "
+                    "findSafe was called on the server thread. That is fine, but if you then "
                             + "join() or get() the result you will deadlock the server, because the "
                             + "chunk load it is waiting for needs this same thread. Use "
                             + "thenAccept.");

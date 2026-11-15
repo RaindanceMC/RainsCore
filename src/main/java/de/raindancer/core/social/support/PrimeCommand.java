@@ -76,7 +76,7 @@ public final class PrimeCommand implements BasicCommand {
             case "grant" -> {
                 Optional<Duration> length = days(args[2]);
                 if (length.isEmpty()) {
-                    say(sender, "<red>'<days>' is not a number of days (1–3660).", Placeholder.unparsed("days", args[2]));
+                    say(sender, "<red>'<days>' is not a number of days (1 to 3660).", Placeholder.unparsed("days", args[2]));
                     return;
                 }
                 PrimeMembers.Member member = members.grant(who, length.get(), now);

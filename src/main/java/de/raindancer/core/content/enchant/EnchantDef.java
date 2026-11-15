@@ -20,7 +20,7 @@ public record EnchantDef(String namespace, String path, String name, int maxLeve
             throw new IllegalArgumentException("An enchantment key is namespace:path in lower case.");
         }
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("An enchantment needs a name — it is the line on the item.");
+            throw new IllegalArgumentException("An enchantment needs a name. It is the line on the item.");
         }
         if (maxLevel < 1 || maxLevel > 255) {
             throw new IllegalArgumentException("An enchantment's max level is 1 to 255.");

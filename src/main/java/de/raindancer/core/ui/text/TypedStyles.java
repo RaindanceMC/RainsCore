@@ -39,7 +39,7 @@ public final class TypedStyles {
      */
     public static Read read(List<String> words, Function<String, TextColor> extraColour) {
         if (words == null || words.isEmpty()) {
-            return Read.no("Name at least one colour — a chat colour or a #hex code.");
+            return Read.no("Name at least one colour: a chat colour or a #hex code.");
         }
         NameStyle style = NameStyle.NONE;
         boolean animated = false;

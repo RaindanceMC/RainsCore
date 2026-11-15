@@ -187,7 +187,7 @@ public final class SettingsCommand implements BasicCommand {
     }
 
     private void help(CommandSender sender) {
-        chat().tell(sender, "<white>Settings</white> <gray>— what the plugins here can be told to do. "
+        chat().tell(sender, "<white>Settings</white><gray>: what the plugins here can be told to do. "
                 + "Each has a name, like <white>flight-seconds-per-level</white>.");
         boolean layered = navigation().registry().keys().stream().anyMatch(key -> navigation().registry().isLayered(key));
         for (HelpLine line : help(navigation().plugins(), layered)) {
@@ -197,7 +197,7 @@ public final class SettingsCommand implements BasicCommand {
                         .tooltip("<gray>" + Text.literal(longer(line)) + "<newline><dark_gray>Click to type it")
                         .suggests(line.suggest()).render()));
             } else {
-                chat().row(sender, " " + text + " <dark_gray>— " + Text.literal(longer(line)));
+                chat().row(sender, " " + text + "<dark_gray>: " + Text.literal(longer(line)));
             }
         }
         List<SettingsNavigation.Plugin> plugins = navigation().plugins();
@@ -244,7 +244,7 @@ public final class SettingsCommand implements BasicCommand {
         chat().tell(sender, "<gray><count> plugins have settings. Pick one:", Chat.arg("count", plugins.size()));
         for (SettingsNavigation.Plugin plugin : plugins) {
             int count = plugin.tree().visibleRoots().stream().mapToInt(root -> root.allSettings().size()).sum();
-            String line = "<white>" + Text.literal(plugin.name()) + " <dark_gray>(" + plugin.id() + ") — <gray>"
+            String line = "<white>" + Text.literal(plugin.name()) + " <dark_gray>(" + plugin.id() + "): <gray>"
                     + count + " settings";
             if (clickable(sender)) {
                 chat().raw(sender, Component.text("  ").append(buttons().label(line)
@@ -263,7 +263,7 @@ public final class SettingsCommand implements BasicCommand {
 
     private void listPlugin(CommandSender sender, String id) {
         navigation().plugin(id).ifPresent(plugin -> {
-            chat().tell(sender, "<white><name></white> <gray>— click a name to see it, or "
+            chat().tell(sender, "<white><name></white><gray>: click a name to see it, or "
                     + "<white>/settings set <name> <value></white>.", Chat.arg("name", plugin.name()));
             for (SettingsTopic root : plugin.tree().visibleRoots()) {
                 listSection(sender, root);
@@ -452,7 +452,7 @@ public final class SettingsCommand implements BasicCommand {
         }
         sender.sendMessage(words().prefixed("settings.search-found", "count", found.size(), "query", query));
         for (Setting<?> setting : found) {
-            chat().row(sender, "<dark_gray>  <white><key> <dark_gray>— <gray><title> <dark_gray>= <gray><value>",
+            chat().row(sender, "<dark_gray>  <white><key><dark_gray>: <gray><title> <dark_gray>= <gray><value>",
                     Chat.arg("key", setting.key()), Chat.arg("title", setting.title()),
                     Chat.arg("value", navigation().registry().display(setting.key())));
         }

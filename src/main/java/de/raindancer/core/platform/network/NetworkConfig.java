@@ -196,10 +196,10 @@ public record NetworkConfig(String serverId, String group, Dialect dialect, Post
 
     private String render() {
         return """
-                # RainsCore — who this server is on its network, and where the network keeps its data.
+                # RainsCore: who this server is on its network, and where the network keeps its data.
                 #
-                # The only settings RainsCore keeps in a file. Everything else — settings, messages, players,
-                # punishments, homes — lives in the database below. Environment variables win over this file:
+                # The only settings RainsCore keeps in a file. Everything else (settings, messages, players,
+                # punishments, homes) lives in the database below. Environment variables win over this file:
                 # RAINS_SERVER_ID, RAINS_SERVER_GROUP, RAINS_DB_TYPE, RAINS_DB_HOST, RAINS_DB_PORT, RAINS_DB_NAME,
                 # RAINS_DB_USER, RAINS_DB_PASSWORD.
 
@@ -211,8 +211,8 @@ public record NetworkConfig(String serverId, String group, Dialect dialect, Post
                   group: %s
 
                 database:
-                  # sqlite     — a server on its own: its data in .db files in this folder.
-                  # postgresql — a network: every server of the network points at the same database below.
+                  # sqlite:     a server on its own: its data in .db files in this folder.
+                  # postgresql: a network: every server of the network points at the same database below.
                   type: %s
                   postgresql:
                     host: %s

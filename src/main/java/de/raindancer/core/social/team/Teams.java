@@ -543,11 +543,11 @@ public final class Teams {
                 if (free.isEmpty()) {
                     problems.add("team '" + data.id() + "' loaded with colour " + colour
                             + ", already held by another loaded team, and no colour was free to give it "
-                            + "instead — kept the clash");
+                            + "instead. Kept the clash");
                 } else {
                     TeamColour reassigned = free.iterator().next();
                     problems.add("team '" + data.id() + "' loaded with colour " + colour
-                            + ", already held by another loaded team — reassigned to " + reassigned);
+                            + ", already held by another loaded team. Reassigned to " + reassigned);
                     colour = reassigned;
                 }
             }
@@ -563,7 +563,7 @@ public final class Teams {
             UUID captain = data.captain().orElse(null);
             if (captain != null && !team.members.contains(captain)) {
                 problems.add("team '" + data.id() + "' loaded with a captain who is not one of its "
-                        + "members — captaincy dropped");
+                        + "members. Captaincy dropped");
                 captain = null;
             }
             team.captain = captain;

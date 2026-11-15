@@ -79,7 +79,7 @@ class AdminSessionRecorderTest {
         recorder.audited(AuditEntry.of("player", "joined").by(null, null).at(Instant.ofEpochMilli(6_000)));
 
         assertThat(recorder.end(STAFF).orElseThrow().actions())
-                .containsExactly(new AdminSessionRecap.Line(4_000, "banned Alex — griefing"));
+                .containsExactly(new AdminSessionRecap.Line(4_000, "banned Alex: griefing"));
     }
 
     @Test

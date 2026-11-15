@@ -79,7 +79,7 @@ public final class LandPolicyStore {
             String why = String.join("; ", store.problems());
             problem = file.getFileName() + " could not be read (" + why + "); every flag is at its built-in setting";
             log.warn("{} could not be read ({}). Every flag is at its built-in setting until this is "
-                    + "fixed — your saved flag decisions are NOT being applied.", file.getFileName(), why);
+                    + "fixed. Your saved flag decisions are NOT being applied.", file.getFileName(), why);
             return policies;
         }
 
@@ -146,7 +146,7 @@ public final class LandPolicyStore {
                     "What this server decided about the land flags.",
                     "",
                     "Only decisions that differ from the built-in behaviour are written here, so a flag that is",
-                    "absent is a flag as it ships — and improving a built-in default in a later release reaches",
+                    "absent is a flag as it ships, and improving a built-in default in a later release reaches",
                     "this server rather than being overruled by a line nobody meant to write.",
                     "",
                     "  policy:  available | forced-on | forced-off | disabled",

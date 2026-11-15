@@ -156,7 +156,7 @@ public final class PrefixCommand implements BasicCommand {
         boolean saved = service.get().change(change);
         audit(sender, what);
         say(sender, saved ? MINI.deserialize("<green>Prefix changed.") : Messages.spoken("prefix-design.changed-not-saved",
-                "<yellow>Prefix changed, but prefix.yml could not be written — this lasts until the next restart or "
+                "<yellow>Prefix changed, but prefix.yml could not be written. This lasts until the next restart or "
                         + "reload."));
         preview(sender);
     }

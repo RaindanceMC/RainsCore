@@ -101,7 +101,7 @@ public final class Grants {
         try {
             return LuckPermsProvider.get();
         } catch (IllegalStateException notYetLoaded) {
-            log.warn("LuckPerms is installed but was not ready yet when Grants asked for it — falling "
+            log.warn("LuckPerms is installed but was not ready yet when Grants asked for it. Falling "
                     + "back to the local file store for this session. If this persists, check that "
                     + "LuckPerms loads before this plugin.");
             return null;

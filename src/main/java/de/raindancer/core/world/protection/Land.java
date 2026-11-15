@@ -118,7 +118,7 @@ public final class Land {
             return false;
         }
         if (!provider.compareAndSet(null, candidate)) {
-            log.warn("{} offered to answer land questions, but {} already does. Ignoring the second one — "
+            log.warn("{} offered to answer land questions, but {} already does. Ignoring the second one, because "
                             + "two answers for the same block cannot both be enforced.",
                     candidate.name(), provider.get().name());
             return false;

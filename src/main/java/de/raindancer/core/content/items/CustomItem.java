@@ -79,7 +79,7 @@ public record CustomItem(String plugin, String id, Material material, String dis
         tags = tags == null ? Map.of() : Map.copyOf(tags);
         String model = tags.get(TAG_ITEM_MODEL);
         if (model != null && !MODEL_KEY.matcher(model).matches()) {
-            throw new IllegalArgumentException("'" + model + "' is not an item model key — write it in full, "
+            throw new IllegalArgumentException("'" + model + "' is not an item model key. Write it in full, "
                     + "namespace:path, lowercase.");
         }
     }

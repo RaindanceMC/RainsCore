@@ -51,13 +51,13 @@ public final class PrimePermission implements Listener {
     public static Permission permission(org.bukkit.plugin.PluginManager manager) {
         Permission found = manager.getPermission(NODE);
         if (found == null) {
-            found = new Permission(NODE, "Holds the Prime subscription — given and taken by RainsCore",
+            found = new Permission(NODE, "Holds the Prime subscription, given and taken by RainsCore",
                     PermissionDefault.FALSE);
             manager.addPermission(found);
         }
         if (manager.getPermission(PrimeCommand.ADMIN) == null) {
             manager.addPermission(new Permission(PrimeCommand.ADMIN,
-                    "/prime grant|revoke|info — the shop's console and the owner", PermissionDefault.OP));
+                    "/prime grant|revoke|info, for the shop's console and the owner", PermissionDefault.OP));
         }
         return found;
     }

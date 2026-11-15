@@ -45,7 +45,7 @@ final class SettingsSaving {
         if (RainsCore.isAvailable()) {
             return RainsCore.get().messages().prefixed("settings.not-saved", "file", String.valueOf(shown));
         }
-        return Component.text("Changed for now, but " + shown + " could not be saved — fix the mistake in it "
+        return Component.text("Changed for now, but " + shown + " could not be saved. Fix the mistake in it "
                 + "(the console says where); until then a restart undoes this.");
     }
 }

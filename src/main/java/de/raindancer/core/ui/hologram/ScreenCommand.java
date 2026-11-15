@@ -35,7 +35,7 @@ import java.util.stream.Stream;
 public final class ScreenCommand implements BasicCommand {
 
     public static final String PERMISSION = "rainscore.screens";
-    public static final String DESCRIPTION = "Screens floating in the world: stats, boards, guilds — and everybody's own.";
+    public static final String DESCRIPTION = "Screens floating in the world: stats, boards, guilds, and everybody's own.";
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     /** Over the head of whoever places it. */
     static final double ABOVE = 2.2;
@@ -97,12 +97,12 @@ public final class ScreenCommand implements BasicCommand {
             case "move", "here" -> {
                 Integer number = number(args, 1);
                 if (number == null) {
-                    say(player, "<red>/screen move <number> <gray>— /screen list shows the numbers.");
+                    say(player, "<red>/screen move <number><gray>. /screen list shows the numbers.");
                     return;
                 }
                 meant(player, screens, number, touchable, staff).ifPresent(screen -> {
                     if (!staff && !mayBuildHere(player)) {
-                        say(player, "<red>Only where you may build — your base.");
+                        say(player, "<red>Only where you may build, like your base.");
                         return;
                     }
                     screens.move(screen, overHead(player));
@@ -124,18 +124,18 @@ public final class ScreenCommand implements BasicCommand {
             say(player, switch (refusal) {
                 case OFF -> "<red>Only staff put up screens on this server.";
                 case KIND -> "<red>That screen is for staff to put up.";
-                case LIMIT -> "<red>You have " + screens.limit() + " screen(s) up already — take one down first: "
+                case LIMIT -> "<red>You have " + screens.limit() + " screen(s) up already. Take one down first: "
                         + "<white>/screen remove";
             });
             return;
         }
         if (!staff && !mayBuildHere(player)) {
-            say(player, "<red>Only where you may build — your base.");
+            say(player, "<red>Only where you may build, like your base.");
             return;
         }
         PlacedScreen placed = screens.place(overHead(player), kind, staff ? null : player.getUniqueId());
-        say(player, "<green>Screen <white>#" + placed.number() + "</white> — " + MINI.escapeTags(kind.title())
-                + " — is up." + (kind.personal() ? " <gray>Everybody near it sees their own." : "")
+        say(player, "<green>Screen <white>#" + placed.number() + "</white> (" + MINI.escapeTags(kind.title())
+                + ") is up." + (kind.personal() ? " <gray>Everybody near it sees their own." : "")
                 + " <gray>/screen up, /screen down to nudge it.");
     }
 
@@ -187,7 +187,7 @@ public final class ScreenCommand implements BasicCommand {
         for (PlacedScreen screen : placed) {
             String title = screens.kind(screen.kind()).map(ScreenKind::title).orElse(screen.kind() + " <red>(not offered now)");
             String owner = !staff || screen.owner() == null ? ""
-                    : " <dark_gray>— " + MINI.escapeTags(Optional.ofNullable(Bukkit.getOfflinePlayer(screen.owner()).getName())
+                    : " <dark_gray>by " + MINI.escapeTags(Optional.ofNullable(Bukkit.getOfflinePlayer(screen.owner()).getName())
                     .orElse(screen.owner().toString().substring(0, 8)));
             say(sender, String.format(Locale.ROOT, " <white>#%d</white> <yellow>%s</yellow> <gray>%s %.1f %.1f %.1f",
                     screen.number(), MINI.escapeTags(title), MINI.escapeTags(screen.world()), screen.x(), screen.y(),
@@ -201,7 +201,7 @@ public final class ScreenCommand implements BasicCommand {
             say(sender, "<gray>No screens to put up.");
             return;
         }
-        say(sender, "<gold><bold>Screens</bold></gold> <gray>— click one to put it up over your head:");
+        say(sender, "<gold><bold>Screens</bold></gold><gray>: click one to put it up over your head:");
         for (ScreenKind kind : kinds) {
             sender.sendMessage(MINI.deserialize(" <dark_gray>•</dark_gray> <yellow>" + MINI.escapeTags(kind.title())
                             + "</yellow>" + (kind.personal() ? " <aqua>(everybody their own)</aqua>" : "")

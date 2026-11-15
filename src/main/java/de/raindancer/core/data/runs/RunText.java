@@ -18,7 +18,7 @@ public final class RunText {
     /** {@code 1:23.456}, or {@code 1:02:03.004} past an hour. */
     public static String clock(Duration time) {
         if (time == null) {
-            return "—";
+            return "-";
         }
         long millis = Math.abs(time.toMillis());
         long hours = millis / 3_600_000;
@@ -106,7 +106,7 @@ public final class RunText {
                 default -> "<gray>";
             };
             boolean mine = reader != null && run.includes(reader);
-            lines.add(colour + ordinal(place) + " <white>" + Text.literal(who(run)) + " <dark_gray>— "
+            lines.add(colour + ordinal(place) + " <white>" + Text.literal(who(run)) + "<dark_gray>: "
                     + colour + Text.literal(shown.apply(run)) + (mine ? " <green>(you)" : ""));
         }
         return lines;

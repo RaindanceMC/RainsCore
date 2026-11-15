@@ -65,7 +65,7 @@ public final class NetworkCommand implements BasicCommand {
                         return;
                     }
                     String home = roles.home(NetworkEconomy.ROLE).orElse("none yet");
-                    String holder = roles.holder(NetworkEconomy.ROLE).orElse("nobody — money cannot move");
+                    String holder = roles.holder(NetworkEconomy.ROLE).orElse("nobody, so money cannot move");
                     say(sender, "<gold>Bank</gold> <gray>belongs to <white><id></white>, answering now: <white>"
                             + MINI.escapeTags(holder) + "</white>. <dark_gray>/network bank here</dark_gray> moves it.", home);
                 }, () -> say(sender, "<red>The network's services are not running."));

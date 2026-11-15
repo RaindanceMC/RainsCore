@@ -23,8 +23,8 @@ class OptionChooserTest {
     @Test
     @DisplayName("a value with nothing in it still has something on the button")
     void handlesNothing() {
-        assertThat(OptionChooser.readable(null)).isEqualTo("—");
-        assertThat(OptionChooser.readable("  ")).isEqualTo("—");
+        assertThat(OptionChooser.readable(null)).isEqualTo("-");
+        assertThat(OptionChooser.readable("  ")).isEqualTo("-");
     }
 
     @Test

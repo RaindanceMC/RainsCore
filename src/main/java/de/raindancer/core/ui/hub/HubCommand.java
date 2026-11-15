@@ -84,9 +84,9 @@ public final class HubCommand implements BasicCommand {
         sender.sendMessage(MINI.deserialize("<dark_aqua>" + entries.size() + " feature(s):"));
         for (HubEntry entry : entries) {
             sender.sendMessage(MINI.deserialize("<blue>" + Text.literal(entry.name()) + " <dark_gray>"
-                    + Text.literal(entry.version()) + " <gray>— " + Text.literal(entry.description())));
+                    + Text.literal(entry.version()) + "<gray>: " + Text.literal(entry.description())));
             for (CommandNote note : Hub.notesFor(entry, core.commands(), sender::hasPermission)) {
-                sender.sendMessage(MINI.deserialize("<dark_gray>    " + Text.literal(note.slashed()) + " — "
+                sender.sendMessage(MINI.deserialize("<dark_gray>    " + Text.literal(note.slashed()) + ": "
                         + Text.literal(note.sentence())));
             }
         }

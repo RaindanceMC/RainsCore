@@ -185,7 +185,7 @@ public final class Votes {
         for (Vote vote : List.copyOf(votes.values())) {
             if (!vote.isOpen(now) && announced.add(vote.id())) {
                 justEnded.add(vote.id());
-                log.info("Vote ended: \"{}\" — {}", vote.question(), vote.tally(now).describe());
+                log.info("Vote ended: \"{}\": {}", vote.question(), vote.tally(now).describe());
             }
             // Kept for a day so the result outlives the vote and somebody can still act on it;
             // let go after that, because every vote ever held is a leak with a long fuse.
