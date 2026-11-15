@@ -1,8 +1,8 @@
 id: guide
 title: Asking the guide
-summary: How /help works, and how to get the most out of me.
+summary: How /help works and how to ask me things.
 intro: |
-  Me? I am <white>{setting:core-help:guide-name}</white>, and I know how everything on <white>{server}</white> works — <i>as it is set up right now</i>. When the owner changes a price, I know the new one before you do.
+  I am <white>{setting:core-help:guide-name}</white>. I know how everything on <white>{server}</white> works <i>as it is set up right now</i>. When the owner changes a price, I quote the new one.
 icon: ENCHANTED_BOOK
 category: Getting started
 order: 1
@@ -13,14 +13,14 @@ sections:
   - question: How do I ask you something?
     title: Asking
     text: |
-      Three ways, pick your favourite:
+      There are three ways:
       <white>•</white> Type {run:/help} and click through the subjects.
-      <white>•</white> Type your question into the box on my first page, or {cmd:/help search <words>} — I search every answer I have.
+      <white>•</white> Type your question into the box on my first page, or {cmd:/help search <words>}. I search every answer I have.
       <white>•</white> {cmd:/help <subject>} goes straight to a subject. Command names work too: <white>/help sell</white> opens whatever explains selling.
   - question: Where do I find you in the world?
     title: The guide in the world
     text: |
-      Somewhere near the spawn, usually — look for my name floating over my head. Right-click me and we talk, exactly like {run:/help}. I am not much of a fighter, so please do not try.
+      Usually near the spawn. Look for my name over my head. Right-click me to talk, the same as {run:/help}.
   - question: Can I get the answers in chat?
     title: Answers in chat
     text: |
@@ -28,7 +28,7 @@ sections:
   - question: Why do you know more than I do?
     title: Live answers
     text: |
-      Because I read the server's settings every time you ask. The prices, limits and cooldowns I quote are the ones in force right now — not whatever somebody wrote into a guide two updates ago.
+      Because I read the server's settings every time you ask. The prices, limits and cooldowns I quote are the ones in force right now.
   - question: Something here is wrong.
     title: Reporting mistakes
     text: |

@@ -2,7 +2,7 @@ id: basics
 title: Finding your way
 summary: The hub, every command in one book, what changed lately, and player profiles.
 intro: |
-  New to <white>{server}</white>? Splendid. Here is how not to stay lost. Everything else on this server hangs off these few doors.
+  New to <white>{server}</white>? Start here. Everything else on this server can be reached from these few places.
 icon: COMPASS
 category: Getting started
 order: 2
@@ -14,11 +14,11 @@ sections:
   - question: What is there to do here?
     title: The hub
     text: |
-      Type {run:/hub} — the hub. It shows every feature this server runs, each with its own page: what it does and the commands it brings. Click a feature to open it.
+      Type {run:/hub} to open the hub. It shows every feature this server runs, each with its own page: what it does and the commands it brings. Click a feature to open it.
   - question: Is there a list of all commands?
     title: All commands
     text: |
-      {run:/commands} opens a book with every command <i>you</i> may use, plugin by plugin — commands you cannot use are left out, so nothing in it will refuse you. {cmd:/commands <plugin>} shows just one plugin's.
+      {run:/commands} opens a book with every command <i>you</i> may use, plugin by plugin. Commands you cannot use are left out. {cmd:/commands <plugin>} shows just one plugin's.
   - question: What changed lately?
     title: What's new
     text: |
@@ -30,19 +30,19 @@ sections:
   - question: Can I put up screens in my base?
     title: Screens of your own
     text: |
-      If the server lets you: stand where it should float — somewhere you may build — and type {run:/screen}. Pick one: the server's status with its meters, charts of the last hours, the player record, your money, your guild, your quests… Screens marked <aqua>everybody near it sees their own</aqua> show each visitor their own stats.
+      If the server allows it, stand where it should float (somewhere you may build) and type {run:/screen}. Pick one: the server's status with its meters, charts of the last hours, the player record, your money, your guild, your quests… Screens marked <aqua>everybody near it sees their own</aqua> show each visitor their own stats.
 
       {cmd:/screen up} and {cmd:/screen down} nudge your nearest screen, {cmd:/screen up 1} as far as you say, {cmd:/screen remove} takes it down, {run:/screen list} shows yours. There is a limit to how many you may have up at once.
   - question: Can I have the plain menus back?
     title: Painted menus
     text: |
-      With the server pack on, menus are drawn as wood, brass and parchment. If you would rather have the plain glass windows, open {run:/hub}, click <white>Your profile</white> and then <white>Painted menus</white> — that switches them off for you alone, and the same click brings them back.
+      With the server pack on, menus are drawn as wood, brass and parchment. If you would rather have the plain glass windows, open {run:/hub}, click <white>Your profile</white> and then <white>Painted menus</white>. That switches them off for you alone, and the same click brings them back.
   - question: Can I see my own nametag?
     title: Your own nametag
     text: |
-      Where names above heads are styled, you see your own too — best from behind (F5). If it gets in your way, open {run:/hub}, click <white>Your profile</white> and then <white>Your own nametag</white> to hide it for you alone; the same click brings it back.
+      Where names above heads are styled, you see your own too, best from behind (F5). If it gets in your way, open {run:/hub}, click <white>Your profile</white> and then <white>Your own nametag</white> to hide it for you alone; the same click brings it back.
   - question: Can I change settings?
     title: Settings
     permission: rainscore.settings
     text: |
-      You can: {run:/settings} holds everything every plugin on this server can be told to do. Changes take hold at once — and I quote the new values from then on.
+      {run:/settings} holds everything the plugins on this server can be told to do. Changes take effect at once, and I quote the new values from then on.

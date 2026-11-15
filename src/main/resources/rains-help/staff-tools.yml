@@ -1,8 +1,8 @@
 id: staff-tools
 title: Running the server
-summary: Settings, maintenance, documents and the network — the owner's levers.
+summary: Settings, maintenance, documents and the network for the owner.
 intro: |
-  The levers behind the curtain. With great power, and so on. Everything here is for staff only — players never see this page.
+  Everything here is for staff only. Players never see this page.
 icon: COMMAND_BLOCK
 category: Staff
 order: 900
@@ -20,7 +20,7 @@ sections:
     title: Maintenance
     permission: rainscore.maintenance
     text: |
-      {cmd:/maintenance on <reason>} closes the server — only operators and the maintenance list may join. {cmd:/maintenance off} opens it again; {cmd:/maintenance add <player>} lets somebody in meanwhile.
+      {cmd:/maintenance on <reason>} closes the server. Only operators and the maintenance list may join. {cmd:/maintenance off} opens it again; {cmd:/maintenance add <player>} lets somebody in meanwhile.
   - question: Where are the config files?
     title: Documents
     permission: rainscore.documents
@@ -29,16 +29,16 @@ sections:
   - question: How do I put up screens?
     title: Screens
     text: |
-      Stand where it should float and type {run:/screen} — every kind there is, from every plugin, click one to put it up over your head. Some show the same to everybody (who is online, the richest, the top guilds); others show every player near them their <i>own</i> (their money, their guild, their quests, their playtime).
+      Stand where it should float and type {run:/screen}. It lists every kind from every plugin; click one to put it up over your head. Some show the same to everybody (who is online, the richest, the top guilds); others show every player near them their <i>own</i> (their money, their guild, their quests, their playtime).
 
       {cmd:/screen up} and {cmd:/screen down} nudge the nearest a quarter block, {cmd:/screen up 1} as far as you say, {cmd:/screen up 0.5 #3} screen number 3 wherever you are. {cmd:/screen move <number>} brings one over your head, {cmd:/screen remove} takes the nearest away, {run:/screen list} shows them all with their numbers.
 
-      Players may put up a few of their own where they may build — switch it off, change how many, or keep kinds for staff in {run:/settings} under screens. You handle every screen, theirs too; they only their own. Charts: <white>server-status</white>, <white>chart-tps</white>, <white>chart-memory</white>, <white>chart-cpu</white>, <white>chart-players</white> and <white>player-record</white> — measured once a minute, kept across restarts.
+      Players may put up a few of their own where they may build. Switch it off, change how many, or keep kinds for staff in {run:/settings} under screens. You handle every screen, theirs too; they only their own. Charts: <white>server-status</white>, <white>chart-tps</white>, <white>chart-memory</white>, <white>chart-cpu</white>, <white>chart-players</white> and <white>player-record</white>. They are measured once a minute and kept across restarts.
   - question: How do I place a guide at spawn?
     title: Placing a guide
     permission: rainscore.help.guide
     text: |
-      Stand where the guide should stand, facing the way they should face, and type {cmd:/help guide place} for a person (their skin is the setting <white>guide-skins</white>) or {cmd:/help guide place witch} — any mob works. {cmd:/help guide remove} takes away the nearest one. They are called <white>{setting:core-help:guide-name}</white>; change that in /settings.
+      Stand where the guide should stand, facing the way they should face, and type {cmd:/help guide place} for a person (their skin is the setting <white>guide-skins</white>) or {cmd:/help guide place witch} (any mob works). {cmd:/help guide remove} takes away the nearest one. They are called <white>{setting:core-help:guide-name}</white>; change that in /settings.
   - question: Is the guide correct here?
     title: Checking the guide
     permission: rainscore.help.manage
