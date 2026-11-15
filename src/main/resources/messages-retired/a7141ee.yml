@@ -1,0 +1,505 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Rain's Core — every word a player sees.
+#
+#  Edit any line here and that line is what players get. A line you delete, or
+#  a key a newer version added and this file has not got, falls back to the
+#  wording built into the jar — so an old file never blanks out a message, it
+#  just stops customising it.
+#
+#  Your edits are never overwritten. This file is written once, on the first
+#  start, and left alone from then on.
+#
+#  FORMATTING is MiniMessage: <red>text</red>, <bold>, <gradient:gold:yellow>.
+#  See https://docs.advntr.dev/minimessage/format.html
+#
+#  PLACEHOLDERS are the <angled> names in each line. They are filled in with
+#  real values, and anything a player typed — a name, a reason, a home's title
+#  — is inserted as plain text. A player called <rainbow> cannot recolour your
+#  messages. Placeholders you delete simply do not appear; ones you invent are
+#  left as they are, which is usually a typo in the name.
+#
+#  A COLOUR NAME WITH A TYPO in it will not break anything: the message still
+#  arrives, without its markup, and the mistake is written to the log. The
+#  times these messages matter most are the times somebody is being refused.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# In front of most messages Core sends. Set it to "" for no prefix at all.
+prefix: "<gray>[<aqua>Core<gray>] "
+
+# ─────────────────────────────────────────── punishments: what a player is told
+punishment:
+
+  # The full screen a banned player sees instead of joining. \n is a new line.
+  banned:
+    heading: "<red><bold>You are banned</bold>"
+    # <reason> is what the moderator typed.
+    reason: "<gray>Reason: <white><reason>"
+    permanent: "<gray>This ban does not expire."
+    # <time> reads like "2 days, 4 hours".
+    temporary: "<gray>Ends in <white><time>"
+
+  # One line in chat when a muted player tries to talk.
+  # <reason> is the moderator's; <time> only appears in the temporary version.
+  muted: "<red>You are muted: <gray><reason>"
+  muted-temporary: "<red>You are muted: <gray><reason> <dark_gray>(<time> left)"
+
+  # And when a frozen player tries to build.
+  frozen: "<red>You cannot build right now: <gray><reason>"
+  frozen-temporary: "<red>You cannot build right now: <gray><reason> <dark_gray>(<time> left)"
+
+  # Shown under the ban reason, if the owner set an appeal address in the
+  # settings. Left out entirely when they have not.
+  appeal: "<dark_gray><message>"
+
+  # How a length is written out. <count> is the number.
+  length:
+    forever: "for ever"
+    days: "<count> days"
+    hours: "<count> hours"
+    minutes: "<count> minutes"
+    seconds: "<count> seconds"
+
+# ────────────────────────────────────────────────────── clickable chat buttons
+button:
+  not-yours: "<red>That is not your button."
+  already-answered: "<yellow>You have already answered that."
+  no-longer-offered: "<yellow>That offer has expired. Gone, like free diamonds."
+  failed: "<red>That did not work. The server has written down why."
+  not-a-player: "<red>Only a player can click a button."
+  not-typed: "<yellow>That is not something to type."
+
+# ──────────────────────────────────────────────────── a command nobody has
+command:
+  # <command> is what was typed. Only said when something close exists; otherwise the server's own line.
+  unknown: "<red>/<command> is not a thing here. Not even a secret thing."
+  # A command that exists, with a word after it that it does not know. <word> is that word.
+  unknown-sub: "<red>/<command> does not do <word>. It has a short list, and that is not on it."
+  # The guesses follow as buttons, then did-you-mean-end.
+  did-you-mean: "<gray>Did you mean "
+  did-you-mean-end: "<gray>?"
+
+# ─────────────────────────────────────────────────────────── the settings menu
+settings:
+  # <name> is the setting, <value> what it became.
+  changed: "<green><name> is now <value>. Done and dusted."
+  # /settings reset <name>: back to the default, which is <value>.
+  reset: "<green><name> is back to <value>."
+  refused: "<red><value> is not something <name> can be."
+  finish-first: "<gray>Finish what you were asked first."
+  gone: "<gray>That setting is not there any more."
+  # A change that is in effect but could not be written, because the file has a mistake in it.
+  not-saved: "<yellow>Changed for now, but <file> could not be saved — it has a mistake in it (the console says where). Fix it and the next change is kept; until then a restart undoes this."
+  # /settings <name> for a name nothing has. <name> is what was typed.
+  unknown: "<red>Nothing on this server is called <name>."
+  did-you-mean: "<gray>Did you mean "
+  look-for-it: "<gray>Or look for it with <white>/settings search</white> and a word."
+  # Searching the settings. <query> is what was searched for.
+  search-title: "Search the settings"
+  search-none: "<gray>No setting mentions <query>. Try a shorter word."
+  search-found: "<gray><count> settings mention <query>:"
+
+# ─────────────────────────────────────── the chat log, and telling players it exists
+chatlog:
+  notice: "<dark_gray>Chat on this server is kept for <days> days so staff can look into reports. Private messages are not kept."
+
+# ─────────────────────────────────────── looking inside somebody's inventory
+invsee:
+  # What a moderator is told when opening one does not work.
+  opened: "<gray>Looking inside <who>."
+  yourself: "<gray>Your own inventory is a key rather than a menu. Check your pockets instead."
+  being-edited: "<yellow>Somebody else is editing that inventory."
+  never-seen: "<red>This server has never seen that player."
+  unreadable: "<red>Their inventory could not be read — the log says why."
+  not-allowed: "<red>You may not do that."
+  switched-off: "<red>Looking inside inventories is switched off on this server."
+
+  # When an offline edit could not be saved. Nothing was changed either way.
+  not-saved: "<red>Their inventory was not saved — nothing was changed, and what you added is back with you."
+  # When its owner logged in before the window was closed. The player wins.
+  owner-returned: "<gold><who> logged in before you closed the window, so your changes were not saved — their file is untouched. Open their inventory again to change it live."
+  # Said to anybody else who was watching when that happened.
+  owner-returned-watcher: "<gray>They just logged in — the window was showing their saved file, which is no longer where their things are. Open it again to see them live."
+
+  # The window's own title: <who> is whose inventory, <access> what you may do.
+  title: "<who> — <access>"
+
+  # What a watcher is allowed to do, as it appears in the title.
+  access:
+    read-only: "Looking"
+    edit: "Editing"
+    edit-everything: "Editing everything"
+
+  # The parts of an inventory, as the window labels them.
+  section:
+    hotbar: "Hotbar"
+    storage: "Backpack"
+    armour: "Worn"
+    off-hand: "Off Hand"
+    ender-chest: "Ender Chest"
+
+  # Armour, named from the head down.
+  armour:
+    helmet: "Helmet"
+    chestplate: "Chestplate"
+    leggings: "Leggings"
+    boots: "Boots"
+    other: "Worn"
+
+  # The two buttons on the window.
+  ender-chest-button:
+    name: "Ender Chest"
+    # <used> of <total> slots have something in them.
+    lore: "Their ender chest — <used> of <total> used"
+    hint: "Click to look inside"
+  back-button:
+    name: "Back"
+    lore: "What <who> is carrying"
+    hint: "Click to go back"
+
+# ──────────────────────────────────────────── attendants standing in the world
+desk:
+  # <desk>: what the attendant is called, e.g. Insurance agent.
+  in-person-only: "<red>That is done in person here. <gray>Go and see an <white><desk></white> — they do not take calls."
+
+# ──────────────────────────────────────────────────────── menus, everywhere
+menu:
+  back: "<gray>Back"
+  back-to: "<gray>Back to <where>"
+  home: "<gray>Main menu"
+  close: "<gray>Close"
+  close-lore: "<gray>Shut this menu. It will not be offended"
+  help: "<aqua>What is this?"
+  # A button somebody may not use is shown greyed with the reason.
+  locked: "<dark_gray><reason>"
+  previous-page: "<gray>Previous page"
+  next-page: "<gray>Next page"
+  # <page> of <pages>.
+  page-of: "<dark_gray>Page <page> of <pages>"
+  previous-menu: "the previous menu"
+
+# ────────────────────────────────────────────────────── who may hurt whom
+combat:
+  # Told to the attacker, at most once every few seconds. The person being
+  # protected is not told anything: they did not do anything.
+  no-pvp: "<red>Players cannot hurt each other here."
+  no-pve: "<red>Fighting creatures is off here."
+  # When something else refused — a claim, an arena. Deliberately vague,
+  # because Core does not know which plugin said no or why.
+  protected: "<red>Something is protecting that."
+  # A rule that allows this fight with bare fists only. A plugin can say this its own way.
+  fists-only: "<red>Only fists here — put down what you are holding."
+
+navigation:
+  # world.visual.Navigator — walking somebody to a point. A plugin can say these its own way.
+  started: "<green>Navigating to <white><target></white>. Follow the trail."
+  distance: "<yellow><target> <gray>— <white><blocks></white> blocks"
+  other-world: "<yellow><target> <gray>is in another world."
+  arrived: "<green>You have reached <white><target></white>. Ta-da."
+
+# ─────────────────────────────────────────────────────────── custom items
+#
+#  Said when a custom item was clicked and did not do its thing. There is no
+#  line for the case where it worked: the item itself is the message, and a
+#  chat line saying "you used the smoke bomb" on top of a cloud of smoke is
+#  noise. A miss — a grappling hook aimed at the sky — is also silent, and
+#  deliberately: it costs nothing, so it should read as a miss rather than as
+#  a refusal.
+items:
+  not-for-spawners: "<red>Nice try. Eggs from the shop hatch mobs — they don't set spawners."
+  cooling-down: "<yellow><item> is not ready yet — <white><seconds>s</white>."
+  used-up: "<yellow><item> has nothing left in it."
+  # The ability threw. The reason is in the log with its stack trace; the
+  # player gets a sentence rather than an item that silently does nothing.
+  went-wrong: "<red><item> did not work. Somebody should look at the log."
+  # Saving an empty crafting grid in /items. <item> is the item's id.
+  no-recipe: "<yellow><item> has no recipe any more."
+
+# ─────────────────────────────────────────────────────────────── the tablist
+tablist:
+  nobody-on: "<dark_gray>nobody is on. Very exclusive."
+
+# ─────────────────────────────────────────────── world protection: land
+#
+#  Neutral on purpose. Core protects "an area"; it does not know whether the
+#  area is a claim, an arena, a plot or a spawn region. Whichever plugin owns
+#  the ground reads better than this and should say so —
+#
+#      messages.define("land.flag.pvp.description",
+#              "Players may damage each other inside this claim");
+#
+#  A `define` sits below this file, so a server owner's own edit still wins.
+land:
+  # Said on the action bar when somebody is refused. Throttled to once every
+  # second and a half, because holding a mouse button down produces one of
+  # these per tick.
+  denied: "<red>You may not <white><permission></white> in <white><claim></white>."
+  pvp-refused: "<red>Fighting is not allowed in <white><claim></white>."
+  potions-refused: "<red>Potions are not allowed in <white><claim></white>."
+  redstone-refused: "<red>Redstone does not work in <white><claim></white>. The wiring is on strike."
+  riptide-refused: "<red>Riptide is not allowed in <white><claim></white>. No flying trident tours here."
+  leads-refused: "<red>You may not lead animals about in <white><claim></white>."
+  boats-refused: "<red>Boats and minecarts may not be put down in <white><claim></white>."
+  walk-in-refused: "<red>You may not go into <white><claim></white>. The door is metaphorical, the no is not."
+  hit-mobs-refused: "<red>You may not hurt the animals in <white><claim></white>."
+  hit-monsters-refused: "<red>You may not fight monsters in <white><claim></white>."
+  interact-mobs-refused: "<red>You may not handle the animals in <white><claim></white>."
+
+  bypass-reminder: "<gold>Your protection bypass has been on for a while. <gray>Still need your superpowers?"
+  bypass-reminder-extended: "<gray>Alright — asked again in ten minutes."
+  bypass-reminder-silenced: "<gray>Won't ask again until you toggle bypass off and back on."
+
+  audience:
+    owner:
+      name: "Owners"
+      description: "Whoever is responsible for this ground"
+    trusted:
+      name: "Trusted"
+      description: "People who have been given a say here"
+    visitor:
+      name: "Visitors"
+      description: "Everybody else"
+
+  flag-group:
+    player: {name: "You & other players", description: "What may happen to somebody standing here"}
+    nature: {name: "Nature", description: "What the ground and the weather do on their own"}
+    entities: {name: "Creatures & things", description: "Where creatures come from, what they may break, and what may be put down"}
+    travel: {name: "Getting in", description: "Ways in and out that are not walking"}
+    border: {name: "Across the border", description: "What somebody outside can reach in with"}
+    machinery: {name: "Machinery", description: "Whether what has been built here actually runs"}
+    death: {name: "Dying here", description: "What happens to what you were carrying"}
+    pickup: {name: "Picking things up", description: "What may be taken off the ground here"}
+    other: {name: "Everything else", description: "Rules not filed anywhere yet"}
+
+  flag:
+    pvp: {name: "PvP", description: "Players may damage each other"}
+    monster-spawning: {name: "Monster spawning", description: "Hostile mobs may spawn naturally"}
+    animal-spawning: {name: "Animal spawning", description: "Passive mobs may spawn naturally"}
+    spawner-spawning: {name: "Spawner spawning", description: "Monster spawners keep working"}
+    potion-spawning: {name: "Potion spawning", description: "Mobs may spawn from a potion — silverfish from infestation, slimes from oozing"}
+    monster-entry: {name: "Monster entry", description: "Hostile mobs may walk in"}
+    monster-targeting: {name: "Monster targeting", description: "Hostile mobs may target players inside"}
+    explosions: {name: "Explosions", description: "Creepers, TNT and beds may damage blocks"}
+    explosion-damage: {name: "Explosion damage", description: "Explosions may hurt players and mobs — separate from block damage"}
+    mob-damage: {name: "Mob damage", description: "Mobs may hurt players and other mobs"}
+    hit-mobs: {name: "Hurting animals", description: "Players may damage animals, villagers and other peaceful creatures"}
+    hit-monsters: {name: "Fighting monsters", description: "Players may damage hostile mobs"}
+    interact-mobs: {name: "Handling animals", description: "Players may shear, milk, saddle, dye and breed the creatures here"}
+    item-pickup: {name: "Picking up items", description: "Players may pick dropped items up off the ground"}
+    xp-pickup: {name: "Collecting experience", description: "Players may collect experience orbs"}
+    fire-spread: {name: "Fire spread", description: "Fire may spread and burn blocks"}
+    leaf-decay: {name: "Leaf decay", description: "Leaves decay when their tree is cut"}
+    enderman-grief: {name: "Enderman grief", description: "Endermen may pick up blocks"}
+    mob-grief: {name: "Mob grief", description: "Mobs may change blocks (ravagers, silverfish, sheep …)"}
+    pistons-from-outside: {name: "Outside pistons", description: "Pistons outside may move blocks inside"}
+    fluids-from-outside: {name: "Outside fluids", description: "Water and lava may flow in from outside"}
+    fluid-flow: {name: "Fluids flow", description: "Water and lava may spread here at all — off freezes them where they are"}
+    snow-ice-form: {name: "Snow & ice", description: "Snow and ice may form or melt"}
+    fall-damage: {name: "Fall damage", description: "Players take fall damage"}
+    hunger: {name: "Hunger", description: "Players lose food"}
+    keep-inventory: {name: "Keep inventory", description: "Players keep what they carried when they die here"}
+    item-drops: {name: "Items drop", description: "Off means what they carried is gone rather than dropped — only when they do not keep it"}
+    elytra-flight: {name: "Elytra", description: "Players may fly with an elytra"}
+    riptide: {name: "Riptide", description: "Players may launch themselves with a riptide trident"}
+    ender-pearl-in: {name: "Ender pearls", description: "Players may pearl in"}
+    walk-in: {name: "Walk in", description: "Players may walk in over the border"}
+    visible-from-outside: {name: "Seen from outside", description: "People inside can be seen by somebody standing outside"}
+    teleport-in: {name: "Teleport in", description: "Players may teleport in"}
+    potions: {name: "Potions", description: "Potions may be drunk, thrown or left lingering here"}
+    totems: {name: "Totems of undying", description: "A totem may save somebody from dying here"}
+    redstone: {name: "Redstone", description: "Redstone runs — pistons fire, dispensers dispense, doors open themselves"}
+    breeding: {name: "Breeding", description: "Animals may be bred here"}
+    leads: {name: "Leads", description: "Animals may be led about — off stops anybody walking one off the property"}
+    boats: {name: "Boats & minecarts", description: "They may be put down here at all"}
+    armor-durability: {name: "Equipment wear", description: "Worn armour and elytra lose durability"}
+
+  action:
+    enter: {name: "Enter", description: "Walk or teleport in"}
+    build: {name: "Build", description: "Place blocks"}
+    break: {name: "Break", description: "Break blocks"}
+    containers: {name: "Containers", description: "Open chests, barrels, furnaces, hoppers …"}
+    doors: {name: "Doors & gates", description: "Open doors, trapdoors and fence gates"}
+    redstone: {name: "Buttons & levers", description: "Use buttons, levers and pressure plates"}
+    beds: {name: "Beds & anchors", description: "Sleep in beds and use respawn anchors"}
+    workstations: {name: "Workstations", description: "Use crafting tables, anvils, enchanting tables …"}
+    animals: {name: "Animals", description: "Interact with and leash passive mobs"}
+    damage-animals: {name: "Hurt animals", description: "Damage or kill passive mobs"}
+    vehicles: {name: "Vehicles", description: "Place, enter and break boats and minecarts"}
+    item-frames: {name: "Frames & stands", description: "Modify item frames and armour stands"}
+    farmland: {name: "Farmland", description: "Trample crops and till soil"}
+    buckets: {name: "Buckets", description: "Fill and empty buckets"}
+    ignite: {name: "Fire", description: "Use flint and steel or fire charges"}
+    item-pickup: {name: "Item pickup", description: "Pick up dropped items"}
+    trade: {name: "Villager trading", description: "Trade with villagers"}
+
+
+# ──────────────────────────────────────────────────────── questions typed into chat
+# <problem> is what was wrong with the answer, <left> how many tries remain.
+prompt:
+  how: "<dark_gray>Type your answer in chat — or <white>cancel</white>. <seconds>s to answer."
+  again: "<red><problem> <gray>Try again — <left> <tries> left."
+  gave-up: "<red><problem> That was the last try; nothing was changed."
+  timed-out: "<gray>No answer came, so nothing was changed. The silence was deafening."
+  cancelled: "<gray>Cancelled — nothing was changed."
+  busy: "<yellow>Something else is already waiting for your answer — answer or cancel that first."
+  suggestions: "<dark_gray>Click one: "
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Nothing else here on purpose.
+#
+#  Core is a library: warps, votes, resource packs and achievements are things
+#  it *manages*, not things it talks about. The sentences a player reads about
+#  their own warp come from whichever plugin owns the command — and that plugin
+#  registers its own wording, either in its own messages.yml or through
+#  RainsCore.messages().define(...).
+#
+#  An earlier draft of this file had keys for all of them. They were removed:
+#  a message file listing lines that never appear is worse than a short one,
+#  because somebody translates them and then wonders why nothing changed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── vanish: saying something while hidden ────────────────────────────────────
+vanish-chat:
+  held: "<yellow>Psst — you're vanished. Saying <white><line></white> would tell everybody you're here."
+  not-asking: "<gray>Sent. You will not be asked again until you reappear."
+  kept: "<gray>Not sent."
+
+# ─────────────────────────────────────────────── /prefix and its menu
+prefix-design:
+  which-mode: "<red>Either <white>shared</white> or <white>per-plugin</white>."
+  no-style: "<red>No colour or decoration in that. Like <white>#ff8800,#ffee00|bold</white>."
+  file-broken: "<red>prefix.yml is broken; the defaults are used until it is fixed. The console says where."
+  # The change is in effect, it just will not survive a restart.
+  changed-not-saved: "<yellow>Prefix changed, but prefix.yml could not be written — this lasts until the next restart or reload."
+  not-saved: "<red>prefix.yml could not be written, so this lasts until the next restart or reload."
+
+# ─────────────────────────────────────────────── editing a sound or particle cue
+cues:
+  not-a-sound: "<red>Nothing in that could be read as a sound, so nothing changed."
+  not-a-particle: "<red>Nothing in that could be read as a particle, so nothing changed."
+  busy: "<red>You are already being asked something else — answer or cancel that first."
+
+# A player sent to another server of the network (2.0.0).
+travel:
+  failed: "<red>Could not reach <white><server></white> just now — you are still here."
+  arrival-lost: "<yellow>You arrived, but the place you were sent to is not on this server any more."
+
+friends:
+  off: "<red>Friends need the network — this server is on its own."
+  joined-network: "<green>●</green> <white><name></white> <gray>joined the network."
+  now-playing: "<green>●</green> <white><name></white> <gray>is now playing <white><server></white><gray>."
+  requests-waiting: "<gray>You have <white><count></white> friend request(s) waiting — <white>/friend requests</white>."
+  sent: "<gray>Friend request sent to <white><name></white>."
+  asked-you: "<white><name></white> <gray>wants to be your friend — <green>/friend accept <name></green> <gray>or <red>/friend deny <name></red>"
+  accepted: "<green>You and <white><name></white> are friends now."
+  now-friends: "<green><white><name></white> and you are friends now."
+  denied: "<gray>You turned down <white><name></white>."
+  removed: "<gray><white><name></white> is no longer on your friends list."
+  already-friends: "<gray>You and <white><name></white> are friends already."
+  already-asked: "<gray>You asked <white><name></white> already — they have not answered yet."
+  no-request: "<red><white><name></white> has not asked to be your friend."
+  not-friends: "<red><white><name></white> is not on your friends list."
+  self: "<red>You are your own best friend already."
+  too-many: "<red>That friends list is full (a hundred)."
+  failed: "<red>That did not work — try again in a moment."
+  unknown: "<red>Nobody called <white><name></white> has been on the network."
+  not-online: "<red><white><name></white> is not online — or not your friend."
+  list-empty: "<gray>No friends yet — <white>/friend add <name></white>."
+  list-header: "<gold>Friends <gray>(<white><online></white> of <white><total></white> online)"
+  list-online: " <green>●</green> <white><name></white> <gray>— <server> · <white>/friend join <name></white>"
+  list-offline: " <dark_gray>○</dark_gray> <gray><name>"
+  requests-empty: "<gray>No friend requests."
+  requests-line: " <white><name></white> <gray>— <green>/friend accept <name></green> <gray>· <red>/friend deny <name></red>"
+  usage: "<gray>/friend add|accept|deny|remove <name> · list · requests · join <name>"
+
+party:
+  off: "<red>Parties need the network — this server is on its own."
+  invited: "<white><name></white> <gray>invited you to their party — <green>/party accept <name></green> <gray>(two minutes)"
+  invite-sent: "<gray>Invited <white><name></white> — the invite lasts two minutes."
+  joined: "<green>You are in <white><name></white>'s party now. <gray>Where they go, you go — <white>/pc</white> to talk."
+  member-joined: "<light_purple>[Party]</light_purple> <white><name></white> <gray>joined."
+  left: "<gray>You left the party."
+  member-left: "<light_purple>[Party]</light_purple> <white><name></white> <gray>left."
+  member-gone: "<light_purple>[Party]</light_purple> <white><name></white> <gray>left the network and the party."
+  kicked: "<gray><white><name></white> is out of the party."
+  you-were-kicked: "<red>You were removed from the party."
+  following: "<light_purple>[Party]</light_purple> <gray>Following your leader…"
+  chat: "<light_purple>[Party]</light_purple> <white><name></white><gray>: <message>"
+  none: "<gray>You are in no party — <white>/party invite <name></white> starts one."
+  none-but-invited: "<gray>You are in no party. Invited by: <white><names></white> — <white>/party accept <name></white>"
+  list-header: "<light_purple>Party <gray>(<white><count></white>/<most>)"
+  list-leader: " <gold>★</gold> <white><name></white> <gray>— <server>"
+  list-line: " <light_purple>●</light_purple> <white><name></white> <gray>— <server>"
+  not-leader: "<red>Only the party's leader does that."
+  not-in-one: "<red>You are not in a party — or they are not in yours."
+  already-in-one: "<red>Already in a party."
+  no-invite: "<red>No invite from <white><name></white> — or it ran out."
+  full: "<red>The party is full (eight)."
+  self: "<red>That is you."
+  failed: "<red>That did not work — try again in a moment."
+  not-online: "<red><white><name></white> is not online."
+  usage: "<gray>/party invite|accept|kick <name> · leave · list · chat <message> · /pc <message>"
+
+# ────────────────────────────────────────── /help and the guide at spawn
+help:
+  # What the guide says first, one line dealt at a time. <player>, <server>, <guide>.
+  greeting:
+    - "Ah, <white><player></white>. Lost already? Splendid — lost people are my favourite kind."
+    - "Welcome to <white><server></white>, dear. Ask me anything. I may even know the answer."
+    - "Back again, <white><player></white>? Nobody reads the signs. That is why I exist."
+    - "Right. What do you want to know?"
+    - "I have answers. Lots of them. Whether they are to your questions, we shall see."
+    - "Ah, a visitor. Questions cost nothing here. Answers cost nothing either. What a deal."
+  # Under the greeting. <topics>: how many things the guide can explain to this reader.
+  greeting-hint: "<gray>Pick a subject below, or type a question into the box. I know about <white><topics></white> things here."
+  ask-label: "Ask me something"
+  ask-button: "<#C4B5FD>✦ Ask"
+  ask-tooltip: "Searches every answer I have for the words in the box."
+  commands-button: "<#FDE68A>All commands"
+  commands-tooltip: "Every command you may use here, in one book."
+  wiki-button: "<#7DD3FC>Read the wiki"
+  goodbye: "<gray>Goodbye"
+  back: "<gray>« Back"
+  # A shelf of topics. <category>.
+  category-intro: "<white><category></white><gray> — what would you like to know?"
+  # On a topic page.
+  which-commands: "<#FDE68A>Which commands are there?"
+  related: "<gray>About <white><title></white>…"
+  more-on-wiki: "<#7DD3FC>Read more on the wiki"
+  # Under an answer.
+  next-question: "<gray>Next: <white><question></white>"
+  something-else: "<gray>Ask about something else"
+  # The commands of a topic. <title>.
+  commands-intro: "<gray>The commands for <white><title></white> you may use. Click one to run it — I will ask for anything it needs."
+  commands-none: "<gray>Nothing to type for <white><title></white> — it all happens by itself, or by clicking."
+  # Searching. <asked>: what was typed.
+  search-intro: "<gray>You asked: <white><asked></white>"
+  search-found: "<gray>Here is what I know about that. Anything with a <#7DD3FC>▶</#7DD3FC> is a command I can run for you."
+  search-nothing: "<gray>Hmm. I know nothing about <white><asked></white>. Try other words — or fewer of them."
+  search-did-you-mean: "<gray>Did you mean <white><names></white>?"
+  # A topic that exists but is switched off on this server. <title>.
+  switched-off: "<gray><white><title></white> is not part of this server right now — whoever runs it has switched that off."
+  # Running commands from the guide.
+  run: "<#86EFAC>▶ Run"
+  type-it: "<gray>Type it myself"
+  command-pick: "<gray>Which one? Click it to fill it in and run it."
+  # <field>: what was left empty.
+  form-missing: "<red>Fill in <white><field></white> first — I cannot guess it. Well, I could, but you would not like it."
+  search-empty: "<gray>You have to actually type a question into the box, dear. I read minds only on Tuesdays."
+  # Generated topics, for a feature that shipped no guide.
+  generated-note: "<dark_gray><i>Nobody has written me a proper guide for this yet, so here is what it tells me about itself.</i>"
+  # Chat, for the console and anybody who asks for it.
+  chat-header: "<gradient:#C084FC:#7DD3FC>━━━━━━━━ <title> ━━━━━━━━</gradient>"
+  chat-question: " <#C4B5FD><number>.</#C4B5FD> <white><question></white>"
+  chat-index-category: "<#C4B5FD><category>:</#C4B5FD> <topics>"
+  # A new player's first join.
+  new-player: "<gray>New here? Type <white><click:run_command:'/help'><hover:show_text:'<gray>Click to ask'>/help</hover></click></white> or talk to <white><guide></white> at spawn — they know everything. Almost."
+  # Staff.
+  usage-guide: "<gray>/help guide place [mannequin|witch|villager|…] · /help guide remove"
+  guide-placed: "<green><guide> is standing here now. Right-click them to talk."
+  guide-removed: "<green>The guide nearest you is gone."
+  guide-none-near: "<red>No guide within four blocks of you."
+  guide-bad-type: "<red><type> cannot be a guide — pick a mob, or mannequin for a person in any skin."
+  reloaded: "<green>The guide re-read every help file: <white><topics></white> topics, <white><problems></white> problem(s)."
+  check-clean: "<green>Every topic reads, every setting it quotes exists. <white><topics></white> topics checked."
+  check-header: "<red><count> problem(s) in the guide:"
+  check-line: "<dark_gray>• <gray><problem>"

@@ -18,9 +18,9 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * messages-serious.yml is a second wording of the same lines, so it can only go wrong by drifting from
- * the first: a key that no longer exists says nothing, and a placeholder that went missing drops the
- * name or the time out of a sentence a player needed it in.
+ * messages-serious.yml was a second wording of the same lines. There is one tone now, so it stays empty;
+ * should a line come back, it must not drift from messages.yml: a key that no longer exists says
+ * nothing, and a placeholder that went missing drops a name out of a sentence a player needed.
  */
 class SeriousWordingTest {
 
@@ -65,9 +65,10 @@ class SeriousWordingTest {
     private final Map<String, Object> serious = flat("src/main/resources/messages-serious.yml");
 
     @Test
-    @DisplayName("the serious file is there and says something")
-    void notEmpty() {
-        assertThat(serious).hasSizeGreaterThanOrEqualTo(10);
+    @DisplayName("there is one tone only: the serious file is there but has no lines")
+    void oneToneOnly() {
+        assertThat(new File("src/main/resources/messages-serious.yml")).exists();
+        assertThat(serious).isEmpty();
     }
 
     @Test
