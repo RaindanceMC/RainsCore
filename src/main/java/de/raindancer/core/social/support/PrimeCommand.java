@@ -62,15 +62,53 @@ public final class PrimeCommand implements BasicCommand {
             say(sender, "<gray>Usage: /prime grant <player|uuid> <days> · /prime revoke <player|uuid> · /prime info <player|uuid>");
             return;
         }
-        Optional<UUID> target = target(args[1]);
-        if (target.isEmpty()) {
-            say(sender, "<red>Nobody called <name> has been here. Use their UUID (Tebex: {id}).",
-                    Placeholder.unparsed("name", args[1]));
-            return;
+        // A name nobody here has seen yet (Prime bought before ever joining) is looked up with Mojang, off the
+        // server's threads; the rest goes on, on the server's, once the answer is in.
+        org.bukkit.plugin.Plugin plugin = Bukkit.getPluginManager().getPlugin("RainsCore");
+        resolve(args[1], PrimeCommand::target, PrimeCommand::mojang).whenComplete((found, failed) -> {
+            Runnable rest = () -> {
+                if (found == null || found.isEmpty()) {
+                    say(sender, "<red>Nobody is called <name>, here or at Mojang. Use their UUID (Tebex: {id}).",
+                            Placeholder.unparsed("name", args[1]));
+                    return;
+                }
+                act(sender, word, args, found.get());
+            };
+            if (plugin == null) {
+                rest.run();
+            } else {
+                Scheduling.global(plugin, rest);
+            }
+        });
+    }
+
+    private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_]{3,16}");
+
+    /**
+     * Who {@code typed} means: a UUID or somebody this server knows straight away; any other name that could be a
+     * Minecraft name through {@code mojang}. Nonsense is not asked about.
+     */
+    static java.util.concurrent.CompletableFuture<Optional<UUID>> resolve(String typed,
+            java.util.function.Function<String, Optional<UUID>> known,
+            java.util.function.Function<String, java.util.concurrent.CompletableFuture<Optional<UUID>>> mojang) {
+        Optional<UUID> here = uuidOf(typed).or(() -> known.apply(typed));
+        if (here.isPresent() || !NAME.matcher(typed.trim()).matches()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(here);
         }
+        return mojang.apply(typed.trim()).exceptionally(failed -> Optional.empty());
+    }
+
+    private static java.util.concurrent.CompletableFuture<Optional<UUID>> mojang(String name) {
+        if (!RainsCore.isAvailable()) {
+            return java.util.concurrent.CompletableFuture.completedFuture(Optional.empty());
+        }
+        return RainsCore.get().profileLookup().byName(name).thenApply(found -> found.map(
+                de.raindancer.core.social.presence.ProfileLookup.Found::id));
+    }
+
+    private void act(CommandSender sender, String word, String[] args, UUID who) {
         RainsCore core = RainsCore.get();
         PrimeMembers members = core.prime();
-        UUID who = target.get();
         Instant now = Instant.now();
         switch (word) {
             case "grant" -> {
@@ -128,6 +166,12 @@ public final class PrimeCommand implements BasicCommand {
     }
 
     static Optional<UUID> target(String typed) {
+        return uuidOf(typed).or(() -> Bukkit.getServer() == null ? Optional.empty()
+                : PlayerTargets.idOf(Bukkit.getServer(), typed.trim()));
+    }
+
+    /** A UUID, with or without dashes (Tebex's {id} has none). */
+    static Optional<UUID> uuidOf(String typed) {
         String text = typed.trim();
         if (BARE_UUID.matcher(text).matches()) {
             text = text.replaceFirst("(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{12})",
@@ -136,7 +180,7 @@ public final class PrimeCommand implements BasicCommand {
         try {
             return Optional.of(UUID.fromString(text));
         } catch (IllegalArgumentException notAUuid) {
-            return Bukkit.getServer() == null ? Optional.empty() : PlayerTargets.idOf(Bukkit.getServer(), text);
+            return Optional.empty();
         }
     }
 
