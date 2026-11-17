@@ -214,10 +214,7 @@ public final class ClickHints {
         }
         List<Component> lines = lore == null ? List.of() : lore;
         for (Component line : lines) {
-            String text = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                    .serialize(line);
-            if (HINT.matcher(text).find() || text.indexOf(Glyph.LEFT.character()) >= 0
-                    || text.indexOf(Glyph.RIGHT.character()) >= 0 || text.indexOf(Glyph.MIDDLE.character()) >= 0) {
+            if (saysAClick(line)) {
                 return lore;
             }
         }
@@ -227,6 +224,26 @@ public final class ClickHints {
         }
         shown.add(glyph(Glyph.LEFT, Style.empty(), audience));
         return shown;
+    }
+
+    /**
+     * A dialog button's tooltip — one component, its lines split by newlines — with the mouse under it when nothing in
+     * it says what a click does, like {@link #withClickLine(List, Audience)} for a chest page's lore.
+     */
+    public static Component withClickLine(Component tooltip, Audience audience) {
+        if (audience == null || audience == Audience.NONE || tooltip != null && saysAClick(tooltip)) {
+            return tooltip;
+        }
+        Component mouse = glyph(Glyph.LEFT, Style.empty(), audience);
+        return tooltip == null ? mouse
+                : Component.text().append(tooltip).append(Component.newline()).append(Component.newline())
+                .append(mouse).build();
+    }
+
+    private static boolean saysAClick(Component text) {
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(text);
+        return HINT.matcher(plain).find() || plain.indexOf(Glyph.LEFT.character()) >= 0
+                || plain.indexOf(Glyph.RIGHT.character()) >= 0 || plain.indexOf(Glyph.MIDDLE.character()) >= 0;
     }
 
     /** A copy of the item with its lore's hints drawn; the very same item when there were none. */

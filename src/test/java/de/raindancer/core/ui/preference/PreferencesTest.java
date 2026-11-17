@@ -126,4 +126,16 @@ class PreferencesTest {
         DialogPage page = PreferencesDialog.page(ada);
         assertThat(page.plainText()).contains("Nothing to set");
     }
+
+    @Test
+    @DisplayName("every button says what a click does, drawn as the mouse like on a chest page")
+    void clickHints() {
+        Preferences.offer(null, toggle("pets:others", "Pets", "See other people's pets", true));
+        Preferences.offer(null, Preference.page("core:sidebar", "Sidebar", "Your sidebar", "What is on the right.",
+                (player, parent) -> { }));
+
+        DialogPage page = PreferencesDialog.page(ada);
+        assertThat(plain(page.button("See other people's pets").tooltip())).contains("Click to turn it off");
+        assertThat(plain(page.button("Your sidebar").tooltip())).contains("Click to open it");
+    }
 }

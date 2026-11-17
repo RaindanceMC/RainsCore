@@ -31,7 +31,7 @@ public final class TravelDialog {
         page.text("<gray>Where to?").columns(2);
         for (TravelDoor door : doors) {
             Optional<String> locked = door.lockedFor(viewer);
-            page.button(locked.isEmpty(), "<white>" + Text.literal(door.title()), "<gray>" + door.description(),
+            page.button(locked.isEmpty(), "<white>" + Text.literal(door.title()), "<gray>" + door.description() + "\n\n<dark_gray>» <white>Click to travel",
                     locked.orElse(null), answers -> door.open().accept(viewer,
                             new DialogReturn(viewer, brand(), "Travel", () -> open(viewer))));
         }

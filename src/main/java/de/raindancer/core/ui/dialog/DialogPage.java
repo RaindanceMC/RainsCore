@@ -483,11 +483,14 @@ public final class DialogPage {
             return tooltip;
         }
 
-        /** The tooltip as this player sees it: "Click to go" drawn as the mouse, as on a chest page's lore. */
+        /**
+         * The tooltip as this player sees it: "Click to go" drawn as the mouse, as on a chest page's lore, and a button
+         * that can be pressed and does not say so gets the mouse under it, as a chest page's button does.
+         */
         public Component tooltipFor(java.util.UUID player) {
-            return tooltip == null ? null
-                    : de.raindancer.core.ui.menu.ClickHints.rewrite(tooltip,
-                    de.raindancer.core.ui.menu.ClickHints.audience(player));
+            var audience = de.raindancer.core.ui.menu.ClickHints.audience(player);
+            Component drawn = tooltip == null ? null : de.raindancer.core.ui.menu.ClickHints.rewrite(tooltip, audience);
+            return allowed ? de.raindancer.core.ui.menu.ClickHints.withClickLine(drawn, audience) : drawn;
         }
 
         public int width() {

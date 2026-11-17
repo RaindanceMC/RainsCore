@@ -67,6 +67,11 @@ class HubDialogTest {
         }
 
         @Override
+        public String name(Player viewer) {
+            return "<gradient:#FF0000:#00FF00>Ada-Painted</gradient>";
+        }
+
+        @Override
         public List<String> facts(Player viewer) {
             return List.of("<gray>Online now: <white>3");
         }
@@ -147,5 +152,21 @@ class HubDialogTest {
         assertThat(ran).containsExactly("pets", "bank");
         economyPage.button("/pay").press(ada, DialogAnswers.none());
         assertThat(typed).containsExactly("/pay");
+    }
+
+    @Test
+    @DisplayName("every button the viewer may press says what a click does")
+    void clickHints() {
+        DialogPage page = HubDialog.page(ada, source);
+        assertThat(page.pressable().stream().filter(DialogPage.Button::allowed)
+                .map(button -> PlainTextComponentSerializer.plainText().serialize(button.tooltip())).toList())
+                .isNotEmpty().allSatisfy(tooltip -> assertThat(tooltip).contains("Click to"));
+    }
+
+    @Test
+    @DisplayName("the welcome shows the name in the player's own colours")
+    void paintedName() {
+        DialogPage page = HubDialog.page(ada, source);
+        assertThat(page.plainText()).contains("Welcome, Ada-Painted");
     }
 }

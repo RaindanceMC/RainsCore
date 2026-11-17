@@ -46,6 +46,9 @@ public final class HubDialog {
 
         String serverName();
 
+        /** The viewer's name as MiniMessage, painted the way their name is everywhere else. */
+        String name(Player viewer);
+
         List<String> facts(Player viewer);
 
         void run(Player viewer, String command);
@@ -71,33 +74,35 @@ public final class HubDialog {
     }
 
     static DialogPage page(Player viewer, Source source) {
-        String name = Text.literal(viewer.getName());
+        String name = source.name(viewer);
         DialogPage page = DialogPage.titled("<bold><gradient:" + Style.brandFrom() + ":" + Style.brandTo() + ">"
                         + Text.literal(source.serverName()) + "</gradient></bold>").columns(2)
                 .face(viewer.getUniqueId(), () -> Icons.head(viewer.getUniqueId(), "<white>" + name),
                         "<gray>Welcome, <white>" + name + "</white>.\n" + String.join("\n", source.facts(viewer)));
         if (source.travel()) {
             page.button("<gradient:#7DD3FC:#A78BFA>Travel</gradient>",
-                    "<gray>Homes, warps, other players, a random spot and back.",
+                    "<gray>Homes, warps, other players, a random spot and back.\n\n<dark_gray>» <white>Click to choose where to go",
                     answers -> de.raindancer.core.ui.travel.TravelDialog.open(viewer));
         }
         page.button("<gradient:#A7F3D0:#7DD3FC>Your preferences</gradient>",
-                "<gray>Everything you set for yourself: sidebar, health bars, requests and more.",
+                "<gray>Everything you set for yourself: sidebar, health bars, requests and more."
+                        + "\n\n<dark_gray>» <white>Click to change them",
                 answers -> de.raindancer.core.ui.preference.PreferencesDialog.open(viewer));
-        page.button("<gradient:#F9A8D4:#FBCFE8>Your profile</gradient>", "<gray>How the server sees you.",
+        page.button("<gradient:#F9A8D4:#FBCFE8>Your profile</gradient>", "<gray>How others see you: your time here and what"
+                + " each feature shows about you.\n\n<dark_gray>» <white>Click to look",
                 answers -> de.raindancer.core.ui.profile.ProfileDialog.open(viewer, brand(), viewer.getUniqueId(),
                         viewer.getName(), () -> open(viewer)));
         if (source.exists("changelog")) {
-            page.button("<gradient:#86EFAC:#6EE7B7>What's new</gradient>", "<gray>What changed on the server lately.",
+            page.button("<gradient:#86EFAC:#6EE7B7>What's new</gradient>", "<gray>What changed on the server lately.\n\n<dark_gray>» <white>Click to read it",
                     answers -> source.run(viewer, "changelog"));
         }
         if (source.exists("commands")) {
-            page.button("<gradient:#FDE68A:#FDBA74>All commands</gradient>", "<gray>Every command you may use, in one book.",
+            page.button("<gradient:#FDE68A:#FDBA74>All commands</gradient>", "<gray>Every command you may use, in one book.\n\n<dark_gray>» <white>Click to open the book",
                     answers -> source.run(viewer, "commands"));
         }
         if (source.exists("settings") && viewer.hasPermission("rainscore.settings")) {
             page.button("<gradient:#7DD3FC:#A5B4FC>Server settings</gradient>",
-                    "<gray>How every feature here is set up. Staff only.", answers -> source.run(viewer, "settings"));
+                    "<gray>How every feature here is set up. Staff only.\n\n<dark_gray>» <white>Click to open them", answers -> source.run(viewer, "settings"));
         }
         for (HubEntry entry : source.entries(viewer)) {
             List<CommandNote> notes = source.notes(entry, viewer);
@@ -152,7 +157,7 @@ public final class HubDialog {
                 .findFirst()
                 .ifPresent(topic -> page.button("<gradient:#C084FC:#7DD3FC>Ask " + Text.literal(desk.settings().guideName())
                                 + "</gradient>", "<gray>How " + Text.literal(entry.name()) + " works here, explained as it is"
-                                + " set up.",
+                                + " set up.\n\n<dark_gray>» <white>Click to ask",
                         answers -> de.raindancer.core.ui.help.HelpDialogs.forReader(desk, viewer).topic(topic)));
     }
 
@@ -236,6 +241,12 @@ public final class HubDialog {
         @Override
         public String serverName() {
             return HubDialog.serverName();
+        }
+
+        @Override
+        public String name(Player viewer) {
+            return net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().serialize(
+                    RainsCore.get().identities().painted(viewer.getUniqueId(), viewer.getName()));
         }
 
         @Override

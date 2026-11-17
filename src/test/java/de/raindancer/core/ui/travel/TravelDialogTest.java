@@ -86,4 +86,13 @@ class TravelDialogTest {
         assertThat(TravelDialog.page(ada).plainText()).contains("No way to travel");
         assertThat(TravelDoors.any()).isFalse();
     }
+
+    @Test
+    @DisplayName("every way to travel says what a click does")
+    void clickHints() {
+        TravelDoors.offer(null, TravelDoor.of("warp:warps", 20, "Warps", "Places the server set up.",
+                (player, parent) -> { }));
+        assertThat(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(TravelDialog.page(ada).button("Warps").tooltip())).contains("Click to");
+    }
 }

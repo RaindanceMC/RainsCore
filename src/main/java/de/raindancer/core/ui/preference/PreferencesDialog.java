@@ -35,14 +35,17 @@ public final class PreferencesDialog {
             String tooltip = "<gray>" + preference.description()
                     + (preference.group().isBlank() ? "" : "\n<dark_gray>" + Text.literal(preference.group()));
             if (preference.isPage()) {
-                page.button("<white>" + Text.literal(preference.title()) + " ›", tooltip, answers ->
+                page.button("<white>" + Text.literal(preference.title()) + " ›",
+                        tooltip + "\n\n<dark_gray>» <white>Click to open it", answers ->
                         preference.page().accept(viewer, new DialogReturn(viewer, brand(), "Preferences",
                                 () -> open(viewer))));
             } else {
                 String state = preference.state(viewer);
                 String colour = state.equals("Off") ? "<red>" : state.equals("On") ? "<green>" : "<yellow>";
+                String does = state.equals("On") ? "Click to turn it off" : state.equals("Off") ? "Click to turn it on"
+                        : "Click for the next choice";
                 page.button("<white>" + Text.literal(preference.title()) + ": " + colour + Text.literal(state),
-                        tooltip, answers -> {
+                        tooltip + "\n\n<dark_gray>» <white>" + does, answers -> {
                             preference.next(viewer);
                             open(viewer);
                         });
