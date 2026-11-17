@@ -84,4 +84,22 @@ class SupporterPermissionTest {
         permission.forget(id);
         assertThat(permission.holding()).isZero();
     }
+
+    @Test
+    @DisplayName("on a network without coffee supporters nobody gets the node from the list, and it is taken back")
+    void supportersOff() {
+        supporters.credit(id, 1, Instant.now());
+        permission.sync(player);
+        assertThat(permission.holding()).isEqualTo(1);
+
+        Thanks.supporters(false);
+        try {
+            permission.sync(player);
+            assertThat(permission.holding()).isZero();
+            permission.sync(player);
+            verify(player, times(1)).addAttachment(plugin);
+        } finally {
+            Thanks.supporters(true);
+        }
+    }
 }

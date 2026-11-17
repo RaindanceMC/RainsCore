@@ -843,6 +843,9 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.support.PrimePermission.permission(getServer().getPluginManager());
         primePermission = new de.raindancer.core.social.support.PrimePermission(this, prime, this::groups,
                 java.time.Instant::now);
+        // Coffee supporters, or Prime in their place (setting coffee-supporters); the 30-second sync above follows.
+        applyThanks(settings.current().coffeeSupporters());
+        settings.onChange(config -> Scheduling.global(this, () -> applyThanks(config.coffeeSupporters())));
         getServer().getPluginManager().registerEvents(primePermission, this);
         // Granted on another server, or run out: applied here within half a minute; the group once a minute.
         Scheduling.globalTimer(this, 20L * 30, 20L * 30, ignored -> getServer().getOnlinePlayers().forEach(online ->
@@ -2767,6 +2770,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     @Override
     public de.raindancer.core.social.presence.Playtime playtime() {
         return playtime;
+    }
+
+    private void applyThanks(boolean supportersOn) {
+        de.raindancer.core.social.support.Thanks.supporters(supportersOn);
+        org.bukkit.permissions.Permission primeNode =
+                de.raindancer.core.social.support.PrimePermission.permission(getServer().getPluginManager());
+        de.raindancer.core.social.support.Thanks.linkToPrime(primeNode, supportersOn);
+        primeNode.recalculatePermissibles();
     }
 
     @Override
