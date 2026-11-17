@@ -45,7 +45,7 @@ public final class SupporterPermission implements Listener {
     /** On the player's own thread. Gives or takes the node so it matches the list. */
     public void sync(Player player) {
         UUID who = player.getUniqueId();
-        boolean should = supporters.isSupporter(who);
+        boolean should = Thanks.supportersOn() && supporters.isSupporter(who);
         boolean has = attachments.containsKey(who);
         if (should && !has) {
             PermissionAttachment attachment = player.addAttachment(plugin);

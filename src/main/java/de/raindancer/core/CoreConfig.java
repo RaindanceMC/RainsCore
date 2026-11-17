@@ -47,6 +47,8 @@ import org.bukkit.Material;
                 description = "What everybody said in chat, kept for staff for a while."),
         @Topic(path = "config/screens", title = "Screens", icon = Material.ITEM_FRAME,
                 description = "Screens floating in the world (/screen): what players may put up in their bases."),
+        @Topic(path = "config/support", title = "Supporters", icon = Material.COCOA_BEANS,
+                description = "Whether the server thanks coffee supporters, or Prime members in their place."),
         @Topic(path = "world/desks", title = "Attendants", icon = Material.ARMOR_STAND,
                 description = "People standing in the world who serve players: insurance agents and bankers."),
         @Topic(path = "moderation", title = "Moderation", icon = Material.IRON_AXE,
@@ -434,7 +436,13 @@ public record CoreConfig(
         @Describe("Chat nobody can report to Mojang, and no 'Chat messages can't be verified' warning when joining: "
                 + "the clients' chat keys are kept from the server and player chat goes out unsigned. Bedrock players "
                 + "and clients without a key chat as before. Takes effect for whoever joins next.")
-        boolean noChatReports
+        boolean noChatReports,
+
+        @In("config/support") @Title("Coffee supporters")
+        @Describe("Whether people who bought the owner a coffee are the server's supporters, with a badge, perks "
+                + "and /support. Off: there are no supporters here; every perk that was theirs (rod skins, the coffee "
+                + "trail, the cosmetics library, supporter pets) goes to Prime members, and texts point at /prime.")
+        boolean coffeeSupporters
 
 ) {
 
@@ -487,5 +495,7 @@ public record CoreConfig(
             true, 3, "",
             true, true,
             false,
-            false);
+            false,
+            // Supporters as before; a network that sells Prime instead switches them off.
+            true);
 }
