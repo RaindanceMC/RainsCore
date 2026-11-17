@@ -23,6 +23,7 @@ import java.util.Optional;
  * <p>The enchantment's key is also the first custom_model_data string: a resource pack picks each shard's own
  * model by it, and without one it stays a plain echo shard.
  */
+@Deprecated // shards are gone from the game (17.11.2026); kept only so plugins built against it still load
 public final class EnchantShards {
 
     public static final NamespacedKey KEY = new NamespacedKey("rainsenchants", "shard");
