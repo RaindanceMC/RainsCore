@@ -76,6 +76,26 @@ public class LearningMenu extends TreeMenu {
             return node.cost();
         }
 
+        /** What the next rank costs, said for a player ("4 shards, $20k"); null for the tree's points. */
+        default String price(TreeNode node, int nextRank) {
+            return null;
+        }
+
+        /** The text for a {@link SkillTree.Refusal#NO_POINTS} refusal; null for "Not enough points.". */
+        default String notEnough(TreeNode node, int nextRank) {
+            return null;
+        }
+
+        /** Whether this learner has points to show on the summary. */
+        default boolean showsPoints() {
+            return true;
+        }
+
+        /** Whether shift-click on the summary may reset the tree. */
+        default boolean resettable() {
+            return true;
+        }
+
         default Backdrop backdrop(String branch) {
             return null;
         }
@@ -178,9 +198,7 @@ public class LearningMenu extends TreeMenu {
         }
         lore.addAll(learner.extra(node));
         lore.add("");
-        int cost = learner.cost(node);
-        lore.add("<gray>Rank <white>" + rank + "<gray>/" + node.ranks() + (cost == 0 ? " · <white>free"
-                : " · <white>" + cost + "<gray> point" + (cost == 1 ? "" : "s") + " a rank"));
+        lore.add(priceLine(learner, node, rank));
         if (rank < node.ranks() && node.levelFor(rank + 1) > 0) {
             lore.add("<gray>Needs " + learner.levelWord() + " <white>" + node.levelFor(rank + 1));
         }
@@ -195,15 +213,33 @@ public class LearningMenu extends TreeMenu {
         return icon;
     }
 
+    static String priceLine(Learner learner, TreeNode node, int rank) {
+        String head = "<gray>Rank <white>" + rank + "<gray>/" + node.ranks();
+        String own = rank < node.ranks() ? learner.price(node, rank + 1) : null;
+        if (own != null) {
+            return head + " · <white>" + own;
+        }
+        if (learner.price(node, Math.min(rank + 1, node.ranks())) != null) {
+            return head;
+        }
+        int cost = learner.cost(node);
+        return head + (cost == 0 ? " · <white>free"
+                : " · <white>" + cost + "<gray> point" + (cost == 1 ? "" : "s") + " a rank");
+    }
+
     /** Why a node may not be taken, said for a player. */
     public String reason(SkillTree.Refusal why, TreeNode node, int rank) {
+        return reasonFor(learner, why, node, rank);
+    }
+
+    static String reasonFor(Learner learner, SkillTree.Refusal why, TreeNode node, int rank) {
         return switch (why) {
             case MAXED -> "At its highest rank.";
             case BARRED -> "Shut: the other side of this choice is taken.";
             case NEEDS -> "Needs a node next to it first.";
             case UNFINISHED -> "Finish every other node of the branch first.";
             case LEVEL -> "Needs " + learner.levelWord() + " " + node.levelFor(rank + 1) + ".";
-            case NO_POINTS -> "Not enough points.";
+            case NO_POINTS -> Optional.ofNullable(learner.notEnough(node, rank + 1)).orElse("Not enough points.");
         };
     }
 
@@ -215,7 +251,9 @@ public class LearningMenu extends TreeMenu {
         }
         lore.add("<gray>" + Character.toUpperCase(learner.levelWord().charAt(0)) + learner.levelWord().substring(1)
                 + " <white>" + learner.level());
-        lore.add("<green>Points to spend: <white>" + learner.pointsLeft() + "<gray> of " + learner.points());
+        if (learner.showsPoints()) {
+            lore.add("<green>Points to spend: <white>" + learner.pointsLeft() + "<gray> of " + learner.points());
+        }
         int mastered = 0;
         int branches = 0;
         for (TreeBranch branch : learner.tree().branches()) {
@@ -234,7 +272,7 @@ public class LearningMenu extends TreeMenu {
             lore.add("");
             lore.add("<yellow>Click<gray> for the next branch.");
         }
-        if (!learner.ranks().isEmpty()) {
+        if (learner.resettable() && !learner.ranks().isEmpty()) {
             long again = learner.resetAgainAt() - System.currentTimeMillis();
             lore.add(again > 0 ? "<dark_gray>Reset again in " + Times.describe(Duration.ofMillis(again)) + "."
                     : "<yellow>Shift-click<gray> to take every point back.");
@@ -267,7 +305,7 @@ public class LearningMenu extends TreeMenu {
             }
             return;
         }
-        if (learner.ranks().isEmpty()) {
+        if (!learner.resettable() || learner.ranks().isEmpty()) {
             return;
         }
         if (learner.resetAgainAt() > System.currentTimeMillis()) {
