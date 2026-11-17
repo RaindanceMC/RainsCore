@@ -97,11 +97,14 @@ public final class SettingsMenu extends Menu {
 
     private final String path;
     private final SettingsPage page;
+    /** The page it was opened from, when that was not another settings page. */
+    private final Menu given;
     private int window;
 
     public SettingsMenu(Player viewer, Brand brand, Chat chat, SettingsNavigation navigation,
                         String path, Menu parent) {
         super(viewer, brand, parent == null ? pageAbove(viewer, brand, chat, navigation, path) : parent);
+        this.given = parent;
         this.navigation = navigation;
         this.chat = chat;
         this.path = path;
@@ -134,6 +137,17 @@ public final class SettingsMenu extends Menu {
     }
 
     /** The front page. */
+    /**
+     * The settings open as the game's own window ({@link SettingsDialog}) since Core 2.113.0 — wherever they are opened
+     * from, so a plugin's admin page that opens this menu gets the window too. Its Back on the front page goes to the
+     * page it was opened from.
+     */
+    @Override
+    public void open() {
+        Menu from = given instanceof SettingsMenu ? null : given;
+        new SettingsDialog(viewer, navigation, brand(), from == null ? null : from::open).open(path);
+    }
+
     public static SettingsMenu root(Player viewer, Brand brand, Chat chat,
                                     SettingsNavigation navigation) {
         return new SettingsMenu(viewer, brand, chat, navigation, null, null);
