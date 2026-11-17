@@ -328,6 +328,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private final Map<String, RunHistory> histories = new ConcurrentHashMap<>();
     private CombatListener combatListener;
     private Messages messages;
+    private de.raindancer.core.ui.statue.Statues statues;
     /** False while the stores are being read, true once players can be on. */
     private volatile boolean watchingThreads;
 
@@ -735,6 +736,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.desk.ServiceDesks.install(messages, chat.brand());
         getServer().getPluginManager().registerEvents(new de.raindancer.core.social.desk.DeskListener(), this);
         startTheGuide();
+        startTheStatues();
         if (signed > 0) {
             log.debug("{} message section(s) signed as Core's own.", signed);
         }
@@ -1508,6 +1510,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
+        if (statues != null) {
+            statues.stop();
+            de.raindancer.core.ui.statue.Statues.install(null);
+        }
+        de.raindancer.core.ui.statue.StatueBoards.clear();
         de.raindancer.core.ui.help.HelpDesk.install(null);
         de.raindancer.core.social.roles.PlayerRoles.clear();
         de.raindancer.core.data.loadout.SideData.clear();
@@ -3005,6 +3012,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
      * guide, the guide's desk, and the listener keeping it current. The command itself is registered by whichever
      * plugin's bootstrapper asks first — see {@code CoreCommands.help}.
      */
+    /** Statues of every plugin's boards (economy's rankings, Prime's members, the creators), kept by Core. */
+    private void startTheStatues() {
+        statues = new de.raindancer.core.ui.statue.Statues(this, getServer(),
+                new de.raindancer.core.ui.statue.StatueSpots(new de.raindancer.core.data.store.YamlStore(
+                        getDataFolder().toPath().resolve("statues.yml"))), messages, System::currentTimeMillis);
+        de.raindancer.core.ui.statue.Statues.install(statues);
+        statues.start();
+    }
+
     private void startTheGuide() {
         var helpSettings = settingsFor(SettingsSchema.of(de.raindancer.core.ui.help.HelpSettings.class,
                 de.raindancer.core.ui.help.HelpSettings.DEFAULTS), getDataFolder().toPath().resolve("config.yml"));
@@ -3138,6 +3154,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + de.raindancer.core.social.desk.ServiceDesks.forgetFrom(loader)
                 + de.raindancer.core.social.presence.Away.forgetFrom(loader)
                 + de.raindancer.core.social.presence.PresenceLines.forgetFrom(loader)
+                + de.raindancer.core.ui.statue.StatueBoards.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.ServerRules.forgetFrom(loader)
                 + de.raindancer.core.moderation.rules.RuleBreaches.forgetFrom(loader)
                 + de.raindancer.core.moderation.punishment.ExternalBans.forgetFrom(loader)

@@ -151,6 +151,22 @@ public final class PlayerTargets {
         return find(server, text).map(OfflinePlayer::getUniqueId);
     }
 
+    /**
+     * Somebody's real name by id: online, or as Core remembers it. Empty for somebody this server never saw. Never
+     * blocks, so any thread may ask.
+     */
+    public static Optional<String> nameOf(Server server, UUID id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        Player online = server == null ? null : server.getPlayer(id);
+        if (online != null) {
+            return Optional.of(online.getName());
+        }
+        de.raindancer.core.social.presence.KnownNames names = knownNames;
+        return names == null ? Optional.empty() : names.nameOf(id);
+    }
+
     /** What to call somebody in a message: their nickname when they have one, else their name. */
     public static String shownName(OfflinePlayer who) {
         if (who == null) {
