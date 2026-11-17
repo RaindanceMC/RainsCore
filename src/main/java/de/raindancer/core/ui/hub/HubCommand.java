@@ -43,12 +43,10 @@ public final class HubCommand implements BasicCommand {
             return;
         }
         if (sender instanceof Player player) {
-            var brand = core.chatFor("SMP").brand();
             if (wanted.isPresent()) {
-                HubMenu root = new HubMenu(player, brand);
-                new HubModuleMenu(player, brand, root, wanted.get()).open();
+                HubDialog.openFeature(player, wanted.get());
             } else {
-                new HubMenu(player, brand).open();
+                HubDialog.open(player);
             }
             return;
         }
