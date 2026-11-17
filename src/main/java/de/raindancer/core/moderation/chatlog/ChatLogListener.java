@@ -37,7 +37,9 @@ public final class ChatLogListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        if (log.isEnabled() && !event.getPlayer().hasPlayedBefore()) {
+        // With the welcome book, its "Your data" chapter says this instead.
+        if (log.isEnabled() && !event.getPlayer().hasPlayedBefore()
+                && !de.raindancer.core.ui.book.WelcomeBook.takesOver()) {
             messages.sendPlain(event.getPlayer(), "chatlog.notice", "days", retentionDays.getAsInt());
         }
     }

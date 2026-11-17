@@ -39,11 +39,16 @@ public record HelpSettings(
         @In("config/help") @Title("Answers in chat for Bedrock players")
         @Describe("Bedrock players get the guide's answers in chat instead of a dialog window. Geyser shows "
                 + "dialogs as forms, which works; turn this on if yours does not.")
-        boolean bedrockInChat
+        boolean bedrockInChat,
+
+        @In("config/help") @Title("Hand new players a book")
+        @Describe("A player's first join gives them a book instead of lines in chat: getting started, the rules and "
+                + "what is kept about them, each plugin adding its chapter.")
+        boolean welcomeBook
 
 ) {
 
     public static final HelpSettings DEFAULTS = new HelpSettings("Guide",
             "mineskin:09625d300be0469db9d173dcb6a32bef", "block.amethyst_block.chime", true,
-            "", false);
+            "", false, true);
 }

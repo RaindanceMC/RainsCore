@@ -99,6 +99,11 @@ settings:
   search-found: "<gray><count> settings mention <query>:"
 
 # ─────────────────────────────────────── the chat log, and telling players it exists
+# ─────────────────────────────────────── the welcome book a new player is handed (Core's own chapters)
+book:
+  getting-started: "<dark_aqua><bold>Getting started</bold></dark_aqua>\n\n<black>Ask anything with <dark_aqua>/help</dark_aqua>, or talk to <dark_aqua><guide></dark_aqua> at spawn.\n\n<dark_aqua>/hub</dark_aqua> shows everything this server has.\n\n<dark_aqua>/travel</dark_aqua> takes you home, to warps and to friends.\n\n<dark_aqua>/preferences</dark_aqua> holds everything you set for yourself."
+  your-data: "<dark_aqua><bold>Your data</bold></dark_aqua>\n\n<black>Chat on this server is kept for <days> days so staff can look into reports. Private messages are not kept."
+
 chatlog:
   notice: "<dark_gray>Chat on this server is kept for <days> days so staff can look into reports. Private messages are not kept."
 

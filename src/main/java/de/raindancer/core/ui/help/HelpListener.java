@@ -44,7 +44,9 @@ public final class HelpListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
-        if (!desk.settings().greetNewPlayers() || !RainsCore.isAvailable()) {
+        // With the welcome book, its "Getting started" chapter says this instead.
+        if (!desk.settings().greetNewPlayers() || !RainsCore.isAvailable()
+                || de.raindancer.core.ui.book.WelcomeBook.takesOver()) {
             return;
         }
         Player player = event.getPlayer();

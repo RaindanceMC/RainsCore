@@ -1240,6 +1240,11 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         getServer().getPluginManager().registerEvents(
                 new de.raindancer.core.moderation.chatlog.ChatLogListener(chatLog, messages,
                         () -> settings.current().chatLogRetention()), this);
+        // What is kept about a player, in the welcome book; nothing while the chat log is off.
+        de.raindancer.core.ui.book.WelcomeBook.offer(this, new de.raindancer.core.ui.book.BookChapter("core:data", 90,
+                "Your data", player -> chatLog.isEnabled() ? java.util.List.of(net.kyori.adventure.text.minimessage
+                        .MiniMessage.miniMessage().serialize(messages.get("book.your-data",
+                                "days", settings.current().chatLogRetention()))) : java.util.List.of()));
         Scheduling.asyncTimer(this, AUDIT_FLUSH_PERIOD_SECONDS, AUDIT_FLUSH_PERIOD_SECONDS, task -> chatLog.flush());
         // Throwing old rows away is done by one server of a network, with its settings: the tables are shared, and a
         // group with a shorter retention must not cut everybody's history short.
@@ -1510,6 +1515,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.ui.cosmetic.CosmeticDoors.clear();
         de.raindancer.core.ui.preference.Preferences.clear();
         de.raindancer.core.ui.travel.TravelDoors.clear();
+        de.raindancer.core.ui.book.WelcomeBook.clear();
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
@@ -3046,6 +3052,14 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         helpSettings.onChange(changed -> de.raindancer.core.social.desk.ServiceDesks.skins(
                 de.raindancer.core.social.desk.ServiceDesk.GUIDE, changed.guideSkins()));
         getServer().getPluginManager().registerEvents(new de.raindancer.core.ui.help.HelpListener(helpDesk), this);
+        // The welcome book: switched with the guide's settings; Core writes its first chapter, the guide's greeting.
+        de.raindancer.core.ui.book.WelcomeBook.active(helpSettings.current().welcomeBook());
+        helpSettings.onChange(changed -> de.raindancer.core.ui.book.WelcomeBook.active(changed.welcomeBook()));
+        de.raindancer.core.ui.book.WelcomeBook.offer(this, new de.raindancer.core.ui.book.BookChapter("core:start", 0,
+                "Getting started", player -> java.util.List.of(net.kyori.adventure.text.minimessage.MiniMessage
+                        .miniMessage().serialize(messages.get("book.getting-started",
+                                "guide", helpSettings.current().guideName())))));
+        getServer().getPluginManager().registerEvents(new de.raindancer.core.ui.book.WelcomeBookListener(this), this);
     }
 
     /**
@@ -3137,6 +3151,7 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 + ProfileExtensions.forgetFrom(loader)
                 + de.raindancer.core.ui.preference.Preferences.forgetFrom(loader)
                 + de.raindancer.core.ui.travel.TravelDoors.forgetFrom(loader)
+                + de.raindancer.core.ui.book.WelcomeBook.forgetFrom(loader)
                 + ChatChannels.forgetFrom(loader)
                 + de.raindancer.core.ui.identity.NameBadges.forgetFrom(loader)
                 + de.raindancer.core.ui.scoreboard.SidebarSections.forgetFrom(loader)
