@@ -44,10 +44,11 @@ public final class HubMenu extends HubPage {
     @Override
     void header() {
         set(MenuLayout.HEADER_SUBJECT, banner());
-        if (exists("settings")) {
+        // The server's settings are staff's; a player's own are on Preferences below.
+        if (exists("settings") && viewer().hasPermission("rainscore.settings")) {
             set(MenuLayout.HEADER_LEFT, Icons.of(Material.COMPARATOR,
-                    "<gradient:#7DD3FC:#A5B4FC>Settings</gradient>",
-                    "<gray>Everything you can tune,", "<gray>for you and for the server.", "",
+                    "<gradient:#7DD3FC:#A5B4FC>Server settings</gradient>",
+                    "<gray>How every feature here is set up.", "<gray>Staff only.", "",
                     "<dark_gray>» <white>Click to open"), event -> run("settings"));
         }
         if (exists("commands")) {
@@ -64,14 +65,16 @@ public final class HubMenu extends HubPage {
         toolbar(5, Icons.head(viewer(), "<gradient:#F9A8D4:#FBCFE8>Your profile</gradient>",
                 "<gray>How the server sees you.", "", "<dark_gray>» <white>Click to open"),
                 event -> ProfileMenu.open(viewer(), brand(), viewer().getUniqueId()));
-        if (!de.raindancer.core.ui.scoreboard.SidebarSections.sections().isEmpty()) {
-            // The page for the player's own sidebar, from here too: whoever draws the sidebar redraws it on its own
-            // timer, so no switch and no redraw are needed from this door.
-            toolbar(7, Icons.of(Material.OAK_SIGN, "<gradient:#A7F3D0:#6EE7B7>Your sidebar</gradient>",
-                    "<gray>What is on the right of your screen,", "<gray>in the order you like.", "",
-                    "<dark_gray>» <white>Click to arrange"),
-                    event -> new de.raindancer.core.ui.scoreboard.SidebarMenu(viewer(), brand(), this, null, null, null).open());
+        if (de.raindancer.core.ui.travel.TravelDoors.any()) {
+            toolbar(1, Icons.of(Material.COMPASS, "<gradient:#7DD3FC:#A78BFA>Travel</gradient>",
+                    "<gray>Homes, warps, other players,", "<gray>a random spot and back.", "",
+                    "<dark_gray>» <white>Click to open"),
+                    event -> de.raindancer.core.ui.travel.TravelDialog.open(viewer()));
         }
+        toolbar(7, Icons.of(Material.COMPARATOR, "<gradient:#A7F3D0:#7DD3FC>Your preferences</gradient>",
+                "<gray>Everything you set for yourself:", "<gray>sidebar, health bars, requests and more.", "",
+                "<dark_gray>» <white>Click to open"),
+                event -> de.raindancer.core.ui.preference.PreferencesDialog.open(viewer()));
     }
 
     private ItemStack banner() {

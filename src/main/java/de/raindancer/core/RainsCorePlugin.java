@@ -286,7 +286,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
     private final de.raindancer.core.ui.badge.Badges badges = new de.raindancer.core.ui.badge.Badges();
     private final java.util.concurrent.atomic.AtomicBoolean badgesPending = new java.util.concurrent.atomic.AtomicBoolean();
     private ResourcePacks resourcePacks;
-    private de.raindancer.core.ui.profile.ProfileExtension menusSwitch;
     private de.raindancer.core.ui.profile.ProfileExtension ownNametagSwitch;
     private ChunkHolds chunks;
     private Safety safety;
@@ -977,7 +976,22 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 this, vanish, new de.raindancer.core.moderation.vanish.VanishedSpeech(), messages, buttons), this);
         nametags = new de.raindancer.core.ui.identity.Nametags(this, identities, vanish);
         getServer().getPluginManager().registerEvents(nametags, this);
-        ownNametagSwitch = nametags.profileSwitch();
+        // A player's own settings are one window, /preferences, which their own profile opens too.
+        de.raindancer.core.ui.preference.Preferences.offer(this, de.raindancer.core.ui.preference.Preference.toggle(
+                "rainscore:own-nametag", "General", "Your own nametag",
+                "See the name above your head yourself, best from behind (F5).",
+                de.raindancer.core.ui.identity.Nametags.OWN_NAME).shownTo(player -> nametags.isEnabled()));
+        de.raindancer.core.ui.preference.Preferences.offer(this, de.raindancer.core.ui.preference.Preference.page(
+                "rainscore:sidebar", "General", "Your sidebar", "What is on the right of your screen, in the order"
+                        + " you like.", (player, parent) -> new de.raindancer.core.ui.scoreboard.SidebarMenu(player,
+                        chatFor("SMP").brand(), parent, null, null, null).open())
+                .shownTo(player -> !de.raindancer.core.ui.scoreboard.SidebarSections.sections().isEmpty()));
+        ownNametagSwitch = (viewer, subject, parent) -> !viewer.getUniqueId().equals(subject.getUniqueId()) ? null
+                : new de.raindancer.core.ui.profile.ProfileButton(de.raindancer.core.ui.menu.Icons.of(
+                        org.bukkit.Material.COMPARATOR, "<white>Your preferences",
+                        "<gray>Everything you set for yourself:", "<gray>health bars, sidebar, requests and more.", "",
+                        "<yellow>Click<gray> to open"),
+                        click -> de.raindancer.core.ui.preference.PreferencesDialog.open(viewer));
         de.raindancer.core.ui.profile.ProfileExtensions.register(ownNametagSwitch);
         getServer().getPluginManager().registerEvents(
                 new VanishListener(this, vanish, player -> VanishSight.sees(player, vanish, SEE_VANISHED)), this);
@@ -1058,13 +1072,15 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
                 new BukkitPackSink());
         de.raindancer.core.ui.menu.MenuPack.offer(this, resourcePacks, () -> settings.current().menusPainted());
         de.raindancer.core.content.pack.ServerAssets.offer(getDataFolder().toPath(), resourcePacks);
-        menusSwitch = de.raindancer.core.ui.menu.MenuPack.profileSwitch(() -> settings.current().menusPainted());
+        de.raindancer.core.ui.preference.Preferences.offer(this, de.raindancer.core.ui.preference.Preference.toggle(
+                "rainscore:painted-menus", "General", "Painted menus",
+                "Menus drawn as wood, brass and parchment while you wear the server pack.",
+                de.raindancer.core.ui.menu.MenuStyle.PAINTED).shownTo(player -> settings.current().menusPainted()));
         de.raindancer.core.ui.menu.ClickHints.install(id -> de.raindancer.core.ui.menu.ClickHints.audience(
                 de.raindancer.core.ui.menu.ClickHints.isBedrock(id), resourcePacks.isWearing(id),
                 settings.current().clickIcons(), settings.current().clickIconsBedrock()));
         badges.onChange(this::publishBadges);
         publishBadges();
-        de.raindancer.core.ui.profile.ProfileExtensions.register(menusSwitch);
         startResourcePacks(settings.current());
         java.nio.file.Path linkFile = getDataFolder().toPath().resolve("link.yml");
         if (network.isNetwork()) {
@@ -1461,9 +1477,6 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         if (clickHintPackets != null) {
             getServer().getOnlinePlayers().forEach(clickHintPackets::eject);
         }
-        if (menusSwitch != null) {
-            de.raindancer.core.ui.profile.ProfileExtensions.unregister(menusSwitch);
-        }
         if (ownNametagSwitch != null) {
             de.raindancer.core.ui.profile.ProfileExtensions.unregister(ownNametagSwitch);
         }
@@ -1490,6 +1503,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         de.raindancer.core.social.economy.ItemPrices.clear();
         de.raindancer.core.content.items.ItemGivers.clear();
         de.raindancer.core.ui.cosmetic.CosmeticDoors.clear();
+        de.raindancer.core.ui.preference.Preferences.clear();
+        de.raindancer.core.ui.travel.TravelDoors.clear();
         de.raindancer.core.social.economy.PriceModifiers.clear();
         de.raindancer.core.social.economy.SaleStops.clear();
         de.raindancer.core.social.desk.ServiceDesks.clear();
@@ -3092,6 +3107,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         int dropped = worldEntryRules.forgetFrom(loader)
                 + registry.forgetFrom(loader)
                 + ProfileExtensions.forgetFrom(loader)
+                + de.raindancer.core.ui.preference.Preferences.forgetFrom(loader)
+                + de.raindancer.core.ui.travel.TravelDoors.forgetFrom(loader)
                 + ChatChannels.forgetFrom(loader)
                 + de.raindancer.core.ui.identity.NameBadges.forgetFrom(loader)
                 + de.raindancer.core.ui.scoreboard.SidebarSections.forgetFrom(loader)

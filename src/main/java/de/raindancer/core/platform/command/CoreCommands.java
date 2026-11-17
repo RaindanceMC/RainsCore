@@ -231,6 +231,44 @@ public final class CoreCommands {
         return hub(registrar, "hub", "smp");
     }
 
+    private static final AtomicBoolean PREFERENCES_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /preferences} (aliases {@code /prefs}, {@code /options}): everything a player sets for themselves, from
+     * every plugin, in one window. One per server, taken by the first plugin that asks.
+     */
+    public static boolean preferences(Commands registrar, String name, String... aliases) {
+        if (!PREFERENCES_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register(name, "Everything you set for yourself, in one window.", List.of(aliases),
+                new de.raindancer.core.ui.preference.PreferencesCommand());
+        return true;
+    }
+
+    public static boolean preferences(Commands registrar) {
+        return preferences(registrar, "preferences", "prefs", "options");
+    }
+
+    private static final AtomicBoolean TRAVEL_TAKEN = new AtomicBoolean();
+
+    /**
+     * {@code /travel}: every way to get somewhere (homes, warps, requests, a random spot, back) in one window. One per
+     * server, taken by the first plugin that asks.
+     */
+    public static boolean travel(Commands registrar, String name, String... aliases) {
+        if (!TRAVEL_TAKEN.compareAndSet(false, true)) {
+            return false;
+        }
+        registrar.register(name, "Every way to get somewhere, in one window.", List.of(aliases),
+                new de.raindancer.core.ui.travel.TravelCommand());
+        return true;
+    }
+
+    public static boolean travel(Commands registrar) {
+        return travel(registrar, "travel");
+    }
+
     private static final AtomicBoolean MAINTENANCE_TAKEN = new AtomicBoolean();
 
     /** {@code /maintenance}: one per server, so taken by the first plugin that asks. */
