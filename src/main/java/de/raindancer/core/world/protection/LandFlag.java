@@ -41,6 +41,8 @@ public enum LandFlag {
     MONSTER_SPAWNING(Material.ZOMBIE_HEAD, false),
     ANIMAL_SPAWNING(Material.WHEAT, true),
     SPAWNER_SPAWNING(Material.SPAWNER, true),
+    /** A wandering trader and its llamas turning up on their own; neither monsters nor animals to the other two. */
+    TRADER_SPAWNING(Material.EMERALD, true),
 
     /**
      * Whether a mob may spawn here as the side effect of a potion.

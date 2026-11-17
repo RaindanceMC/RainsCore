@@ -143,6 +143,43 @@ class MobSpawnTest {
     }
 
     @Nested
+    @DisplayName("a wandering trader")
+    class Trader {
+
+        @Test
+        @DisplayName("is refused, llamas too, where TRADER_SPAWNING is denied, whatever ANIMAL_SPAWNING says")
+        void deniedTraderSpawning() {
+            provider.claim = FakeArea.named("spawn").with(LandFlag.TRADER_SPAWNING, false)
+                    .with(LandFlag.ANIMAL_SPAWNING, true);
+            CreatureSpawnEvent trader = new CreatureSpawnEvent(
+                    entityAt(org.bukkit.entity.WanderingTrader.class, EntityType.WANDERING_TRADER, INSIDE),
+                    CreatureSpawnEvent.SpawnReason.NATURAL);
+            CreatureSpawnEvent llama = new CreatureSpawnEvent(
+                    entityAt(org.bukkit.entity.TraderLlama.class, EntityType.TRADER_LLAMA, INSIDE),
+                    CreatureSpawnEvent.SpawnReason.NATURAL);
+
+            listener.onSpawn(trader);
+            listener.onSpawn(llama);
+
+            assertThat(trader.isCancelled()).isTrue();
+            assertThat(llama.isCancelled()).isTrue();
+        }
+
+        @Test
+        @DisplayName("comes as before where nobody touched the flag")
+        void allowedByDefault() {
+            provider.claim = FakeArea.named("somebody's claim");
+            CreatureSpawnEvent trader = new CreatureSpawnEvent(
+                    entityAt(org.bukkit.entity.WanderingTrader.class, EntityType.WANDERING_TRADER, INSIDE),
+                    CreatureSpawnEvent.SpawnReason.NATURAL);
+
+            listener.onSpawn(trader);
+
+            assertThat(trader.isCancelled()).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("a spawner")
     class Spawner {
 

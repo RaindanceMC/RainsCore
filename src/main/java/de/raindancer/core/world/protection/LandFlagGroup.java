@@ -51,7 +51,7 @@ public enum LandFlagGroup {
      */
     ENTITIES(Material.ZOMBIE_HEAD,
             LandFlag.MONSTER_SPAWNING, LandFlag.ANIMAL_SPAWNING, LandFlag.SPAWNER_SPAWNING,
-            LandFlag.POTION_SPAWNING, LandFlag.MONSTER_ENTRY, LandFlag.MOB_GRIEF,
+            LandFlag.TRADER_SPAWNING, LandFlag.POTION_SPAWNING, LandFlag.MONSTER_ENTRY, LandFlag.MOB_GRIEF,
             LandFlag.ENDERMAN_GRIEF, LandFlag.BREEDING, LandFlag.LEADS, LandFlag.BOATS,
             LandFlag.HIT_MOBS, LandFlag.HIT_MONSTERS, LandFlag.INTERACT_MOBS),
 

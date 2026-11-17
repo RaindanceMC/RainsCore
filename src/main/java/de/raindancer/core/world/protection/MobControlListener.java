@@ -99,7 +99,11 @@ public final class MobControlListener implements Listener {
         if (!isNaturalReason(reason)) {
             return;
         }
-        if (isHostile(entity)) {
+        if (entity instanceof org.bukkit.entity.WanderingTrader || entity instanceof org.bukkit.entity.TraderLlama) {
+            if (flagDenied(location, LandFlag.TRADER_SPAWNING)) {
+                event.setCancelled(true);
+            }
+        } else if (isHostile(entity)) {
             if (flagDenied(location, LandFlag.MONSTER_SPAWNING)) {
                 event.setCancelled(true);
             }

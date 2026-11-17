@@ -291,6 +291,7 @@ land:
     pvp: {name: "PvP", description: "Players may damage each other"}
     monster-spawning: {name: "Monster spawning", description: "Hostile mobs may spawn naturally"}
     animal-spawning: {name: "Animal spawning", description: "Passive mobs may spawn naturally"}
+    trader-spawning: {name: "Wandering traders", description: "A wandering trader and its llamas may turn up"}
     spawner-spawning: {name: "Spawner spawning", description: "Monster spawners keep working"}
     potion-spawning: {name: "Potion spawning", description: "Mobs may spawn from a potion effect (silverfish from infestation, slimes from oozing)"}
     monster-entry: {name: "Monster entry", description: "Hostile mobs may walk in"}
