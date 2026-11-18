@@ -1,10 +1,15 @@
 package de.raindancer.core.ui.statue;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -34,11 +39,42 @@ public record StatueBoard(String id, String heading, String caption, String rank
      * One place on a board.
      *
      * @param worth what the place is held with, as shown after the caption ({@code 5,000 coins}); null for none
+     * @param badge drawn instead of a thank-you board's mark for this one person (a team member's own rank); null for
+     *              the board's mark
      */
-    public record Standing(UUID player, String name, Component worth) {
+    public record Standing(UUID player, String name, Component worth, Component badge) {
 
         public Standing {
             worth = worth == null ? Component.empty() : worth;
+        }
+
+        public Standing(UUID player, String name, Component worth) {
+            this(player, name, worth, null);
+        }
+    }
+
+    /** How statues draw a name and a mark: in the player's name style, and a rank tag as its badge where badges show. */
+    public interface Look {
+
+        Look PLAIN = of((player, name) -> Component.text(name), tag -> Optional.empty());
+
+        Component painted(UUID player, String name);
+
+        /** The badge for a rank tag as typed; empty to write the tag out. */
+        Optional<Component> badge(String tag);
+
+        static Look of(BiFunction<UUID, String, Component> painter, Function<String, Optional<Component>> badges) {
+            return new Look() {
+                @Override
+                public Component painted(UUID player, String name) {
+                    return painter.apply(player, name);
+                }
+
+                @Override
+                public Optional<Component> badge(String tag) {
+                    return badges.apply(tag);
+                }
+            };
         }
     }
 
@@ -94,6 +130,46 @@ public record StatueBoard(String id, String heading, String caption, String rank
             return "<gray><bold>#" + place + "</bold> <dark_gray>Nobody yet";
         }
         return medal(place) + "<bold>#" + place + "</bold> <white>" + MINI.escapeTags(name);
+    }
+
+    /**
+     * {@link #title} as drawn: the name in the holder's own name style, a thank-you board's mark (or the holder's own
+     * badge) as a badge where the server shows them.
+     */
+    public Component nameplate(int place, Standing holder, Look look) {
+        Look drawing = look == null ? Look.PLAIN : look;
+        String name = holder == null ? null : holder.name();
+        if (!thankYou) {
+            if (name == null) {
+                return MINI.deserialize(title(place, null));
+            }
+            return Component.text().append(MINI.deserialize(medal(place) + "<bold>#" + place + "</bold> "))
+                    .append(named(drawing, holder)).build();
+        }
+        Component before = holder != null && holder.badge() != null ? holder.badge()
+                : mark.isEmpty() ? Component.empty() : drawing.badge(mark).orElseGet(() -> MINI.deserialize(mark));
+        var plate = Component.text();
+        if (!before.equals(Component.empty())) {
+            plate.append(before).append(Component.space());
+        }
+        return name == null ? plate.append(MINI.deserialize("<dark_gray>This spot is waiting")).build()
+                : plate.append(named(drawing, holder)).build();
+    }
+
+    private static Component named(Look look, Standing holder) {
+        Component painted;
+        try {
+            painted = look.painted(holder.player(), holder.name());
+        } catch (RuntimeException failed) {
+            painted = null;
+        }
+        return (painted == null ? Component.text(holder.name()) : painted).colorIfAbsent(NamedTextColor.WHITE);
+    }
+
+    /** {@link #line}, or empty when it would say nothing: a mannequin then shows no second line at all. */
+    public Optional<Component> subtitle(Standing holder) {
+        Component line = line(holder);
+        return PlainTextComponentSerializer.plainText().serialize(line).isBlank() ? Optional.empty() : Optional.of(line);
     }
 
     /** The line under a statue's name: the caption and what the place is held with; empty for nobody. */

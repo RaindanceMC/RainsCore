@@ -25,7 +25,8 @@ public final class StatueBoards {
 
     private static final LogChannel log = Log.of("core");
 
-    private record Offered(ClassLoader loader, StatueBoard board) {
+    /** @param lookAgain asks again who is on the board, for a reload; null for a board that always asks fresh */
+    private record Offered(ClassLoader loader, StatueBoard board, Runnable lookAgain) {
     }
 
     private static final Map<String, Offered> BOARDS = new TreeMap<>();
@@ -40,10 +41,41 @@ public final class StatueBoards {
     }
 
     /** @param loader the offering plugin's class loader, for {@link #forgetFrom} */
-    public static synchronized void offer(ClassLoader loader, StatueBoard board) {
+    public static void offer(ClassLoader loader, StatueBoard board) {
+        offer(loader, board, null);
+    }
+
+    /**
+     * As {@link #offer(Plugin, StatueBoard)}, for a board that answers from what it found last: {@code lookAgain}
+     * finds out afresh when staff reload the statues. Called off the server thread; may block.
+     */
+    public static void offer(Plugin owner, StatueBoard board, Runnable lookAgain) {
+        offer(owner == null ? board.standings().getClass().getClassLoader() : owner.getClass().getClassLoader(),
+                board, lookAgain);
+    }
+
+    public static synchronized void offer(ClassLoader loader, StatueBoard board, Runnable lookAgain) {
         if (board != null) {
-            BOARDS.put(board.id(), new Offered(loader, board));
+            BOARDS.put(board.id(), new Offered(loader, board, lookAgain));
         }
+    }
+
+    /** Has every board that can look again do so. Blocks: off the server thread. @return how many looked */
+    public static int lookAgain() {
+        List<Offered> asked;
+        synchronized (StatueBoards.class) {
+            asked = BOARDS.values().stream().filter(each -> each.lookAgain() != null).toList();
+        }
+        int looked = 0;
+        for (Offered each : asked) {
+            try {
+                each.lookAgain().run();
+                looked++;
+            } catch (RuntimeException failed) {
+                log.warn("The {} statue board could not look again: {}", each.board().id(), failed.getMessage());
+            }
+        }
+        return looked;
     }
 
     /** Withdraws this very board; a newer offer of the same id stays. */

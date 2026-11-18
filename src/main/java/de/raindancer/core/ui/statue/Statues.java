@@ -81,10 +81,17 @@ public final class Statues {
     private final Messages messages;
     private final LongSupplier clock;
     private final StatueRule rule = new StatueRule();
+    private volatile StatueBoard.Look look = StatueBoard.Look.PLAIN;
     private volatile ScheduledTask timer;
 
     /** What one refresh found for one statue, waiting to be drawn on its region. */
-    private record Shown(StatueSpot spot, StatueBoard board, StatueBoard.Standing holder, boolean labelled) {
+    private record Shown(StatueSpot spot, StatueBoard board, StatueBoard.Standing holder, boolean labelled,
+                         boolean redress) {
+    }
+
+    /** How names and marks are drawn from now on: Core's name styles and badges once those are up. */
+    public void look(StatueBoard.Look look) {
+        this.look = look == null ? StatueBoard.Look.PLAIN : look;
     }
 
     public Statues(Plugin plugin, Server server, StatueSpots spots, Messages messages, LongSupplier clock) {
@@ -152,6 +159,33 @@ public final class Statues {
 
     /** Asks every board once and puts every statue whose ground is loaded up to date. Off the server thread. */
     public void refresh() {
+        refresh(spot -> false);
+    }
+
+    /** {@link #refresh} soon, off the server thread: for a plugin whose board just changed (a rank taken away). */
+    public void refreshSoon() {
+        Scheduling.async(plugin, this::refresh);
+    }
+
+    /**
+     * Staff's reload: every board looks again who is on it ({@link StatueBoards#lookAgain}), then the statues in
+     * {@code world} (null: every world, statues.yml read again first) are dressed afresh, skins included.
+     * {@code done} runs off the server thread once the boards have answered.
+     */
+    public void reload(String world, Runnable done) {
+        Scheduling.async(plugin, () -> {
+            if (world == null && !spots.load()) {
+                log.error("statues.yml could not be read again; the statues stay as they were placed.");
+            }
+            StatueBoards.lookAgain();
+            refresh(spot -> world == null || spot.world().equals(world));
+            if (done != null) {
+                done.run();
+            }
+        });
+    }
+
+    private void refresh(java.util.function.Predicate<StatueSpot> redress) {
         List<StatueSpot> all = spots.all();
         if (all.isEmpty()) {
             return;
@@ -173,7 +207,8 @@ public final class Statues {
             StatueBoard.Standing holder = board.get().thankYou()
                     ? rule.standing(top, spot.place(), counts.get(spot.board()), turn).orElse(null)
                     : spot.place() <= top.size() ? top.get(spot.place() - 1) : null;
-            shown.add(new Shown(spot, board.get(), holder, rule.labelled(spot, all, board.get().thankYou())));
+            shown.add(new Shown(spot, board.get(), holder, rule.labelled(spot, all, board.get().thankYou()),
+                    redress.test(spot)));
         }
         if (shown.isEmpty()) {
             return;
@@ -271,15 +306,16 @@ public final class Statues {
             // A thank-you statue put up on a pedestal (Economy before 0.74.0) steps down; nothing else is moved here.
             statue.teleportAsync(feet);
         }
-        dress(statue, spot, board, shown.holder());
+        dress(statue, spot, board, shown.holder(), shown.redress());
     }
 
-    private void dress(Mannequin statue, StatueSpot spot, StatueBoard board, StatueBoard.Standing holder) {
-        statue.customName(MINI.deserialize(board.title(spot.place(), holder == null ? null : holder.name())));
-        statue.setDescription(board.line(holder));
+    private void dress(Mannequin statue, StatueSpot spot, StatueBoard board, StatueBoard.Standing holder,
+                       boolean afresh) {
+        statue.customName(board.nameplate(spot.place(), holder, look));
+        statue.setDescription(board.subtitle(holder).orElse(null));
         String wearing = statue.getPersistentDataContainer().get(HOLDER, PersistentDataType.STRING);
         String now = holder == null ? NOBODY : holder.player().toString();
-        if (!now.equals(wearing)) {
+        if (afresh || !now.equals(wearing)) {
             statue.setProfile(holder == null ? Attendants.look(null) : skinOf(holder.player()));
             statue.getPersistentDataContainer().set(HOLDER, PersistentDataType.STRING, now);
         }
@@ -462,7 +498,8 @@ public final class Statues {
      * The statue command for whichever plugin's command hands it on ({@code /eco statue}):
      * {@code place [board] [place]} puts up a ranking's podium, a thank-you board's next statue, or one statue of a
      * place; {@code move <board> <place>} brings the nearest such statue here; {@code remove [podium]} takes away the
-     * nearest statue, or the whole podium it stands on. On the player's thread.
+     * nearest statue, or the whole podium it stands on; {@code reload [all]} dresses the statues of this world (or
+     * every world) afresh. On the player's thread.
      *
      * @param command  what was typed before these, for the messages ({@code /eco statue})
      * @param args     what follows it
@@ -470,6 +507,18 @@ public final class Statues {
      */
     public void command(Player player, String command, String[] args, String fallback) {
         String action = args.length > 0 ? args[0].toLowerCase(Locale.ROOT) : "place";
+        if (action.equals("reload")) {
+            boolean everywhere = args.length > 1 && args[1].equalsIgnoreCase("all");
+            UUID asker = player.getUniqueId();
+            reload(everywhere ? null : player.getWorld().getName(), () -> {
+                Player still = server.getPlayer(asker);
+                if (still != null) {
+                    Scheduling.entity(plugin, still, () -> messages.send(still,
+                            everywhere ? "statue.reloaded-all" : "statue.reloaded"));
+                }
+            });
+            return;
+        }
         if (action.equals("remove")) {
             boolean whole = args.length > 1 && args[1].equalsIgnoreCase("podium");
             messages.send(player, remove(player, whole) ? whole ? "statue.podium-removed" : "statue.removed"
@@ -540,12 +589,13 @@ public final class Statues {
             return List.of();
         }
         if (args.length == 1) {
-            return starting(args[0], List.of("place", "move", "remove"));
+            return starting(args[0], List.of("place", "move", "remove", "reload"));
         }
         boolean placing = args[0].equalsIgnoreCase("place") || args[0].equalsIgnoreCase("move");
         if (args.length == 2) {
             return placing ? starting(args[1], StatueBoards.ids())
-                    : args[0].equalsIgnoreCase("remove") ? starting(args[1], List.of("podium")) : List.of();
+                    : args[0].equalsIgnoreCase("remove") ? starting(args[1], List.of("podium"))
+                    : args[0].equalsIgnoreCase("reload") ? starting(args[1], List.of("all")) : List.of();
         }
         if (args.length == 3 && placing) {
             return StatueBoards.find(args[1].toLowerCase(Locale.ROOT)).filter(board -> !board.thankYou())

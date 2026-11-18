@@ -3035,6 +3035,10 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         statues = new de.raindancer.core.ui.statue.Statues(this, getServer(),
                 new de.raindancer.core.ui.statue.StatueSpots(new de.raindancer.core.data.store.YamlStore(
                         getDataFolder().toPath().resolve("statues.yml"))), messages, System::currentTimeMillis);
+        statues.look(de.raindancer.core.ui.statue.StatueBoard.Look.of(
+                (player, name) -> identities == null ? net.kyori.adventure.text.Component.text(name)
+                        : identities.painted(player, name),
+                tag -> badgesShown() && badges != null ? badges.known(tag) : java.util.Optional.empty()));
         de.raindancer.core.ui.statue.Statues.install(statues);
         statues.start();
     }

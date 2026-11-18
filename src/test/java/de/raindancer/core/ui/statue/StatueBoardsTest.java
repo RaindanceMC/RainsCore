@@ -67,6 +67,77 @@ class StatueBoardsTest {
     }
 
     @Test
+    @DisplayName("the name over a statue is drawn the way the player's name is, behind the medal or the mark")
+    void paintedNames() {
+        StatueBoard.Look look = StatueBoard.Look.of(
+                (who, name) -> Component.text(name, net.kyori.adventure.text.format.TextColor.color(0x7DD3FC)),
+                tag -> java.util.Optional.empty());
+        Component ranked = richest(List.of()).nameplate(1, new StatueBoard.Standing(ADA, "Ada", null), look);
+        assertThat(plain(ranked)).isEqualTo("#1 Ada");
+        assertThat(ranked.children().getLast().color()).isEqualTo(net.kyori.adventure.text.format.TextColor.color(0x7DD3FC));
+
+        StatueBoard creators = StatueBoard.thanks("creator", "Our creators", "", "<light_purple>[CREATOR]", "creators",
+                List::of);
+        assertThat(plain(creators.nameplate(4, new StatueBoard.Standing(ADA, "Ada", null), look)))
+                .isEqualTo("[CREATOR] Ada");
+        assertThat(plain(creators.nameplate(4, null, look))).contains("waiting");
+        assertThat(plain(richest(List.of()).nameplate(1, new StatueBoard.Standing(ADA, "Ada", null),
+                StatueBoard.Look.PLAIN))).isEqualTo("#1 Ada");
+    }
+
+    @Test
+    @DisplayName("a thank-you mark is the rank's badge where badges show; a standing may bring a badge of its own")
+    void badges() {
+        Component badge = Component.text("\uF900");
+        StatueBoard.Look look = StatueBoard.Look.of((who, name) -> Component.text(name),
+                tag -> tag.contains("CREATOR") ? java.util.Optional.of(badge) : java.util.Optional.empty());
+        StatueBoard creators = StatueBoard.thanks("creator", "Our creators", "", "<light_purple>[CREATOR]", "creators",
+                List::of);
+        assertThat(plain(creators.nameplate(1, new StatueBoard.Standing(ADA, "Ada", null), look)))
+                .isEqualTo("\uF900 Ada");
+        assertThat(plain(creators.nameplate(1, null, look))).startsWith("\uF900 ");
+
+        StatueBoard team = StatueBoard.thanks("team", "Our team", "", "[TEAM]", "team", List::of);
+        Component own = Component.text("\uF901");
+        assertThat(plain(team.nameplate(1, new StatueBoard.Standing(ADA, "Ada", null, own), look)))
+                .isEqualTo("\uF901 Ada");
+    }
+
+    @Test
+    @DisplayName("a board without a caption puts no line under the name at all, not an empty one")
+    void noEmptyLine() {
+        StatueBoard creators = StatueBoard.thanks("creator", "Our creators", "", "CREATOR", "creators", List::of);
+        assertThat(creators.subtitle(new StatueBoard.Standing(ADA, "Ada", null))).isEmpty();
+        assertThat(creators.subtitle(null)).isEmpty();
+        StatueBoard casino = StatueBoard.ranking("casino", "h", "<gray>won ", "casino winners", List::of);
+        assertThat(casino.subtitle(new StatueBoard.Standing(ADA, "Ada", Component.text("5 coins"))).map(this::plainOf))
+                .contains("won 5 coins");
+    }
+
+    private String plainOf(Component text) {
+        return plain(text);
+    }
+
+    @Test
+    @DisplayName("a reload asks every board that can look again to do so; one that fails does not stop the others")
+    void lookAgain() {
+        java.util.concurrent.atomic.AtomicInteger looked = new java.util.concurrent.atomic.AtomicInteger();
+        StatueBoard creators = StatueBoard.thanks("creator", "h", "", "CREATOR", "creators", List::of);
+        StatueBoard team = StatueBoard.thanks("team", "h", "", "TEAM", "team", List::of);
+        StatueBoards.offer(getClass().getClassLoader(), creators, () -> {
+            throw new IllegalStateException("storage gone");
+        });
+        StatueBoards.offer(getClass().getClassLoader(), team, looked::incrementAndGet);
+        StatueBoards.offer(getClass().getClassLoader(), richest(List.of()));
+
+        assertThat(StatueBoards.lookAgain()).isEqualTo(1);
+        assertThat(looked).hasValue(1);
+        StatueBoards.withdraw(team);
+        StatueBoards.lookAgain();
+        assertThat(looked).as("a withdrawn board is not asked").hasValue(1);
+    }
+
+    @Test
     @DisplayName("the line under a name is the caption and what the place is held with")
     void line() {
         StatueBoard board = StatueBoard.ranking("casino", "Biggest casino winners", "<gray>won ", "casino winners",

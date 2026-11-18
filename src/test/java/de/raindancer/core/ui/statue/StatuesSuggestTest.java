@@ -29,7 +29,8 @@ class StatuesSuggestTest {
     @Test
     @DisplayName("the command offers placing, moving and removing, then every offered board, then a ranking's places")
     void suggest() {
-        assertThat(Statues.suggest(new String[]{""})).containsExactly("place", "move", "remove");
+        assertThat(Statues.suggest(new String[]{""})).containsExactly("place", "move", "remove", "reload");
+        assertThat(Statues.suggest(new String[]{"reload", ""})).containsExactly("all");
         assertThat(Statues.suggest(new String[]{"place", ""})).containsExactly("casino", "prime", "richest");
         assertThat(Statues.suggest(new String[]{"move", "ca"})).containsExactly("casino");
         assertThat(Statues.suggest(new String[]{"place", "richest", ""})).containsExactly("1", "2", "3");

@@ -71,6 +71,12 @@ public final class Badges {
         return badge;
     }
 
+    /** The badge already made for exactly this tag; never makes one, so a statue cannot add a glyph to the pack. */
+    public synchronized Optional<Component> known(String tag) {
+        Badge badge = tag == null ? null : byTag.get(tag);
+        return badge == null ? Optional.empty() : Optional.of(component(badge));
+    }
+
     private Optional<Component> make(String tag) {
         Badge known = byTag.get(tag);
         if (known != null) {

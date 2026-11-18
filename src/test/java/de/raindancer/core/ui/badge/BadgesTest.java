@@ -90,6 +90,17 @@ class BadgesTest {
     }
 
     @Test
+    @DisplayName("looking a badge up never makes one: the pack and every server's characters stay as they are")
+    void known() {
+        Badges badges = new Badges();
+        assertThat(badges.known(OWNER)).isEmpty();
+        assertThat(badges.all()).isEmpty();
+        Component owner = badges.register(OWNER).orElseThrow();
+        assertThat(badges.known(OWNER)).contains(owner);
+        assertThat(badges.known(null)).isEmpty();
+    }
+
+    @Test
     @DisplayName("badges never share a character, and a tag without letters is no badge")
     void distinct() {
         Badges badges = new Badges();
