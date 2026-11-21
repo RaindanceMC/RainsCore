@@ -29,6 +29,13 @@ class GiveTextTest {
     }
 
     @Test
+    @DisplayName("a give that reached nobody — a name not online — says so instead of breaking")
+    void nobody() {
+        assertThat(GiveText.NO_PLAYER).isEqualTo("No player was found");
+        assertThat(plain(GiveText.given(1, ROD, List.of()))).isEqualTo("✔ Gave 1 × [Void Rod] to nobody");
+    }
+
+    @Test
     @DisplayName("whoever gets it is told by whom, or simply that it came")
     void received() {
         assertThat(plain(GiveText.received(3, ROD, "Tom"))).isEqualTo("+ 3 × [Void Rod] from Tom");

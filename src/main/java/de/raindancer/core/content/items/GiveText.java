@@ -55,7 +55,13 @@ public final class GiveText {
                 Placeholder.unparsed("search", "/give @s search diamond"));
     }
 
+    /** Vanilla's words for a give whose player is not online. */
+    public static final String NO_PLAYER = "No player was found";
+
     private static String who(List<String> names) {
+        if (names.isEmpty()) {
+            return "nobody";
+        }
         if (names.size() > MOST_NAMES) {
             return names.size() + " players";
         }

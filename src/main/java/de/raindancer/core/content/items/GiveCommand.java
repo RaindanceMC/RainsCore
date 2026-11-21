@@ -110,6 +110,10 @@ public final class GiveCommand {
             case GiveRequest.Ours ours -> {
                 List<Player> players = context.getArgument("targets", PlayerSelectorArgumentResolver.class)
                         .resolve(context.getSource());
+                if (players.isEmpty()) {
+                    throw new SimpleCommandExceptionType(MessageComponentSerializer.message().serialize(
+                            Component.text(GiveText.NO_PLAYER))).create();
+                }
                 give(sender, players, ours.key(), ours.amount());
                 return players.size();
             }
