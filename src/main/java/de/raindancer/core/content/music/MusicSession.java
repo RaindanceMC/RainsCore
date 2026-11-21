@@ -7,7 +7,9 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 /**
@@ -27,9 +29,11 @@ public final class MusicSession {
     private final Player player;
     private final Entity emitter;
     private final LongSupplier clock;
-    private final float volume;
+    private final Consumer<Track> onTrack;
+    private float volume;
     private Playlist playlist;
     private String playing = "";
+    private Track current;
     private long nextAt;
     private long quietAt;
 
@@ -40,10 +44,26 @@ public final class MusicSession {
      */
     public MusicSession(Player player, Entity emitter, List<Track> tracks, boolean wearsPack, String fallback,
                         float volume, LongSupplier clock) {
+        this(player, emitter, tracks, wearsPack, fallback, volume, clock, track -> { });
+    }
+
+    /**
+     * Only the tracks, for someone wearing the pack — a radio station. Since 2.115.0.
+     *
+     * @param onTrack told of every track as it starts, the first one included — for a "now playing" line
+     */
+    public MusicSession(Player player, Entity emitter, List<Track> tracks, float volume, LongSupplier clock,
+                        Consumer<Track> onTrack) {
+        this(player, emitter, tracks, true, "", volume, clock, onTrack);
+    }
+
+    private MusicSession(Player player, Entity emitter, List<Track> tracks, boolean wearsPack, String fallback,
+                         float volume, LongSupplier clock, Consumer<Track> onTrack) {
         this.player = player;
         this.emitter = emitter;
         this.clock = clock;
         this.volume = volume;
+        this.onTrack = onTrack;
         player.stopSound(SoundStop.source(Sound.Source.MUSIC));
         quietAt = clock.getAsLong() + 5_000;
         if (wearsPack && !tracks.isEmpty()) {
@@ -73,18 +93,55 @@ public final class MusicSession {
         return playing;
     }
 
+    /** The track heard now; none for a fallback sound or once stopped. Since 2.115.0. */
+    public Optional<Track> current() {
+        return Optional.ofNullable(current);
+    }
+
+    /** Straight on to another track. False, and nothing done, with no tracks or once stopped. Since 2.115.0. */
+    public boolean skip() {
+        if (playlist == null || playing.isEmpty()) {
+            return false;
+        }
+        next();
+        return true;
+    }
+
+    public float volume() {
+        return volume;
+    }
+
+    /**
+     * A new volume, 0 to 1. The game cannot change a sound already playing, so the track starts over at it.
+     * Since 2.115.0.
+     */
+    public void volume(float volume) {
+        this.volume = Math.max(0f, Math.min(1f, volume));
+        if (current != null && !playing.isEmpty()) {
+            Track again = current;
+            stop();
+            start(again);
+        }
+    }
+
     public void stop() {
         if (!playing.isEmpty()) {
             player.stopSound(SoundStop.namedOnSource(Key.key(playing), OURS));
             playing = "";
         }
+        current = null;
     }
 
     private void next() {
         stop();
-        Track track = playlist.next();
+        start(playlist.next());
+    }
+
+    private void start(Track track) {
+        current = track;
         play(track.sound());
         nextAt = clock.getAsLong() + (long) ((track.seconds() + GAP_SECONDS) * 1000);
+        onTrack.accept(track);
     }
 
     private void play(String key) {

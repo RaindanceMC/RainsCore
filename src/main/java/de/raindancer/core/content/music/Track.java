@@ -4,10 +4,11 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * One of an owner's music tracks: the plugin's namespace in the resource pack, its name there, how long it plays.
+ * One of an owner's music tracks: the plugin's namespace in the resource pack, its name there, how long it plays,
+ * and its title as the owner wrote it (the file name, e.g. "Beyond The Clouds - Matthew Pablo").
  * The client plays it as the sound event {@code <namespace>:music.<name>}.
  */
-public record Track(String namespace, String name, double seconds) {
+public record Track(String namespace, String name, double seconds, String title) {
 
     private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
 
@@ -15,6 +16,14 @@ public record Track(String namespace, String name, double seconds) {
         if (namespace == null || !NAMESPACE.matcher(namespace).matches()) {
             throw new IllegalArgumentException("not a resource-pack namespace: " + namespace);
         }
+        if (title == null || title.isBlank()) {
+            title = name;
+        }
+    }
+
+    /** Kept for plugins built before 2.115.0: titled by its name. */
+    public Track(String namespace, String name, double seconds) {
+        this(namespace, name, seconds, name);
     }
 
     /** The sound event the client plays. */

@@ -53,6 +53,41 @@ class MusicFolderTest {
     }
 
     @Test
+    @DisplayName("shelves: a folder per shelf, each its own list, all in one pack; the file name is the title")
+    void shelves() throws IOException {
+        Path music = Files.createDirectories(data.resolve("music/calm"));
+        try (InputStream in = getClass().getResourceAsStream("/music/three-seconds.ogg")) {
+            Files.write(music.resolve("Beyond The Clouds - Matthew Pablo.ogg"), in.readAllBytes());
+        }
+
+        Path pack = data.resolve("pack/music");
+        java.util.Map<String, List<Track>> shelves = MusicFolder.build(data.resolve("music"), pack, "rainsradio",
+                "Radio", List.of("calm", "night"));
+
+        assertThat(shelves).containsOnlyKeys("calm", "night");
+        assertThat(shelves.get("night")).isEmpty();
+        assertThat(data.resolve("music/night")).as("made for the owner to fill").isDirectory();
+        assertThat(shelves.get("calm")).singleElement().satisfies(track -> {
+            assertThat(track.title()).isEqualTo("Beyond The Clouds - Matthew Pablo");
+            assertThat(track.sound()).isEqualTo("rainsradio:music.calm.beyond_the_clouds_matthew_pablo");
+        });
+        assertThat(pack.resolve("assets/rainsradio/sounds/music/calm/beyond_the_clouds_matthew_pablo.ogg"))
+                .exists();
+        JsonObject sounds = JsonParser.parseString(Files.readString(pack.resolve("assets/rainsradio/sounds.json")))
+                .getAsJsonObject();
+        assertThat(sounds.getAsJsonObject("music.calm.beyond_the_clouds_matthew_pablo").getAsJsonArray("sounds")
+                .get(0).getAsJsonObject().get("name").getAsString())
+                .isEqualTo("rainsradio:music/calm/beyond_the_clouds_matthew_pablo");
+        assertThat(pack.resolve("pack.mcmeta")).exists();
+    }
+
+    @Test
+    @DisplayName("a track from before titles were kept is titled by its name")
+    void oldTrack() {
+        assertThat(new Track("rainswelcome", "dawn", 3).title()).isEqualTo("dawn");
+    }
+
+    @Test
     @DisplayName("no folder, or nothing in it: no tracks, and a folder is made for the owner to fill")
     void empty() throws IOException {
         Path music = data.resolve("music");
