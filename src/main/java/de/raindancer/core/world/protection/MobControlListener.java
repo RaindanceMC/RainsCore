@@ -127,9 +127,14 @@ public final class MobControlListener implements Listener {
         return fromArea != null && fromArea.equals(toArea);
     }
 
+    /**
+     * DEFAULT is a spawn the server gave no reason for, which in practice is vanilla's own bare
+     * {@code addFreshEntity}: the camel husk and parched a husk brings along come in that way. Plugins name
+     * theirs (CUSTOM, COMMAND), so nobody's deliberate spawn is caught by it.
+     */
     private boolean isNaturalReason(CreatureSpawnEvent.SpawnReason reason) {
         return switch (reason) {
-            case NATURAL, REINFORCEMENTS, VILLAGE_INVASION, VILLAGE_DEFENSE, PATROL, RAID, SILVERFISH_BLOCK,
+            case NATURAL, DEFAULT, REINFORCEMENTS, VILLAGE_INVASION, VILLAGE_DEFENSE, PATROL, RAID, SILVERFISH_BLOCK,
                  SLIME_SPLIT, TRAP, LIGHTNING, JOCKEY, MOUNT, DROWNED, SPELL -> true;
             default -> false;
         };
@@ -138,6 +143,23 @@ public final class MobControlListener implements Listener {
     /** One answer for the whole package — see {@link InteractionClassifier#isHostile}. */
     private boolean isHostile(Entity entity) {
         return InteractionClassifier.isHostile(entity) && !isCompanion(entity);
+    }
+
+    /**
+     * A mount with a monster on its back. The rider never moves on its own, so its own move events change
+     * nothing; the mount is what has to stop, or a parched on a camel rides straight past MONSTER_ENTRY.
+     */
+    private boolean carriesHostile(Entity mount) {
+        java.util.List<Entity> riders = mount.getPassengers();
+        if (riders == null) {
+            return false;
+        }
+        for (Entity rider : riders) {
+            if (isHostile(rider) || carriesHostile(rider)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isCompanion(Entity entity) {
@@ -154,7 +176,7 @@ public final class MobControlListener implements Listener {
             return;
         }
         LivingEntity entity = event.getEntity();
-        if (!isHostile(entity)) {
+        if (!isHostile(entity) && !carriesHostile(entity)) {
             return;
         }
         // Only a move that actually *enters* protected ground is a candidate. Asking the flag about the

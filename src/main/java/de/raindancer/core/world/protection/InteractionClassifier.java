@@ -15,6 +15,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Enemy;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Slime;
@@ -141,9 +142,14 @@ public final class InteractionClassifier {
      *
      * <p>The type checks beside {@code Monster} are not redundant: a ghast, a phantom, a shulker, a slime and both
      * bosses are hostile without implementing that interface.
+     *
+     * <p>{@link Enemy} and the {@code MONSTER} spawn category are vanilla's own answer, so a mob added later is
+     * covered without a release here. The category is what catches the camel husk: the API calls it a camel,
+     * vanilla spawns it as a monster.
      */
     public static boolean isHostile(Entity entity) {
-        return entity instanceof Monster || entity instanceof Slime
+        return entity instanceof Monster || entity instanceof Enemy || entity instanceof Slime
+                || entity.getSpawnCategory() == org.bukkit.entity.SpawnCategory.MONSTER
                 || entity.getType() == EntityType.GHAST
                 || entity.getType() == EntityType.PHANTOM
                 || entity.getType() == EntityType.HOGLIN

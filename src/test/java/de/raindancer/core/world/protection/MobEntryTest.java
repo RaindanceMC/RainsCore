@@ -179,4 +179,72 @@ class MobEntryTest {
 
         assertThat(event.isCancelled()).isFalse();
     }
+
+    // ------------------------------------------------------------ every mob, not a list of them
+
+    private static LivingEntity creature(Class<? extends LivingEntity> kind, EntityType type,
+                                         org.bukkit.entity.SpawnCategory category, Entity... riders) {
+        return kind.cast(Proxy.newProxyInstance(kind.getClassLoader(), new Class<?>[]{kind},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getType" -> type;
+                    case "getSpawnCategory" -> category;
+                    case "getPassengers" -> java.util.List.of(riders);
+                    case "toString" -> "a fake " + type;
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> method.getReturnType().isPrimitive()
+                            ? (method.getReturnType() == boolean.class ? false : 0)
+                            : null;
+                }));
+    }
+
+    @Test
+    @DisplayName("a camel husk is a monster: vanilla says so, even though the API calls it a camel")
+    void aCamelHuskIsStopped() {
+        provider.inside = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_ENTRY, false);
+        LivingEntity husk = creature(org.bukkit.entity.CamelHusk.class, EntityType.CAMEL_HUSK,
+                org.bukkit.entity.SpawnCategory.MONSTER);
+
+        EntityMoveEvent event = new EntityMoveEvent(husk, at(99), at(100));
+        listener.onEntityMove(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a parched riding a camel is stopped with its mount; the rider itself never moves")
+    void aMonsterRidingAnythingIsStoppedWithItsMount() {
+        provider.inside = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_ENTRY, false);
+        LivingEntity parched = creature(org.bukkit.entity.Parched.class, EntityType.PARCHED,
+                org.bukkit.entity.SpawnCategory.MONSTER);
+        LivingEntity camel = creature(org.bukkit.entity.Camel.class, EntityType.CAMEL,
+                org.bukkit.entity.SpawnCategory.ANIMAL, parched);
+
+        EntityMoveEvent event = new EntityMoveEvent(camel, at(99), at(100));
+        listener.onEntityMove(event);
+
+        assertThat(event.isCancelled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a riderless camel is an animal and walks in")
+    void aRiderlessCamelWalksIn() {
+        provider.inside = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_ENTRY, false);
+        LivingEntity camel = creature(org.bukkit.entity.Camel.class, EntityType.CAMEL,
+                org.bukkit.entity.SpawnCategory.ANIMAL);
+
+        EntityMoveEvent event = new EntityMoveEvent(camel, at(99), at(100));
+        listener.onEntityMove(event);
+
+        assertThat(event.isCancelled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("hostility is vanilla's own answer: every mob in the MONSTER category counts")
+    void everyMonsterCategoryMobIsHostile() {
+        assertThat(InteractionClassifier.isHostile(creature(org.bukkit.entity.CamelHusk.class,
+                EntityType.CAMEL_HUSK, org.bukkit.entity.SpawnCategory.MONSTER))).isTrue();
+        assertThat(InteractionClassifier.isHostile(creature(org.bukkit.entity.Camel.class,
+                EntityType.CAMEL, org.bukkit.entity.SpawnCategory.ANIMAL))).isFalse();
+    }
 }

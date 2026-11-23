@@ -112,6 +112,46 @@ class MobSpawnTest {
         }
 
         @Test
+        @DisplayName("a camel husk spawning in the desert is a monster spawn, not an animal one")
+        void aCamelHuskReadsMonsterSpawning() {
+            provider.claim = FakeArea.named("somebody's claim")
+                    .with(LandFlag.MONSTER_SPAWNING, false).with(LandFlag.ANIMAL_SPAWNING, true);
+            LivingEntity husk = (LivingEntity) Proxy.newProxyInstance(
+                    org.bukkit.entity.CamelHusk.class.getClassLoader(),
+                    new Class<?>[]{org.bukkit.entity.CamelHusk.class},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "getType" -> EntityType.CAMEL_HUSK;
+                        case "getSpawnCategory" -> org.bukkit.entity.SpawnCategory.MONSTER;
+                        case "getLocation" -> INSIDE;
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> method.getReturnType().isPrimitive()
+                                ? (method.getReturnType() == boolean.class ? false : 0)
+                                : null;
+                    });
+            CreatureSpawnEvent event = new CreatureSpawnEvent(husk, CreatureSpawnEvent.SpawnReason.NATURAL);
+
+            listener.onSpawn(event);
+
+            assertThat(event.isCancelled()).isTrue();
+        }
+
+        @Test
+        @DisplayName("the parched a husk brings along spawns with no reason at all, and is still the world's doing")
+        void aParchedBroughtAlongByAHuskIsRefused() {
+            provider.claim = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_SPAWNING, false);
+            // Husk.finalizeSpawn adds its camel husk and parched with a bare addFreshEntity, which Bukkit
+            // reports as DEFAULT. The husk itself can be refused and those two stay behind in the claim.
+            CreatureSpawnEvent event = new CreatureSpawnEvent(
+                    entityAt(org.bukkit.entity.Parched.class, EntityType.PARCHED, INSIDE),
+                    CreatureSpawnEvent.SpawnReason.DEFAULT);
+
+            listener.onSpawn(event);
+
+            assertThat(event.isCancelled()).isTrue();
+        }
+
+        @Test
         @DisplayName("a hostile mob spawns when MONSTER_SPAWNING is allowed")
         void allowedMonsterSpawningLetsAZombieThrough() {
             provider.claim = FakeArea.named("somebody's claim").with(LandFlag.MONSTER_SPAWNING, true);
