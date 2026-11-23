@@ -174,15 +174,12 @@ statue:
   placed-one: "<green>The #<place> of the <ranks> stands here now, facing the way you look. <gray><command> move moves it, <command> remove removes it."
   placed-thanks: "<green>Statue #<place> of the <ranks> stands here now, facing the way you look. <gray>Each <command> place <board> puts up one more (up to <most>). With more of them than statues, they take turns every 10 minutes."
   full: "<red>All <most> statues of the <ranks> stand already. <gray><command> remove takes the nearest away."
-  moved: "<green>The #<place> of the <ranks> stands here now, facing the way you look."
   not-found: "<red>There is no #<place> of the <ranks> in this world to move. <gray><command> place puts one up."
   not-a-place: "<red><white><what></white> is not a place. A statue of the <ranks> stands for place <white>1</white> to <white><most></white>."
   not-a-board: "<red><white><what></white> is not a board. Statues stand for <white><boards></white>."
   usage: "<red><command> place [<boards>] [place], <command> move [board] [place], <command> remove [podium] or <command> reload [all]."
   reloaded: "<green>The statues in this world are dressed afresh, with whoever is on their boards now."
   reloaded-all: "<green>statues.yml is read again and every statue is dressed afresh, with whoever is on its board now."
-  removed: "<green>The nearest statue is gone, pedestal included."
-  podium-removed: "<green>The nearest podium is gone, statues included."
   none: "<red>There is no statue within five blocks of you."
 
 # ──────────────────────────────────────────────────────── menus, everywhere
@@ -517,7 +514,6 @@ help:
   # Staff.
   usage-guide: "<gray>/help guide place [mannequin|witch|villager|…] · /help guide remove"
   guide-placed: "<green><guide> is standing here now. Right-click them to talk."
-  guide-removed: "<green>The guide nearest you is gone."
   guide-none-near: "<red>No guide within four blocks of you."
   guide-bad-type: "<red><type> cannot be a guide. Pick a mob, or mannequin for a person in any skin."
   reloaded: "<green>The guide re-read every help file: <white><topics></white> topics, <white><problems></white> problem(s)."

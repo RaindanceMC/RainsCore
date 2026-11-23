@@ -521,8 +521,9 @@ public final class Statues {
         }
         if (action.equals("remove")) {
             boolean whole = args.length > 1 && args[1].equalsIgnoreCase("podium");
-            messages.send(player, remove(player, whole) ? whole ? "statue.podium-removed" : "statue.removed"
-                    : "statue.none");
+            if (!remove(player, whole)) {
+                messages.send(player, "statue.none");
+            }
             return;
         }
         boolean moving = action.equals("move");
@@ -563,8 +564,10 @@ public final class Statues {
             return;
         }
         if (moving) {
-            messages.send(player, move(player, board.id(), place.get()) ? "statue.moved" : "statue.not-found",
-                    "place", place.get(), "ranks", board.ranks(), "command", command);
+            if (!move(player, board.id(), place.get())) {
+                messages.send(player, "statue.not-found",
+                        "place", place.get(), "ranks", board.ranks(), "command", command);
+            }
             return;
         }
         placeOne(player, board, place.get());

@@ -191,7 +191,9 @@ public final class HelpCommand implements BasicCommand {
                 Optional<Entity> nearest = Attendants.nearest(player, 4,
                         entity -> ServiceDesks.deskOf(entity).filter(ServiceDesk.GUIDE::equals).isPresent());
                 nearest.ifPresent(Entity::remove);
-                say(player, nearest.isPresent() ? "help.guide-removed" : "help.guide-none-near");
+                if (nearest.isEmpty()) {
+                    say(player, "help.guide-none-near");
+                }
             }
             default -> say(player, "help.usage-guide");
         }
