@@ -727,6 +727,8 @@ public final class RainsCorePlugin extends JavaPlugin implements RainsCore, List
         buttons = new ChatButtons(clickActions, "");
         chat = chatFor("Core");
         de.raindancer.core.platform.client.ClientChannel.open(this, clients);
+        // Full recipes for JEI, REI and EMI on Fabric clients, which Paper alone never sends (since 1.21.2).
+        de.raindancer.core.platform.client.RecipeSyncChannel.open(this);
         getServer().getPluginManager().registerEvents(
                 new MistypedCommand.Listener(getServer()::getCommandMap, messages, buttons), this);
         // Core's own sections, signed with Core's own brand. Until this, they were unowned, and an

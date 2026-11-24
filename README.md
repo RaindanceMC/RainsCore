@@ -270,7 +270,7 @@ Everything below hangs off `RainsCore.get()`.
 | **`vanish()`** | Being properly not here: hidden, uncounted, silent joins, no collisions. Ask `visibleOf()` rather than `getOnlinePlayers()`, and `isVanished` before naming anybody — nearly every vanish leak is a place that skipped one of those two calls. |
 | **`votes()`** | Ask everybody, or a named few, a question and count the answers. One ballot each, changeable until the deadline, and a tie stays a tie. |
 | **`de.raindancer.core.platform.log`** | One logger, one logfile per day, rotated and pruned. Never blocks, never throws. |
-| **`de.raindancer.core.platform.client`** | Who plays with Rain's client mod ([RaindanceMC/client-mod](https://github.com/RaindanceMC/client-mod)) and the channel to it: handshake, per-feature versions, a budget for what a client may send. For the services that draw, not for plugins — a plugin keeps calling `scoreboards()` and friends. |
+| **`de.raindancer.core.platform.client`** | Who plays with Rain's client mod ([RaindanceMC/client-mod](https://github.com/RaindanceMC/client-mod)) and the channel to it: handshake, per-feature versions, a budget for what a client may send. For the services that draw, not for plugins — a plugin keeps calling `scoreboards()` and friends. Also full recipes for JEI, REI and EMI on Fabric (Fabric API's `fabric:recipe_sync`), which a Paper server otherwise never sends since 1.21.2; nothing to call, it is always on. NeoForge clients are not served: NeoForge drops a vanilla connection over its own recipe payload. |
 
 </details>
 
