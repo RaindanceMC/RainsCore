@@ -142,13 +142,38 @@ class NonIngredientListenerTest {
     void results() {
         InventoryClickEvent take = click(InventoryType.MERCHANT, true, InventoryAction.PICKUP_ALL, null, nugget);
         when(take.getSlotType()).thenReturn(InventoryType.SlotType.RESULT);
+        when(take.getSlot()).thenReturn(2);
         when(take.getView().getTopInventory().getContents()).thenReturn(new ItemStack[]{coin, null, nugget});
         assertThat(NonIngredientListener.feeds(take)).isTrue();
 
         InventoryClickEvent honest = click(InventoryType.MERCHANT, true, InventoryAction.PICKUP_ALL, null, nugget);
         when(honest.getSlotType()).thenReturn(InventoryType.SlotType.RESULT);
+        when(honest.getSlot()).thenReturn(2);
         when(honest.getView().getTopInventory().getContents()).thenReturn(new ItemStack[]{nugget, null, nugget});
         assertThat(NonIngredientListener.feeds(honest)).isFalse();
+    }
+
+    @Test
+    @DisplayName("a marked thing crafted from plain ingredients can be taken out of the result slot")
+    void markedResultFromPlainIngredients() {
+        ItemStack aquarium = stack(Material.GLASS, true);
+        ItemStack glass = stack(Material.GLASS, false);
+        for (InventoryType grid : List.of(InventoryType.WORKBENCH, InventoryType.CRAFTING)) {
+            InventoryClickEvent take = click(grid, true, InventoryAction.PICKUP_ALL, null, aquarium);
+            when(take.getSlotType()).thenReturn(InventoryType.SlotType.RESULT);
+            when(take.getSlot()).thenReturn(0);
+            // A crafting inventory's contents start with its result slot.
+            when(take.getView().getTopInventory().getContents())
+                    .thenReturn(new ItemStack[]{aquarium, glass, glass, glass, null});
+            assertThat(NonIngredientListener.feeds(take)).as("taken from a " + grid).isFalse();
+
+            InventoryClickEvent fromCoin = click(grid, true, InventoryAction.PICKUP_ALL, null, aquarium);
+            when(fromCoin.getSlotType()).thenReturn(InventoryType.SlotType.RESULT);
+            when(fromCoin.getSlot()).thenReturn(0);
+            when(fromCoin.getView().getTopInventory().getContents())
+                    .thenReturn(new ItemStack[]{aquarium, glass, coin, null, null});
+            assertThat(NonIngredientListener.feeds(fromCoin)).as("made from a coin in a " + grid).isTrue();
+        }
     }
 
     @Test

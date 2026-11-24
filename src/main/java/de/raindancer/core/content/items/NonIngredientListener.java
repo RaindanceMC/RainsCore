@@ -63,7 +63,7 @@ public final class NonIngredientListener implements Listener {
 
         // Taking what was made is checked for every crafting window, the player's own 2x2 grid included.
         if (intoTop && event.getSlotType() == InventoryType.SlotType.RESULT
-                && NonIngredients.anyMarked(top.getContents())) {
+                && anyInputMarked(top.getContents(), event.getSlot())) {
             return true;
         }
         if (!WORKSTATIONS.contains(top.getType())) {
@@ -84,6 +84,16 @@ public final class NonIngredientListener implements Listener {
         }
         int button = event.getHotbarButton();
         return button >= 0 && NonIngredients.isMarked(own.getItem(button));
+    }
+
+    /** The result slot itself is skipped: a marked thing made from plain ingredients (an aquarium) is fine to take. */
+    private static boolean anyInputMarked(ItemStack[] contents, int resultSlot) {
+        for (int i = 0; i < contents.length; i++) {
+            if (i != resultSlot && NonIngredients.isMarked(contents[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
